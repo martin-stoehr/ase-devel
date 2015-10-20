@@ -215,7 +215,13 @@ class Dftb(FileIOCalculator):
                 if (line != ' \n') and (line != '\n') and ('Eigenvector: ' not in line):
                     c.append(float(line.split()[1]))
             self.wf = np.array(c).reshape((self.nOrbitals, self.nOrbitals))
-        
+            # species, positions
+            xyzfile = open('geo_end.xyz','r')
+            xyzlines = xyzfile.readlines()
+            xyzfile.close()
+            self.nAtoms = int(xyzlines[0].split()[0])
+            
+            
         self.read_energy()
         # read geometry from file in case dftb+ has done steps
         # to move atoms, in that case forces are not read
