@@ -38,8 +38,10 @@ import numpy as np
 from ase.calculators.calculator import FileIOCalculator, kpts2mp
 
 ## analysis of atomic polarizabilities via Hirshfeld volume ratios (M.S. 19/Oct/15)
+from ase.io import read
+from box.data import data
 from ase.calculators.ext_OPA_DFTB import OverlapPopulationVolumeAnalysis
-from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
+#from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
 
 
 class Dftb(FileIOCalculator):
@@ -171,18 +173,6 @@ class Dftb(FileIOCalculator):
         myfile = open('results.tag', 'r')
         self.lines = myfile.readlines()
         myfile.close()
-        ## read file as string  (M.S. 19/Oct/15)
-        myfile = open('results.tag', 'r')
-        resultstext = myfile.read()
-        myfile.close()
-        try:
-            myfile = open('eigenvec.out','r')
-            evlines = myfile.readlines()
-            myfile.close()
-        except OSError:
-            print 'No eigenvector file available, set Option "WriteEigenvectors = Yes" for calculation if needed.'
-            raise
-        
         if self.first_time:
             self.first_time = False
             # Energy line index
@@ -197,31 +187,29 @@ class Dftb(FileIOCalculator):
                 if line.find(fstring) >= 0:
                     self.index_force_begin = iline + 1
                     line1 = line.replace(':', ',')
-                    self.index_force_end = iline + 1 + \
-                        int(line1.split(',')[-1])
+                    self.index_force_end = iline + 1 + int(line1.split(',')[-1])
                     break
-            # Fillings and further information (M.S. 19/Oct/15)
-            #TODO: Redo for pbc
-            textoccs = resultstext.split('fillings')[1]
-            textoccs = textoccs.split('fermi_energy')[0].replace(':',',')
-            self.nOrbitals = int(textoccs.split(',')[3])
-            self.nk = int(textoccs.split(',')[4])
-            #TODO: self.wk = ??
-            self.f = np.array(textoccs.split()[1:], dtype=float)
-            # LCAO-coefficients (M.S. 19/Oct/15)
-            #TODO: Redo for pbc
-            c = []
-            for line in evlines[1:]:
-                if (line != ' \n') and (line != '\n') and ('Eigenvector: ' not in line):
-                    c.append(float(line.split()[1]))
-            self.wf = np.array(c).reshape((self.nOrbitals, self.nOrbitals))
-            # species, positions
-            xyzfile = open('geo_end.xyz','r')
-            xyzlines = xyzfile.readlines()
-            xyzfile.close()
-            self.nAtoms = int(xyzlines[0].split()[0])
-            
-            
+                
+            ## get number of orbitals and k-points (Martin Stoehr)
+            for line in self.lines:
+                if 'eigenvalues  ' in line:
+                    line1 = line.replace(':',',')
+                    self.nk = int(line1.split(',')[-2])
+                    self.nOrbs = int(line1.split(',')[-3])
+                    break
+            ## read further information (Martin Stoehr)
+            self.read_additional_info()
+            try:
+                myfile = open('eigenvec.out','r')
+                self.evlines = myfile.readlines()
+                myfile.close()
+                ## read-in LCAO-coefficients (Martin Stoehr)
+                self.read_eigenvectors()
+            except OSError:
+                print("No file name 'eigenvec.out', set WriteEigenvectors = Yes,\n \
+                       if you wish to use additional electronic structure properties.\n \
+                       For density dependent dispersion corrections, for instance!")
+                
         self.read_energy()
         # read geometry from file in case dftb+ has done steps
         # to move atoms, in that case forces are not read
@@ -232,7 +220,84 @@ class Dftb(FileIOCalculator):
             #self.read_forces()
         self.read_forces()
         os.remove('results.tag')
-
+#        os.remove('detailed.out')
+        
+    
+    def read_additional_info(self):
+        """
+        Read additional info, i.e. nAtoms, positions, fillings, etc.
+        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
+        """
+        self.atoms = read('geo_end.xyz')
+        self.nAtoms = len(self.atoms)
+        self.atomic_charges = np.zeros(self.nAtoms)
+        self.Orb2Atom = np.zeros(self.nOrbs)
+        ## read 'detailed.out' in lines
+        myfile = open('detailed.out', 'r')
+        linesdet = myfile.readlines()
+        myfile.close()
+        ## net atomic charges
+        for iline, line in enumerate(linesdet):
+            if 'Net atomic charges (e)' in line:
+                for iAtom in xrange(self.nAtoms):
+                    self.atomic_charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
+                iline = iline+2+self.nAtoms
+            if 'Orbital populations (up)' in line:
+                for iOrb in xrange(self.nOrbs):
+                    self.Orb2Atom[iOrb] = int( linesdet[iline+2+iOrb].split()[0] ) - 1
+            
+        ## Fillings 
+        myfile = open('detailed.out','r')
+        textdet = myfile.read()   ## read 'detailed.out' as string
+        myfile.close()
+        textoccs = (textdet.split('Fillings')[1]).split('\n \n')[0]
+        textoccs = np.array(textoccs.split(), dtype=float)  ## 1D array of occupations
+        if len(textoccs) != (self.nOrbs*self.nk):
+            print('Error in reading occupations (~> length). Skipping.')
+            pass
+        else:
+            ## reshape array into shape = (n_kpoints, n_Orbitals)
+            self.f = textoccs.reshape((self.nOrbs, self.nk)).T
+        
+        ## k-point weighting
+        myfile = open('dftb_in.hsd','r')
+        linesin = myfile.readlines()
+        myfile.close()
+        self.pbc = False
+        self.wk = np.ones(self.nk)
+        self.kpts = np.zeros((self.nk,3))
+        for iline, line in enumerate(linesin):
+            if 'KPointsAndWeights =' in line:
+                self.pbc = True
+                for ik in xrange(self.nk):
+                    self.wk[ik] = float(linesin[iline+1+ik].split()[3])
+                    self.kpts[ik,:] = np.array(linesin[iline+1+ik].split()[:3], dtype=float)
+                break
+        ## normalize k-point weighting factors (sum_k wk = 1)
+        self.wk /= np.sum(self.wk)
+        
+    
+    def read_eigenvectors(self):
+        """
+        Read LCAO-coefficients to self.wf, shape = (n_kpoints, n_States, n_Orbitals)
+        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
+        """
+        ## LCAO-coefficients
+        self.wf = np.zeros((self.nk, self.nOrbs, self.nOrbs))
+        c = []
+        if self.pbc:
+            for line in self.evlines[1:]:
+                if (line.split() != []) and ('Eigenvector: ' not in line):
+                    line1 = line.replace(',','').replace(')','')
+                    c.append(float(line1.split()[-3]) + float(line1.split()[-2])*1.j)
+            self.wf = np.array(c, dtype=complex).reshape((self.nk, self.nOrbs, self.nOrbs))
+        else:
+            for line in self.evlines[1:]:
+                if (line.split() != []) and ('Eigenvector: ' not in line):
+                    c.append(float(line.split()[1]))
+            self.wf[0] = np.array(c).reshape((self.nk, self.nOrbs, self.nOrbs))
+        
+    
     def read_energy(self):
         """Read Energy from dftb output file (results.tag)."""
         from ase.units import Hartree
@@ -269,35 +334,46 @@ class Dftb(FileIOCalculator):
         """
         Return Hirshfeld volume ratios using method <approach>
         
-        parameters:
-        ===========
-            approach:  . HA     actual Hirshfeld analysis using confined basis confinement
-                                (see ext_HA_DFTB.py) not implemented yet!
-                       . OPA    approx. ratios as obtained by overlap population analysis
-                                (see ext_OPA_DFTB.py)
-                       . const  return constant ratios of 1.
+        parameters (hard-coded so far):
+        ===============================
+            approach:  . 'HA'     actual Hirshfeld analysis using confined basis confinement
+                                  (see ext_HA_DFTB.py) not implemented yet!
+                       . 'OPA'    approx. ratios as obtained by overlap population analysis
+                                  (see ext_OPA_DFTB.py)
+                       . 'const'  return constant ratios of 1.
         """
-        approach = 'const'
+        approach = 'OPA'
         
         if approach == 'const':
-            return self.get_hvr_const()
+            self.hirsh_volrat = self.get_hvr_const()
 #        elif approach == 'HA':
-#            return self.get_hvr_HA()
-        elif approach == 'OP':
-            return self.get_hvr_OPA()
+#            self.hirsh_volrat = self.get_hvr_HA()
+        elif approach == 'OPA':
+            self.hirsh_volrat = self.get_hvr_OPA()
         else:
             raise NotImplementedError("Sorry dude, I don't know about a scheme called '"+approach+"'.")
+        return self.hirsh_volrat
         
     
 #    def get_hvr_HA(self):
 #        """ Return Hirsfeld volume ratios as obtained by density partitioning """
+#        pos = self.atoms.positions/Bohr
+#        syms = self.atoms.get_chemical_symbols()
 #        HA = 
 #        return HA.get_hvr()
         
     
     def get_hvr_OPA(self):
         """ Return (approximate) Hirshfeld ratios as obtained by on-site overlap population """
-        OPA = OverlapPopulationVolumeAnalysis(self.wf, self.f, self.wk, self.n_el_atom, self.Atom2Orbs)
+        syms = self.atoms.get_chemical_symbols()
+        n_el_atom = np.zeros(self.nAtoms)
+#        n_el_core = np.zeros(self.nAtoms)
+        for iAtom in xrange(self.nAtoms):
+#            Z = data[syms[iAtom]]['Z']
+            n_el_atom[iAtom] = data[syms[iAtom]]['valence_number'] #Z
+#            n_el_core[iAtom] = Z - data[syms[iAtom]]['valence_number']
+        
+        OPA = OverlapPopulationVolumeAnalysis(self.wf, self.f, self.wk, n_el_atom, self.Orb2Atom)
         return OPA.get_hvr()
         
     

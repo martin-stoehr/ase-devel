@@ -16,8 +16,8 @@ class HirshfeldWrapper:
         ~ calculate radial parts of free/confined atomic wavefunctions
         ~ save in temporary (*.unf) files (to be read-in by F90-Routine)
     """
-        
-    def __init__(self, nAtoms, species, positions, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
+    #TODO!
+    def __init__(self, species, positions, At2Orbs, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
         """
         initialize basis functions and grid parameters
                     
@@ -34,12 +34,11 @@ class HirshfeldWrapper:
                              . 'Both': use confined radial wave functions throughout,
                              . list of confinement radii to use per atom.
         """
-        self.calc = calc
-        self.nAtoms = self.calc.el.N
-        self.atoms = self.calc.get_atoms()
-        self.species = self.atoms.get_chemical_symbols()
+        self.nAtoms = len(species)
+#        self.atoms = self.calc.get_atoms()
+        self.species = species
         self.species_set = list(set(self.species))
-        calc.flags['Hirshfeld']=True
+        self.at2orbs = At2Orbs
         
         if cutoff == 0.:
             print '\033[91m'+'WARNING: input cutoff 0. \
@@ -74,19 +73,14 @@ Defaulting to 3 Angstroms.'+'\033[0m'
                 print('Occupation for {0: 2s} not available. Update "ValOccs_lm_free" in "box.data"!'.format(sym))
                 raise
         
-        self.at2orbs = np.zeros((self.nAtoms,2),dtype=int)
         for iAtom in xrange(self.nAtoms):
             atom = KSAllElectron(self.species[iAtom])
             self.len_r.append( atom.grid.get_N() )
             self.rmins.append( atom.rmin )
-            self.at2orbs[iAtom,0] = int(self.calc.el.atom_orb_indices[iAtom][0]+1)
-            self.at2orbs[iAtom,1] = int(self.calc.el.atom_orb_indices[iAtom][-1]+1)
 
         orb2nr = ['s','px','py','pz','dxy','dyz','dzx','dx2-y2','d3z2-r2','f3yx2-y3','fxyz','fyz2','fxz2','fzx2-zy2','fx3-3xy2','fz3']
-        for idx, OrbInfo in enumerate(self.calc.el.orb):
-            atom_idx = OrbInfo['atom']
-            orb = OrbInfo['orbital']
-            sym = OrbInfo['symbol']
+        for iOrb in xrange(self.nOrbs):
+            sym = self.species[self.Orb2Atom[iOrb]]
             self.orb2at.append(atom_idx+1)
             self.otypes.append(orb2nr.index(orb))
             self.occ_free.append(self.free_occs[sym][orb[0]])

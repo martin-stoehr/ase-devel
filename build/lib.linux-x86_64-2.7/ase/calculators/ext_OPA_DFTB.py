@@ -24,8 +24,8 @@ class OverlapPopulationVolumeAnalysis:
     
     """
     
-    def __init__(self, coeff, f, wk, n_el_atom, Atom2Orbs):
-#    def __init__(self, coeff, f, wk, n_el_atom, S_matrix, Atom2Orbs):
+    def __init__(self, coeff, f, wk, n_el_atom, Orb2Atom):
+#    def __init__(self, coeff, f, wk, n_el_atom, S_matrix, Orb2Atom):
         """
         initialize arrays, get (approximate) volume ratios.
         
@@ -36,8 +36,8 @@ class OverlapPopulationVolumeAnalysis:
             . wk        = k-point weighting factors, numpy-array shape(n_kpoints,)
             . n_el_atom = number of electrons in free, neutral atom, numpy-array shape(n_Atoms,)
            [ . S_matrix  = overlap integral matrix, numpy-array shape(n_kpoints, n_Orbitals, n_Orbitals) ]
-            . Atom2Orbs = list of lists containing orbitals located at atom iAtom
-                          (e.g. [[0,1,2,3],[4]]: orbitals 0,1,2,3 on atom 0, orbital 4 on atom 1)
+            . Orb2Atom = list of atom orbital i is located, np.array shape(n_Orbitals)
+              (e.g. H2O: [0,0,0,0,1,2]: orbitals[0:4] on atom 0, orbital 4 on atom 1, and orbital 5 on atom 2)
         """
         
         ## LCAO coefficients, fillings, k-point weightings
@@ -45,8 +45,8 @@ class OverlapPopulationVolumeAnalysis:
         ## number of electrons of neutral, free atoms, overlap matrix
         self.n_el_neutral = n_el_atom
 #        self.S = S_matrix
-        ## orbitals on atom i
-        self.Atom2Orbs = Atom2Orbs
+        ## orbital i located at atom Orb2Atom[i]
+        self.Orb2Atom = Orb2Atom
         ## number of atoms, k-points, and orbitals (= number of states)
         self.nAtoms = len(self.n_el_neutral)
         self.nk = len(self.wk)
@@ -66,22 +66,21 @@ class OverlapPopulationVolumeAnalysis:
         calculate (approximate!) volume ratios 
         """
         
-        OFFOP, ONOP = np.zeros(self.nAtoms), np.zeros(self.nAtoms)
+        ONOP = np.zeros(self.nAtoms)
+#        OFFOP = np.zeros(self.nAtoms)
 #        sumCC = np.zeros(self.nAtoms)
-        for iAtom in xrange(self.nAtoms):
-            for ik in xrange(self.nk):
-                for a in xrange(self.nOrbs):
-                    ## cSc[i] = c[i]*sum_{j in B != A} S[i,j] c[j] = c[i]*(S-1).dot(c)
-#                    cSc = np.conjugate(self.coeff[ik,a])*( (self.Skij[ik] - np.eye(self.nOrbs)).dot(self.coeff[ik,a]) )
-                    wkfka = self.wk[ik]*self.f[ik,a]
-                    for iOrb in self.Atom2Orbs[iAtom]:
-#                        OFFOP[iAtom] += wkfka*( cSc[iOrb] + np.conjugate(cSc[iOrb]) ).real
-                        ONOP[iAtom] += wkfka*abs( self.coeff[ik,a,iOrb] )**2
-#                        for jOrb in xrange(self.nOrbs):
-#                            cicj = self.coeff[ik,a,iOrb].conjugate()*self.coeff[ik,a,jOrb]
-#                            sumCC[iAtom] += wkfka*(( cicj + np.conjugate(cicj) ).real)
-#                        sumCC[iAtom] -= 2.*wkfka*abs( self.coeff[ik,a,iOrb] )**2
-        
+        for ik in xrange(self.nk):
+            for a in xrange(self.nOrbs):
+                ## cSc[i] = c[i]*sum_{j in B != A} S[i,j] c[j] = c[i]*(S-1).dot(c)
+#                cSc = np.conjugate(self.coeff[ik,a])*( (self.Skij[ik] - np.eye(self.nOrbs)).dot(self.coeff[ik,a]) )
+                wkfka = self.wk[ik]*self.f[ik,a]
+                for iOrb in xrange(self.nOrbs):
+#                    OFFOP[Orb2Atom[iOrb]] += wkfka*( cSc[iOrb] + np.conjugate(cSc[iOrb]) ).real
+                    ONOP[self.Orb2Atom[iOrb]] += wkfka*abs( self.coeff[ik,a,iOrb] )**2
+#                    for jOrb in xrange(self.nOrbs):
+#                        cicj = self.coeff[ik,a,iOrb].conjugate()*self.coeff[ik,a,jOrb]
+#                        sumCC[Orb2Atom[iOrb]] += wkfka*(( cicj + np.conjugate(cicj) ).real)
+#                    sumCC[Orb2Atom[iOrb]] -= 2.*wkfka*abs( self.coeff[ik,a,iOrb] )**2
             
         self.ONOP = ONOP/(self.n_el_neutral)
 #        self.OFFOP1 = 1. - (OFFOP / self.n_el_neutral)
