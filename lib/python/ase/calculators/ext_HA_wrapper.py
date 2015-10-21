@@ -16,35 +16,55 @@ class HirshfeldWrapper:
         ~ calculate radial parts of free/confined atomic wavefunctions
         ~ save in temporary (*.unf) files (to be read-in by F90-Routine)
     """
-    #TODO!
-    def __init__(self, species, positions, At2Orbs, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
+    def __init__(self, atoms, wk, wf, f, otypes, Atom2Orbs, Orb2Atom, \
+                 dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
         """
         initialize basis functions and grid parameters
                     
         parameters:
         ===========
+            atoms:         ASE-atoms object, len = n_Atoms
+            wk:            (normalized) k-point weighting factors, len = n_kpoints
+            wf:            LCAO-coefficients, shape = (n_kpoints, n_States, n_Orbitals)
+            f:             occupations of states, shape = (n_kpoints, n_States)
+            otypes:        type of basis orbitals, len = n_Orbitals
+                           (e.g. H2O: otypes = ['s','px','py','pz','s','s'])
+            Atom2Orbs:     first and (last+1) orbital index located at atom i in FORTRAN convention,
+                           shape = (n_Atoms, 2)    --    (e.g. H2O: Atom2Orbs = [[1,4],[5,5],[6,6]])
+            Orb2Atom:      atom index of orbital i, len = n_Orbitals
+                           (e.g. H2O: Orb2Atom = [0,0,0,0,1,2])
             dr(opt):       radial step width in Angstroms, default: 0.1 Angstroms
-            nThetas(opt):  number of discrete azemuthal angles, default: 72
-            nPhis(opt):    number of discrete polar angles, default: 144
+            nThetas(opt):  number of discrete azemuthal angles, default: 36
+            nPhis(opt):    number of discrete polar angles, default: 72
             cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
             conf(opt):     confinement for basis functions in density construction in Angstroms,
                            default: 'default' = (R_conf[symbol] .or. 5*R_cov[symbol] from box.data).
                            Alternative:
                              . 'None': use free radial wave functions throughout,
                              . 'Both': use confined radial wave functions throughout,
-                             . list of confinement radii to use per atom.
+                             . list of confinement radii n Angstroms to use per atom.
         """
-        self.nAtoms = len(species)
-#        self.atoms = self.calc.get_atoms()
-        self.species = species
-        self.species_set = list(set(self.species))
-        self.at2orbs = At2Orbs
+        self.atoms = atoms.copy()
+        self.nAtoms = len(self.atoms)
+        self.species = self.atoms.get_chemical_symbols()
+        self.species_set = []
+        for sym in self.species:
+            if sym not in self.species_set:
+                self.species_set.append(sym)
+        
+        self.wk = np.array(wk)
+        self.wf = np.array(wf).transpose()
+        self.f = np.array(f).transpose()
+        self.otypes = np.array(otypes)
+        self.Atom2Orbs = np.array(Atom2Orbs, dtype=int)#.transpose()
+        self.Orb2Atom = np.array(Orb2Atom, dtype=int)
+        self.nOrbs = len(self.Orb2Atom)
         
         if cutoff == 0.:
             print '\033[91m'+'WARNING: input cutoff 0. \
 Defaulting to 3 Angstroms.'+'\033[0m'
             cutoff = 3.
-        self.nr = round(cutoff/dr)
+        self.nr = int( round(cutoff/dr) )
         self.dr = dr/Bohr
         self.nThetas = int(nThetas)
         self.nPhis = int(nPhis)
@@ -60,7 +80,6 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         self.Rnl_id = Rnl_dump_id
         
         self.occ_free, self.len_r = [], []
-        self.orb2at, self.otypes = [], []
         self.rmins = []
         self.rgrid, self.free_occs = {}, {}
         for sym in self.species_set:
@@ -77,13 +96,13 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             atom = KSAllElectron(self.species[iAtom])
             self.len_r.append( atom.grid.get_N() )
             self.rmins.append( atom.rmin )
-
+        
+        self.otypes_num = np.zeros(self.nOrbs)
         orb2nr = ['s','px','py','pz','dxy','dyz','dzx','dx2-y2','d3z2-r2','f3yx2-y3','fxyz','fyz2','fxz2','fzx2-zy2','fx3-3xy2','fz3']
         for iOrb in xrange(self.nOrbs):
             sym = self.species[self.Orb2Atom[iOrb]]
-            self.orb2at.append(atom_idx+1)
-            self.otypes.append(orb2nr.index(orb))
-            self.occ_free.append(self.free_occs[sym][orb[0]])
+            self.otypes_num[iOrb] = orb2nr.index(self.otypes[iOrb])
+            self.occ_free.append(self.free_occs[sym][self.otypes[iOrb][0]])
         
         if conf == 'Both':
             self._get_radial_conf()
@@ -96,10 +115,8 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         self._write_radial_free(conf=conf)
         self._write_radial_conf(conf=conf)
         
-        self.otypes = np.array(self.otypes, dtype=int)
-        self.orb2at = np.array(self.orb2at, dtype=int)
+        self.otypes_num = np.array(self.otypes_num, dtype=int)
         self.occ_free = np.array(self.occ_free)
-        self.at2orbs = self.at2orbs.transpose()
         self.len_r = np.array(self.len_r)
         self.rmins = np.array(self.rmins)
         
@@ -132,12 +149,11 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             Rnls_free = self.Rnls_conf
         else:
             Rnls_free = self.Rnls_free
-        for idx, OrbInfo in enumerate(self.calc.el.orb):
-            orb = OrbInfo['orbital']
-            sym = OrbInfo['symbol']
-            iAtom = OrbInfo['atom']
-            f = FortranFile(self.Rnl_id+"_Ofree_{0:d}.unf".format(idx+1), 'w')
-            f.write_record( Rnls_free[str(iAtom)][orb[0]](self.rgrid[sym]) )
+        for iOrb in xrange(self.nOrbs):
+            iAtom = self.Orb2Atom[iOrb]
+            sym = self.species[iAtom]
+            f = FortranFile(self.Rnl_id+"_Ofree_{0:d}.unf".format(iOrb+1), 'w')
+            f.write_record( Rnls_free[str(iAtom)][self.otypes[iOrb][0]](self.rgrid[sym]) )
             f.close()
         
     
@@ -178,25 +194,22 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         else:
             Rnls_conf = self.Rnls_conf
         
-        for idx, OrbInfo in enumerate(self.calc.el.orb):
-            iAtom = OrbInfo['atom']
-            orb = OrbInfo['orbital']
-            sym = OrbInfo['symbol']
-            f = FortranFile(self.Rnl_id+"_Oconf_{0:d}.unf".format(idx+1), 'w')
-            f.write_record( Rnls_conf[str(iAtom)][orb[0]](self.rgrid[sym]) )
+        for iOrb in xrange(self.nOrbs):
+            iAtom = self.Orb2Atom[iOrb]
+            sym = self.species[iAtom]
+            f = FortranFile(self.Rnl_id+"_Oconf_{0:d}.unf".format(iOrb+1), 'w')
+            f.write_record( Rnls_conf[str(iAtom)][self.otypes[iOrb][0]](self.rgrid[sym]) )
             f.close()
         
     
-    def get_hirsh_volrat(self):
-        nOrbs = self.calc.el.norb
+    def get_hvr(self):
         positions = (self.atoms.positions/Bohr).transpose()
-        c = self.calc.st.wf.transpose()
-        wk = self.calc.st.wk.transpose()
-        f = self.calc.st.f.transpose()
-        nkpts = len(wk)
-        hvr = HA.hirshfeld_main(self.nAtoms,nkpts,nOrbs,self.nThetas,self.nPhis,positions,\
-                                c,wk,f,max(self.len_r),self.dr,self.nr,self.len_r,self.rmins,\
-                                self.Rnl_id,self.occ_free,self.otypes,self.orb2at,self.at2orbs)
+        nkpts = len(self.wk)
+        Orb2AtomF = self.Orb2Atom - 1
+        hvr = HA.hirshfeld_main(self.nAtoms,nkpts,self.nOrbs,self.nThetas,self.nPhis,positions, \
+                                self.wf,self.wk,self.f,max(self.len_r),self.dr,self.nr,self.len_r, \
+                                self.rmins,self.Rnl_id,self.occ_free,self.otypes_num,Orb2AtomF, \
+                                self.Atom2Orbs)
                                 
         self.remove_files()
         return hvr

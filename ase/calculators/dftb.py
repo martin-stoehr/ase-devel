@@ -41,7 +41,7 @@ from ase.calculators.calculator import FileIOCalculator, kpts2mp
 from ase.io import read
 from box.data import data
 from ase.calculators.ext_OPA_DFTB import OverlapPopulationVolumeAnalysis
-#from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
+from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
 
 
 class Dftb(FileIOCalculator):
@@ -143,6 +143,7 @@ class Dftb(FileIOCalculator):
         outfile.write('Options { \n')
         outfile.write('   WriteResultsTag = Yes  \n')
         outfile.write('   WriteEigenvectors = Yes  \n')
+        outfile.write('   WriteDetailedXML = Yes  \n')
         outfile.write('} \n')
         outfile.close()
 
@@ -199,13 +200,14 @@ class Dftb(FileIOCalculator):
                     break
             ## read further information (Martin Stoehr)
             self.read_additional_info()
+            
             try:
                 myfile = open('eigenvec.out','r')
                 self.evlines = myfile.readlines()
                 myfile.close()
                 ## read-in LCAO-coefficients (Martin Stoehr)
                 self.read_eigenvectors()
-            except OSError:
+            except IOError:
                 print("No file name 'eigenvec.out', set WriteEigenvectors = Yes,\n \
                        if you wish to use additional electronic structure properties.\n \
                        For density dependent dispersion corrections, for instance!")
@@ -220,7 +222,6 @@ class Dftb(FileIOCalculator):
             #self.read_forces()
         self.read_forces()
         os.remove('results.tag')
-#        os.remove('detailed.out')
         
     
     def read_additional_info(self):
@@ -228,15 +229,18 @@ class Dftb(FileIOCalculator):
         Read additional info, i.e. nAtoms, positions, fillings, etc.
         by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
         """
+        orbitalslist = {0:['s'], 1:['py','pz','px'], 2:['dxy','dyz','dz2','dxz','dx2-y2'], \
+                       3:['f3yx2-y3','fxyz','fyz2','fz3','fxz2','fzx2-zy2','fx3-3xy2']}
         self.atoms = read('geo_end.xyz')
         self.nAtoms = len(self.atoms)
         self.atomic_charges = np.zeros(self.nAtoms)
         self.Orb2Atom = np.zeros(self.nOrbs)
+        self.otypes = []
         ## read 'detailed.out' in lines
         myfile = open('detailed.out', 'r')
         linesdet = myfile.readlines()
         myfile.close()
-        ## net atomic charges
+        ## net atomic charges and basis orbital types
         for iline, line in enumerate(linesdet):
             if 'Net atomic charges (e)' in line:
                 for iAtom in xrange(self.nAtoms):
@@ -245,6 +249,15 @@ class Dftb(FileIOCalculator):
             if 'Orbital populations (up)' in line:
                 for iOrb in xrange(self.nOrbs):
                     self.Orb2Atom[iOrb] = int( linesdet[iline+2+iOrb].split()[0] ) - 1
+                    l = int(linesdet[iline+2+iOrb].split()[2])
+                    m = int(linesdet[iline+2+iOrb].split()[3])
+                    self.otypes.append(orbitalslist[l][l+m])
+            
+        self.Atom2Orbs = np.zeros((self.nAtoms, 2))
+        for iAtom in xrange(self.nAtoms):
+            startOrb = list(self.Orb2Atom).index(iAtom) + 1
+            nOrbsiAtom = len(self.Orb2Atom) - np.count_nonzero(self.Orb2Atom - iAtom) - 1
+            self.Atom2Orbs[iAtom] = np.array([startOrb, startOrb + nOrbsiAtom])
             
         ## Fillings 
         myfile = open('detailed.out','r')
@@ -342,12 +355,12 @@ class Dftb(FileIOCalculator):
                                   (see ext_OPA_DFTB.py)
                        . 'const'  return constant ratios of 1.
         """
-        approach = 'OPA'
+        approach = 'HA'
         
         if approach == 'const':
             self.hirsh_volrat = self.get_hvr_const()
-#        elif approach == 'HA':
-#            self.hirsh_volrat = self.get_hvr_HA()
+        elif approach == 'HA':
+            self.hirsh_volrat = self.get_hvr_HA()
         elif approach == 'OPA':
             self.hirsh_volrat = self.get_hvr_OPA()
         else:
@@ -355,12 +368,28 @@ class Dftb(FileIOCalculator):
         return self.hirsh_volrat
         
     
-#    def get_hvr_HA(self):
-#        """ Return Hirsfeld volume ratios as obtained by density partitioning """
-#        pos = self.atoms.positions/Bohr
-#        syms = self.atoms.get_chemical_symbols()
-#        HA = 
-#        return HA.get_hvr()
+    def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
+        """
+        Return Hirsfeld volume ratios as obtained by density partitioning
+        
+        parameters:
+        ===========
+            dr(opt):       radial step width in Angstroms, default: 0.2 Angstroms
+            nThetas(opt):  number of discrete azemuthal angles, default: 36
+            nPhis(opt):    number of discrete polar angles, default: 72
+            cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
+            conf(opt):     confinement for basis functions in density construction in Angstroms,
+                           default: 'default' = (R_conf[symbol] .or. 5*R_cov[symbol] from box.data).
+                           Alternative:
+                             . 'None': use free radial wave functions throughout,
+                             . 'Both': use confined radial wave functions throughout,
+                             . list of confinement radii in Angstroms to use per atom.
+        """
+        Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
+        
+        HA = HirshfeldWrapper(self.atoms, self.wk, self.wf, self.f, self.otypes, Atom2OrbsF, self.Orb2Atom, \
+                              dr=dr, nThetas=nThetas, nPhis=nPhis, cutoff=cutoff,conf=conf)
+        return HA.get_hvr()
         
     
     def get_hvr_OPA(self):

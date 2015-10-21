@@ -481,7 +481,6 @@ class FileIOCalculator(Calculator):
                                'or supply the command keyword')
         command = self.command.replace('PREFIX', self.prefix)
         olddir = os.getcwd()
-        print(command)
         try:
             os.chdir(self.directory)
             errorcode = subprocess.call(command, shell=True)
