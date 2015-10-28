@@ -176,3 +176,12 @@ setup(name='python-ase',
       long_description=long_description,
       cmdclass={'build_py': build_py,
                 'test': test})
+
+## This is probably the most unprofessional way of including FORTRAN module HA_recode with dependencies
+home = os.getcwd()
+os.system('python '+home+'/ase/calculators/make_HA.py '+home+'/ase/calculators ')
+os.system('python '+home+'/ase/calculators/make_OPA.py '+home+'/ase/calculators ')
+for modname in ['HA_recode.', 'splines_alt.', 'spherical_harmonics.', 'OPA_recode.']:
+    os.system('cp '+home+'/'+modname+'* '+home+'/lib/python/ase/calculators/')
+    os.system('mv '+home+'/'+modname+'* '+home+'/ase/calculators/')
+

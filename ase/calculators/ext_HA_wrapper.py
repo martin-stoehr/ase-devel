@@ -1,11 +1,11 @@
 from ase.units import Bohr
 import numpy as np
 from copy import copy
-from hotbit.analysis.DFT_free_atom import KSAllElectron
+from ase.calculators.DFT_free_atom import KSAllElectron
 from box.data import R_conf, data, ValOccs_lm_free
 import random
 from string import digits
-from os import listdir,system
+from os import listdir,remove
 from scipy.io import FortranFile
 from HA_recode import ha_recode as HA
 
@@ -174,6 +174,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
 #                    r_conf = 5.*data[sym]['R_cov']/Bohr
 #            else:
 #                r_conf = conf[iAtom]/Bohr
+            ## conventional confinement
             r_conf = 2.*data[sym]['R_cov']/Bohr
             atom = KSAllElectron(sym, confinement={'mode':'quadratic','r0':r_conf})
             atom.run()
@@ -200,12 +201,15 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             f = FortranFile(self.Rnl_id+"_Oconf_{0:d}.unf".format(iOrb+1), 'w')
             f.write_record( Rnls_conf[str(iAtom)][self.otypes[iOrb][0]](self.rgrid[sym]) )
             f.close()
+            
+        del(self.Rnls_free)
+        del(self.Rnls_conf)
         
     
     def get_hvr(self):
         positions = (self.atoms.positions/Bohr).transpose()
         nkpts = len(self.wk)
-        Orb2AtomF = self.Orb2Atom - 1
+        Orb2AtomF = (self.Orb2Atom + 1)
         hvr = HA.hirshfeld_main(self.nAtoms,nkpts,self.nOrbs,self.nThetas,self.nPhis,positions, \
                                 self.wf,self.wk,self.f,max(self.len_r),self.dr,self.nr,self.len_r, \
                                 self.rmins,self.Rnl_id,self.occ_free,self.otypes_num,Orb2AtomF, \
@@ -216,9 +220,9 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         
     
     def remove_files(self):
-        """ Remove dump directory containing Rnl data """
+        """ Remove dump files containing Rnl data """
         
-        system("rm "+self.Rnl_id+"_*")
+        remove(self.Rnl_id+"_*")
         
     
 

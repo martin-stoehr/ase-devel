@@ -1,5 +1,4 @@
 module HA_recode
-!use splines
 use splines_alt
 use spherical_harmonics
 
@@ -45,25 +44,13 @@ contains
         double precision,dimension(nThetas,nr)              :: wV
         double precision,dimension(3,nThetas,nPhis,nr)      :: sph2cart
         double precision,dimension(nAtoms)                  :: ln_rmin,len_lnrmin_lnrmax
-!        !! radial grid for Rnl functions (to be read-in)
-!        double precision,dimension(nAtoms,lRnl_max)         :: rgrid
-!        double precision,dimension(:,:),allocatable         :: rgrid
         !! Rnl arrays for free and confined atoms (to be read-in)
         double precision,dimension(nOrbs,lRnl_max)          :: Rnls_free,Rnls_conf
-!        double precision,dimension(:,:),allocatable         :: Rnls_free,Rnls_conf
         !! spline coefficients for Rnl functions sp*1(iOrb), sp*2(iOrb), and sp*3(iOrb)
         double precision,dimension(nOrbs,4,lRnl_max)        :: spf,spc
-!        double precision,dimension(nOrbs,lRnl_max)          :: spf1,spf2,spf3,spc1,spc2,spc3
-!        double precision,dimension(:,:),allocatable         :: spf1,spf2,spf3,spc1,spc2,spc3
         
         double precision,dimension(nAtoms),intent(out)      :: hirsh_volrat
         
-        
-!        allocate(Rnls_free(1:nOrbs,1:lRnl_max))
-!        allocate(Rnls_conf(1:nOrbs,1:lRnl_max))
-!        allocate(rgrid(1:nAtoms, 1:lRnl_max))
-!        allocate(spf1(1:nOrbs,1:lRnl_max), spf2(1:nOrbs,1:lRnl_max), spf3(1:nOrbs,1:lRnl_max))
-!        allocate(spc1(1:nOrbs,1:lRnl_max), spc2(1:nOrbs,1:lRnl_max), spc3(1:nOrbs,1:lRnl_max))
         
         !! for arbitrary distance p: largest index with grid(index) < p on logarithmic grid
         !! is given by (log(p)-log(rmin)) * (len(grid)-1)/(log(rmax)-log(rmin))
@@ -73,7 +60,6 @@ contains
             len_lnrmin_lnrmax(i) = (len_r(i)-1)/(ln_rmax-ln_rmin(i))
         enddo
         
-!        call get_Rnls(rgrid,Rnls_free,Rnls_conf,spf1,spf2,spf3,spc1,spc2,spc3)
         call get_Rnls(Rnls_free, Rnls_conf, spf, spc)
         
         dTheta = pi/nThetas
@@ -101,17 +87,12 @@ contains
             hirsh_volrat(i) =  get_hvr_atom(i)
         enddo
         
-!        deallocate(Rnls_free, Rnls_conf, rgrid, spf1,spf2,spf3, spc1,spc2,spc3)
     
     contains
-!        subroutine get_Rnls(rgrid, Rnls_free, Rnls_conf, spf1,spf2,spf3, spc1,spc2,spc3)
         subroutine get_Rnls(Rnls_free, Rnls_conf, spf, spc)
-!            !! radial grid
-!            double precision,dimension(nAtoms,lRnl_max),intent(inout)   :: rgrid
             !! Rnl data
             double precision,dimension(nOrbs,lRnl_max),intent(inout)    :: Rnls_free,Rnls_conf
             !! spline coefficients free, conf
-!            double precision,dimension(nOrbs,lRnl_max),intent(inout)    :: spf1,spf2,spf3,spc1,spc2,spc3
             double precision,dimension(nOrbs,4,lRnl_max),intent(inout)  :: spf,spc
             
             !! I/O-Stuff (file identifier, filenames), loop indices (atoms, orbitals)
@@ -120,14 +101,6 @@ contains
             character(len=35)                                           :: fname
             
             
-!            do a_idx=1, nAtoms
-!                write(int2char, '(I7)') a_idx
-!                !! filename grid: 'R_<a_idx>.unf' (e.g. 'R_1.unf')
-!                fname = trim(adjustl('R_'//trim(adjustl(int2char))//'.unf'))
-!                open (unit=fR_id, file=fname, form='unformatted')
-!                read (fR_id) rgrid(a_idx,1:len_r(a_idx))
-!                close(fR_id)
-!            enddo
             do iOrb=1,nOrbs
                 a_idx = orb2at(iOrb)
                 write(int2char, '(I7)') iOrb
@@ -143,11 +116,7 @@ contains
                 close(fO_id)
                 
                 !! get (3rd order) spline interpolation parameters sp*1,sp*2,sp*3 for Rnl_free and Rnl_conf
-                !! see module splines for further information
-!                call spline(rgrid(a_idx,1:len_r(a_idx)), Rnls_free(iOrb,1:len_r(a_idx)), spf1(iOrb,1:len_r(a_idx)), &
-!                                  &spf2(iOrb,1:len_r(a_idx)), spf3(iOrb,1:len_r(a_idx)), len_r(a_idx))
-!                call spline(rgrid(a_idx,1:len_r(a_idx)), Rnls_conf(iOrb,1:len_r(a_idx)), spc1(iOrb,1:len_r(a_idx)), &
-!                                  &spc2(iOrb,1:len_r(a_idx)), spc3(iOrb,1:len_r(a_idx)), len_r(a_idx))
+                !! see module splines_alt for further information
                 call cubic_spline(Rnls_free(iOrb,1:len_r(a_idx)), len_r(a_idx), spf(iOrb,1:4,1:len_r(a_idx)))
                 call cubic_spline(Rnls_conf(iOrb,1:len_r(a_idx)), len_r(a_idx), spc(iOrb,1:4,1:len_r(a_idx)))
             enddo
@@ -215,15 +184,11 @@ contains
                 pos = positions(:,a_idx)
                 
                 !! interpolate Rnl functions (free,conf) at current grid point for all orbitals
-!                Rnl_c(iOrb) = ispline(norm2(Rcart-pos), rgrid(a_idx,1:len_r(a_idx)), Rnls_conf(iOrb,1:len_r(a_idx)), &
-!                            &spc1(iOrb,1:len_r(a_idx)), spc2(iOrb,1:len_r(a_idx)), spc3(iOrb,1:len_r(a_idx)), len_r(a_idx))
-!                Rnl_f(iOrb) = ispline(norm2(Rcart-pos), rgrid(a_idx,1:len_r(a_idx)), Rnls_free(iOrb,1:len_r(a_idx)), &
-!                            &spf1(iOrb,1:len_r(a_idx)), spf2(iOrb,1:len_r(a_idx)), spf3(iOrb,1:len_r(a_idx)), len_r(a_idx))
                 grid_idx = ( log(norm2(Rcart-pos)) - ln_rmin(a_idx))*len_lnrmin_lnrmax(a_idx)
                 Rnl_c(iOrb) = val_spline(grid_idx, spc(iOrb,1:4,1:len_r(a_idx)), len_r(a_idx))
                 Rnl_f(iOrb) = val_spline(grid_idx, spf(iOrb,1:4,1:len_r(a_idx)), len_r(a_idx))
 
-                !! evaluate spherical harmonics at current grid point
+                !! evaluate spherical harmonics at current grid point (see module spherical_harmonics)
                 Ylm(iOrb) = Ylm_real(Rcart-pos, otypes(iOrb))
                 !! sum up promolecular density = sum_{iOrb} occ_free(iOrb)*|Rnl_f(iOrb)*Ylm(iOrb)|^2
                 rho_pro = rho_pro + occ_free(iOrb)*abs(Rnl_f(iOrb)*Ylm(iOrb))*abs(Rnl_f(iOrb)*Ylm(iOrb))

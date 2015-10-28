@@ -106,7 +106,11 @@ class Dftb(FileIOCalculator):
         self.index_energy = None
         self.index_force_begin = None
         self.index_force_end = None
-
+        
+        ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
+        self.hvr_approach = 'OPA'
+        
+    
     def write_dftb_in(self):
         """ Write the innput file for the dftb+ calculation.
             Geometry is taken always from the file 'geo_end.gen'.
@@ -143,7 +147,6 @@ class Dftb(FileIOCalculator):
         outfile.write('Options { \n')
         outfile.write('   WriteResultsTag = Yes  \n')
         outfile.write('   WriteEigenvectors = Yes  \n')
-        outfile.write('   WriteDetailedXML = Yes  \n')
         outfile.write('} \n')
         outfile.close()
 
@@ -343,6 +346,18 @@ class Dftb(FileIOCalculator):
     #  by Martin Stoehr, martin.stoehr@tum.de (M.S.)  #
     #-------------------------------------------------#
     
+    def set_hvr_approach(self, approach):
+        """ set approach for obtaining (approximate) Hirshfeld ratios """
+        valid_approaches = ['const', 'OPA', 'HA']
+        
+        if approach in valid_approaches:
+            self.hvr_approach = approach
+        else:
+            print('\033[91m'+"WARNING: '"+str(approach)+"' is not a valid identifier. \
+                   Defaulting to constant ratios of 1 instead..."+'\033[0m')
+            self.hvr_approach = 'const'
+        
+    
     def get_hirsh_volrat(self):
         """
         Return Hirshfeld volume ratios using method <approach>
@@ -350,25 +365,23 @@ class Dftb(FileIOCalculator):
         parameters (hard-coded so far):
         ===============================
             approach:  . 'HA'     actual Hirshfeld analysis using confined basis confinement
-                                  (see ext_HA_DFTB.py) not implemented yet!
+                                  (see ext_HA_DFTB.py)
                        . 'OPA'    approx. ratios as obtained by overlap population analysis
                                   (see ext_OPA_DFTB.py)
                        . 'const'  return constant ratios of 1.
         """
-        approach = 'HA'
-        
-        if approach == 'const':
+        if self.hvr_approach == 'const':
             self.hirsh_volrat = self.get_hvr_const()
-        elif approach == 'HA':
+        elif self.hvr_approach == 'HA':
             self.hirsh_volrat = self.get_hvr_HA()
-        elif approach == 'OPA':
+        elif self.hvr_approach == 'OPA':
             self.hirsh_volrat = self.get_hvr_OPA()
         else:
             raise NotImplementedError("Sorry dude, I don't know about a scheme called '"+approach+"'.")
         return self.hirsh_volrat
         
     
-    def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
+    def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='Both'):
         """
         Return Hirsfeld volume ratios as obtained by density partitioning
         

@@ -212,7 +212,24 @@ class Aims(FileIOCalculator):
                                   label, atoms, **kwargs)
         self.cubes = cubes
         self.tier = tier
-
+        ## approach to (approximate) Hirshfeld rescaling (M. Stoehr)
+        self.hvr_approach = 'HA'
+        
+    
+    def set_hvr_approach(self, approach='HA'):
+        """
+        change approach to Hirshfeld rescaling ratios
+        by Martin Stoehr (martin.stoehr@tum.de), Oct 2015
+        """
+        valid_hvr_approaches = ['HA', 'OPA', 'const']
+        if approach in valid_hvr_approaches:
+            self.hvr_approach = approach
+        else:
+            print("Sorry, dude, I don't know about an approach called '"+str(approach)+"'...")
+            print('Defaulting to conventional Hirshfeld analysis.')
+            self.hvr_approach = 'HA'
+        
+    
     def set_label(self, label):
         self.label = label
         self.directory = label
@@ -421,12 +438,39 @@ class Aims(FileIOCalculator):
 
     def get_hirsh_volrat(self):
         atoms = self.atoms
-        if ('output' in self.parameters and
-           'hirshfeld' not in self.parameters['output']):
-                raise NotImplementedError
-        return FileIOCalculator.get_property(self, 'hirsh_volrat', atoms)
+        if (self.hvr_approach == 'const'):
+            return np.array([1.,]*len(atoms))
+        elif (self.hvr_approach == 'OPA'):
+            if ('output' in self.parameters and
+                'h_s_matrices' not in self.parameters['output']):
+                    raise ValueError("Set output 'h_s_matrices' in order to use external overlap population analysis!")
+            return self.get_hvr_OPA()
+        elif (self.hvr_approach == 'HA'):
+            if ('output' in self.parameters and
+                'hirshfeld' not in self.parameters['output']):
+                    raise ValueError("Set output 'hirshfeld' in order to use results from Hirshfeld analysis!")
+            return FileIOCalculator.get_property(self, 'hirsh_volrat', atoms)
     
+    
+    def get_hvr_OPA(self):
+        """
+        return (approximate) rescaling ratios for atomic polarizabilities
+        as obtained from overlap population analysis
+        (see module ext_OPA_AIMS.py and OPA_recode.f90 for further details).
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
+        from ext_OPA_AIMS import ext_OPA_wrapper
+        
+        atoms = self.atoms
+        ext_OPA = ext_OPA_wrapper(atoms, basisfile="basis-indices.out", eigvfile='wvfn.dat')
+        return ext_OPA.get_ONOP()
+        
+        
     def get_hirsh_volume(self):
+        """
+        return effective volumes as obtained by Hirshfeld analysis
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
         atoms = self.atoms
         if ('output' in self.parameters and
            'hirshfeld' not in self.parameters['output']):
@@ -434,6 +478,10 @@ class Aims(FileIOCalculator):
         return FileIOCalculator.get_property(self, 'hirsh_volume', atoms)
     
     def get_hirsh_charges(self):
+        """
+        return atomic charges as obtained by Hirshfeld analysis
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
         atoms = self.atoms
         if ('output' in self.parameters and
            'hirshfeld' not in self.parameters['output']):
@@ -441,6 +489,10 @@ class Aims(FileIOCalculator):
         return FileIOCalculator.get_property(self, 'hirsh_charges', atoms)
     
     def get_mull_charges(self):
+        """
+        return atomic charges as obtained by Mulliken analysis
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
         atoms = self.atoms
         if ('output' in self.parameters and
            'mulliken' not in self.parameters['output']):
