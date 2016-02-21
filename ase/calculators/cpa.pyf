@@ -1,0 +1,23 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module CPA_recode ! in 
+    interface  ! in :CPA_recode
+        module cpa_recode ! in :CPA_recode:/data/stoehr/software/myASE/ase/calculators/CPA_recode.f90
+            subroutine get_apt(n_files,n_k_tot,n_basis,natoms,orb2atom,wk,do_pbc,type_evecs,apt) ! in :CPA_recode:/data/stoehr/software/myASE/ase/calculators/CPA_recode.f90:cpa_recode
+                integer intent(in) :: n_files
+                integer intent(in) :: n_k_tot
+                integer intent(in) :: n_basis
+                integer intent(in) :: natoms
+                integer dimension(n_basis),intent(in),depend(n_basis) :: orb2atom
+                double precision dimension(n_k_tot),intent(in),depend(n_k_tot) :: wk
+                integer intent(in) :: do_pbc
+                character*1 intent(in) :: type_evecs
+                double precision dimension(natoms),intent(out),depend(natoms) :: apt
+            end subroutine get_apt
+        end module cpa_recode
+    end interface 
+end python module CPA_recode
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/

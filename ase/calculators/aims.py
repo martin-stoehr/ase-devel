@@ -218,15 +218,15 @@ class Aims(FileIOCalculator):
     
     def set_hvr_approach(self, approach='HA'):
         """
-        change approach to Hirshfeld rescaling ratios
+        change approach to rescaling ratios for effective polarizabilities
         by Martin Stoehr (martin.stoehr@tum.de), Oct 2015
         """
-        valid_hvr_approaches = ['HA', 'OPA', 'const']
+        valid_hvr_approaches = ['HA', 'CPA', 'const']
         if approach in valid_hvr_approaches:
             self.hvr_approach = approach
         else:
             print("Sorry, dude, I don't know about an approach called '"+str(approach)+"'...")
-            print('Defaulting to conventional Hirshfeld analysis.')
+            print('Defaulting to Hirshfeld volume analysis.')
             self.hvr_approach = 'HA'
         
     
@@ -265,7 +265,6 @@ class Aims(FileIOCalculator):
         if not have_lattice_vectors and have_k_grid:
             raise RuntimeError('Found k-grid but no lattice vectors!')
         write_aims(os.path.join(self.directory, 'geometry.in'), atoms)
-#        if not os.path.exists(os.path.join(self.directory, 'control.in')):
         self.write_control(atoms, os.path.join(self.directory, 'control.in'))
         self.write_species(atoms, os.path.join(self.directory, 'control.in'))
         self.parameters.write(os.path.join(self.directory, 'parameters.ase'))
@@ -315,7 +314,21 @@ class Aims(FileIOCalculator):
                             output.write(' %d' % order)
                         output.write('\n')
                     elif key == 'output':
-                        for output_type in value:     # parses value if only one given!!
+#                        if (self.hvr_approach == 'HA') and ('Hirshfeld' not in value):
+#                            print("You forgot to set output = 'Hirshfeld', my friend.")
+#                            print("Let me fix that for you...")
+#                            value.append('Hirshfeld')
+#                        elif (self.hvr_approach == 'CPA'):
+#                            if ('h_s_matrices' not in value):
+#                                print("You forgot to set output = 'h_s_matrices', my friend.")
+#                                print("Let me fix that for you...")
+#                                value.append('h_s_matrices')
+#                            if np.any(self.atoms.pbc) and ('k_point_list' not in value):
+#                                print("You forgot to set output = 'k_point_list', my friend.")
+#                                print("Let me fix that for you...")
+#                                value.append('k_point_list')
+                            
+                        for output_type in value:     # parses entry if only one given!!
                             output.write('%-35s%s\n' % (key, output_type))
                     elif key == 'vdw_correction_hirshfeld' and value:
                         output.write('%-35s\n' % key)
@@ -440,11 +453,11 @@ class Aims(FileIOCalculator):
         atoms = self.atoms
         if (self.hvr_approach == 'const'):
             return np.array([1.,]*len(atoms))
-        elif (self.hvr_approach == 'OPA'):
+        elif (self.hvr_approach == 'CPA'):
             if ('output' in self.parameters and
                 'h_s_matrices' not in self.parameters['output']):
-                    raise ValueError("Set output 'h_s_matrices' in order to use external overlap population analysis!")
-            return self.get_hvr_OPA()
+                    raise ValueError("Set output 'h_s_matrices' in order to use external charge population analysis!")
+            return self.get_hvr_CPA()
         elif (self.hvr_approach == 'HA'):
             if ('output' in self.parameters and
                 'hirshfeld' not in self.parameters['output']):
@@ -452,18 +465,20 @@ class Aims(FileIOCalculator):
             return FileIOCalculator.get_property(self, 'hirsh_volrat', atoms)
     
     
-    def get_hvr_OPA(self):
+    def get_hvr_CPA(self):
         """
-        return (approximate) rescaling ratios for atomic polarizabilities
-        as obtained from overlap population analysis
-        (see module ext_OPA_AIMS.py and OPA_recode.f90 for further details).
+        return rescaling ratios for atomic polarizabilities
+        as obtained from charge population approach
+        (see module ext_CPA_AIMS.py and CPA_recode.f90 for further details).
         by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
         """
-        from ext_OPA_AIMS import ext_OPA_wrapper
+        from ext_CPA_AIMS import ext_CPA_wrapper
         
         atoms = self.atoms
-        ext_OPA = ext_OPA_wrapper(atoms, basisfile="basis-indices.out", eigvfile='wvfn.dat')
-        return ext_OPA.get_ONOP()
+        ext_CPA = ext_CPA_wrapper(atoms, basisfile="basis-indices.out", eigvfile='wvfn.dat')
+        self.hvr_CPA = ext_CPA.get_a_div_a0()
+        
+        return self.hvr_CPA
         
         
     def get_hirsh_volume(self):

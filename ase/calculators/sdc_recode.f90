@@ -386,16 +386,16 @@ real (kind=sedc_rk),dimension(:),allocatable,public,save :: sedc_ts_veff_div_vfr
 !& nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn /)
 
 ! latest values for vdW-TS, PRL 102, 073005 (2009)
-!
+! with additions from Alex Tkatchenko (private communication, 2014)
 real (kind=sedc_rk),dimension(param_array_size),parameter :: alpha_ts = (Bohr_to_Ang ** 3) * (/ &
 & 4.50,                                                                                  1.38, &
 &164.2, 38.0,                                                   21.0,12.0, 7.4, 5.4, 3.8,2.67, &
 &162.7, 71.0,                                                   60.0,37.0,25.0,19.6,15.0,11.1, &
 &292.9,160.0,120.0,98.0,84.0,78.0,63.0,56.0,50.0,48.0,42.0,40.0,60.0,41.0,29.0,25.0,20.0,16.8, &
-&319.2,199.0, nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,56.1,23.68,50.6,39.7,75.0,60.0,44.0,37.65,35.0,27.3, &
-& nnnn, 275.0, &
+&319.2,199.0,126.737,119.97,101.603,88.4225785,80.083,65.8950,56.1,23.68,50.6,39.7,70.22,55.95,43.67197,37.65,35.0,27.3, &
+& 401.01, 275.0, &
 & nnnn, nnnn, nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn, &
-& nnnn, nnnn, nnnn,nnnn,nnnn,42.51,39.68,36.5,33.9,nnnn,61.8,49.02,nnnn,nnnn,nnnn, &
+& 99.52, 82.53, 71.041,63.04,55.055,42.51,39.68,36.5,33.9,69.92,61.8,49.02,45.013,38.93,33.54, &
 & nnnn, nnnn, &
 & nnnn, nnnn, nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn, &
 & nnnn, nnnn, nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn /)
@@ -405,10 +405,10 @@ real (kind=sedc_rk),dimension(param_array_size),parameter :: C6i_ts = Ha_to_eV *
 & 1387.0, 214.0,                                                               99.5, 46.6, 24.2, 15.6, 9.52, 6.38, &
 & 1556.0, 627.0,                                                              528.0,305.0,185.0,134.0, 94.6, 64.3, &
 & 3897.0,2221.0,1383.0,1044.0,832.0,602.0,552.0,482.0,408.0,373.0,253.0,284.0,498.0,354.0,246.0,210.0,162.0,129.6, &
-& 4691.0,3170.0,  nnnn,  nnnn, nnnn, nnnn, nnnn, nnnn,469.0,157.5,339.0, 452.0,779.0,659.0,492.0,396.0,385.0,285.9, &
-&   nnnn,5727.0, &
+& 4691.0,3170.0,1968.58,1677.91,1263.61,1028.73,1390.87,609.754,469.0,157.5,339.0,452.0,707.046,587.417,459.322,396.0,385.0,285.9,&
+& 6851.0,5727.0, &
 &   nnnn,  nnnn,  nnnn,  nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn,nnnn, &
-&   nnnn,  nnnn,  nnnn,  nnnn, nnnn,359.1,347.1,298.0,392.0, nnnn,697.0,571.0, nnnn, nnnn,nnnn, &
+& 1274.8,1019.92,847.93,710.2,596.67,359.1,347.1,298.0,392.0,717.44,697.0,571.0,530.92,457.53,390.63, &
 &   nnnn,  nnnn, &
 &   nnnn,  nnnn,  nnnn,  nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn, nnnn,nnnn, &
 &   nnnn,  nnnn,  nnnn,  nnnn, nnnn, nnnn, nnnn, nnnn, nnnn /)
@@ -418,10 +418,10 @@ real (kind=sedc_rk),dimension(param_array_size),parameter :: R0i_ts = Bohr_to_An
 & 4.16,4.17,                                                  3.89,3.59,3.34,3.19,3.04,2.91, &
 & 3.73,4.27,                                                  4.33,4.20,4.01,3.86,3.71,3.55, &
 & 3.71,4.65,4.59,4.51,4.44,3.99,3.97,4.23,4.18,3.82,3.76,4.02,4.19,4.20,4.11,4.04,3.93,3.82, &
-& 3.72,4.54,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,3.95,3.66,3.82,3.99,nnnn,nnnn,nnnn,4.22,4.17,4.08, &
-& nnnn,4.77, &
+& 3.72,4.54,4.8151,4.53,4.2365,4.099,4.076,3.9953,3.95,3.66,3.82,3.99,4.23198,4.303,4.2760,4.22,4.17,4.08, &
+& 3.78,4.77, &
 & nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn, &
-& nnnn,nnnn,nnnn,nnnn,nnnn,4.00,3.92,3.86,3.98,nnnn,4.31,4.32,nnnn,nnnn,nnnn, &
+& 4.21,4.15,4.08,4.02,3.84,4.00,3.92,3.86,3.98,3.91,4.31,4.32,4.097,4.07,4.23, &
 & nnnn,nnnn, &
 & nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn, &
 & nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn,nnnn /)

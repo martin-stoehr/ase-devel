@@ -2,10 +2,10 @@ from ase.units import Bohr
 import numpy as np
 from copy import copy
 from ase.calculators.DFT_free_atom import KSAllElectron
-from box.data import R_conf, data, ValOccs_lm_free
+from box.data import data, ValOccs_lm_free
 import random
 from string import digits
-from os import listdir,remove
+from os import listdir,system
 from scipy.io import FortranFile
 from HA_recode import ha_recode as HA
 
@@ -17,7 +17,7 @@ class HirshfeldWrapper:
         ~ save in temporary (*.unf) files (to be read-in by F90-Routine)
     """
     def __init__(self, atoms, wk, wf, f, otypes, Atom2Orbs, Orb2Atom, \
-                 dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='default'):
+                 dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='Both'):
         """
         initialize basis functions and grid parameters
                     
@@ -38,8 +38,6 @@ class HirshfeldWrapper:
             nPhis(opt):    number of discrete polar angles, default: 72
             cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
             conf(opt):     confinement for basis functions in density construction in Angstroms,
-                           default: 'default' = (R_conf[symbol] .or. 5*R_cov[symbol] from box.data).
-                           Alternative:
                              . 'None': use free radial wave functions throughout,
                              . 'Both': use confined radial wave functions throughout,
                              . list of confinement radii n Angstroms to use per atom.
@@ -138,7 +136,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             self.Rnls_free[str(iAtom)] = Rnl_free[sym]
         
     
-    def _write_radial_free(self, conf='default'):
+    def _write_radial_free(self, conf='Both'):
         """
         Write radial part of valence orbitals for isolated atoms
         on radial grid to file as obtained by DFT calculation.
@@ -157,7 +155,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             f.close()
         
     
-    def _get_radial_conf(self, conf='default'):
+    def _get_radial_conf(self, conf='Both'):
         """
         Calculate radial parts of atomic wave functions
         for all atoms in additional harmonic confinement potential.
@@ -166,23 +164,18 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         for iAtom in xrange(self.nAtoms):
             sym = self.species[iAtom]
             self.Rnls_conf[str(iAtom)] = {}
-#            if conf == 'default':
-#                try:
-#                    r_conf = R_conf[sym]/Bohr
-#                except KeyError:
-#                    print 'Confinement radius of '+sym+' not in box.data.R_conf, using 5*R_cov.'
-#                    r_conf = 5.*data[sym]['R_cov']/Bohr
-#            else:
-#                r_conf = conf[iAtom]/Bohr
-            ## conventional confinement
-            r_conf = 2.*data[sym]['R_cov']/Bohr
+            if (conf == 'Both'):
+                r_conf = 2.*data[sym]['R_cov']/Bohr
+            else:
+                r_conf = conf[iAtom]/Bohr
+            
             atom = KSAllElectron(sym, confinement={'mode':'quadratic','r0':r_conf})
             atom.run()
             for iOrb in atom.get_valence_orbitals():
                 self.Rnls_conf[str(iAtom)][iOrb[1]] = atom.Rnl_fct[iOrb]
         
     
-    def _write_radial_conf(self,conf='default'):
+    def _write_radial_conf(self,conf='Both'):
         """
         Write radial part of valence orbitals for confined atoms 
         on radial grid to file as obtained by DFT calculation.
@@ -194,26 +187,22 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             Rnls_conf = self.Rnls_free
         else:
             Rnls_conf = self.Rnls_conf
-        
         for iOrb in xrange(self.nOrbs):
             iAtom = self.Orb2Atom[iOrb]
             sym = self.species[iAtom]
             f = FortranFile(self.Rnl_id+"_Oconf_{0:d}.unf".format(iOrb+1), 'w')
             f.write_record( Rnls_conf[str(iAtom)][self.otypes[iOrb][0]](self.rgrid[sym]) )
             f.close()
-            
-        del(self.Rnls_free)
-        del(self.Rnls_conf)
         
     
     def get_hvr(self):
         positions = (self.atoms.positions/Bohr).transpose()
         nkpts = len(self.wk)
         Orb2AtomF = (self.Orb2Atom + 1)
-        hvr = HA.hirshfeld_main(self.nAtoms,nkpts,self.nOrbs,self.nThetas,self.nPhis,positions, \
-                                self.wf,self.wk,self.f,max(self.len_r),self.dr,self.nr,self.len_r, \
-                                self.rmins,self.Rnl_id,self.occ_free,self.otypes_num,Orb2AtomF, \
-                                self.Atom2Orbs)
+        hvr = np.array( HA.hirshfeld_main(self.nAtoms,nkpts,self.nOrbs,self.nThetas,self.nPhis,positions, \
+                                          self.wf,self.wk,self.f,max(self.len_r),self.dr,self.nr,self.len_r, \
+                                          self.rmins,self.Rnl_id,self.occ_free,self.otypes_num,Orb2AtomF, \
+                                          self.Atom2Orbs) )
                                 
         self.remove_files()
         return hvr
@@ -222,7 +211,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
     def remove_files(self):
         """ Remove dump files containing Rnl data """
         
-        remove(self.Rnl_id+"_*")
+        system("rm -rf "+self.Rnl_id+"_*")
         
     
 

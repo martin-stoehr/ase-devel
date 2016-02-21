@@ -40,33 +40,44 @@ from ase.calculators.calculator import FileIOCalculator, kpts2mp
 ## analysis of atomic polarizabilities via Hirshfeld volume ratios (M.S. 19/Oct/15)
 from ase.io import read
 from box.data import data
-from ase.calculators.ext_OPA_DFTB import OverlapPopulationVolumeAnalysis
+from ase.calculators.ext_CPA_DFTB import ChargePopulationAnalysis
 from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
 
 
+## default value of maximal angular momentum to be included in DFTB calculation
+DefaultMaxAngMom = { 'H':'"s"',                                                                  'He':'"s"', \
+                    'Li':'"p"','Be':'"p"', 'B':'"p"', 'C':'"p"', 'N':'"p"', 'O':'"p"', 'F':'"p"','Ne':'"p"', \
+                    'Na':'"p"','Mg':'"p"','Al':'"p"','Si':'"p"', 'P':'"p"', 'S':'"p"','Cl':'"p"','Ar':'"p"', \
+                     'K':'"p"','Ca':'"p"','Sc':'"d"','Ti':'"d"', 'V':'"d"','Cr':'"d"','Mn':'"d"','Fe':'"d"', \
+                    'Co':'"d"','Ni':'"d"','Cu':'"d"','Zn':'"d"','Ga':'"p"','Ge':'"p"','As':'"p"','Se':'"p"', \
+                    'Br':'"p"','Kr':'"p"','Rb':'"p"','Sr':'"p"', 'Y':'"d"','Zr':'"d"','Nb':'"d"','Mo':'"d"', \
+                    'Tc':'"d"','Ru':'"d"','Rh':'"d"','Pd':'"d"','Ag':'"d"','Cd':'"d"','In':'"p"','Sn':'"p"', \
+                    'Sb':'"p"','Te':'"p"', 'I':'"p"','Xe':'"p"','Cs':'"p"','Ba':'"p"','Lu':'"d"','Hf':'"d"', \
+                    'Ta':'"d"', 'W':'"d"','Re':'"d"','Os':'"d"','Ir':'"d"','Pt':'"d"','Au':'"d"','Hg':'"d"', \
+                    'Tl':'"p"','Pb':'"p"','Bi':'"p"','Po':'"p"','As':'"p"','Rn':'"p"'}
+
+
 class Dftb(FileIOCalculator):
-    """ A dftb+ calculator with ase-FileIOCalculator nomenclature
-    """
+    """  A dftb+ calculator with ase-FileIOCalculator nomenclature  """
     if 'DFTB_COMMAND' in os.environ:
         command = os.environ['DFTB_COMMAND'] + ' > PREFIX.out'
     else:
         command = 'dftb+ > PREFIX.out'
-
+    
     implemented_properties = ['energy', 'forces']
-
+    
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label='dftb', atoms=None, kpts=None,
                  **kwargs):
-        """Construct a DFTB+ calculator.
-        """
-
+        """  Construct a DFTB+ calculator.  """
+        
         from ase.dft.kpoints import monkhorst_pack
-
+        
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
         else:
             slako_dir = './'
-
+        
         self.default_parameters = dict(
             Hamiltonian_='DFTB',
             Driver_='ConjugateGradient',
@@ -75,12 +86,21 @@ class Dftb(FileIOCalculator):
             Hamiltonian_SlaterKosterFiles_='Type2FileNames',
             Hamiltonian_SlaterKosterFiles_Prefix=slako_dir,
             Hamiltonian_SlaterKosterFiles_Separator='"-"',
-            Hamiltonian_SlaterKosterFiles_Suffix='".skf"'
+            Hamiltonian_SlaterKosterFiles_Suffix='".skf"',
+            Hamiltonian_MaxAngularMomentum_ = ''
             )
-
+        
+        ## set default maximum angular momentum to consider
+        for species in list(set(atoms.get_chemical_symbols())):
+            self.default_parameters['Hamiltonian_MaxAngularMomentum_'+species] = DefaultMaxAngMom[species]
+        
+        self.pbc = np.any(atoms.pbc)
+        ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
+        self.hvr_approach = 'CPA'
+        
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
-
+        
         self.kpts = kpts
         # kpoint stuff by ase
         if self.kpts != None:
@@ -91,7 +111,7 @@ class Dftb(FileIOCalculator):
             for i, imp in enumerate(mp):
                 key = initkey + '_empty' + str(i)
                 self.parameters[key] = str(mp[i]).strip('[]') + ' 1.0'
-
+        
         #the input file written only once
         if restart == None:
             self.write_dftb_in()
@@ -100,20 +120,18 @@ class Dftb(FileIOCalculator):
                 os.system('cp ' + restart + ' dftb_in.hsd')
             if not os.path.exists('dftb_in.hsd'):
                 raise IOError('No file "dftb_in.hsd", use restart=None')
-
+        
         #indexes for the result file
         self.first_time = True
         self.index_energy = None
         self.index_force_begin = None
         self.index_force_end = None
         
-        ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
-        self.hvr_approach = 'OPA'
-        
     
     def write_dftb_in(self):
-        """ Write the innput file for the dftb+ calculation.
-            Geometry is taken always from the file 'geo_end.gen'.
+        """
+        Write the input file for the dftb+ calculation.
+        Geometry is taken always from the file 'geo_end.gen'.
         """
 
         outfile = open('dftb_in.hsd', 'w')
@@ -121,10 +139,11 @@ class Dftb(FileIOCalculator):
         outfile.write('    <<< "geo_end.gen" \n')
         outfile.write('} \n')
         outfile.write(' \n')
-
+        
         #--------MAIN KEYWORDS-------
         previous_key = 'dummy_'
         myspace = ' '
+        
         for key, value in sorted(self.parameters.items()):
             current_depth = key.rstrip('_').count('_')
             previous_depth = previous_key.rstrip('_').count('_')
@@ -146,39 +165,41 @@ class Dftb(FileIOCalculator):
         #output to 'results.tag' file (which has proper formatting)
         outfile.write('Options { \n')
         outfile.write('   WriteResultsTag = Yes  \n')
-        outfile.write('   WriteEigenvectors = Yes  \n')
+        if (self.hvr_approach == 'CPA') or (self.hvr_approach == 'HA'):
+            outfile.write('   WriteEigenvectors = Yes  \n')
         outfile.write('} \n')
         outfile.close()
-
+        
     def set(self, **kwargs):
         changed_parameters = FileIOCalculator.set(self, **kwargs)
         if changed_parameters:
             self.reset()
             self.write_dftb_in()
-
+    
     def check_state(self, atoms):
         system_changes = FileIOCalculator.check_state(self, atoms)
         return system_changes
-
+    
     def write_input(self, atoms, properties=None, system_changes=None):
         from ase.io import write
         FileIOCalculator.write_input(\
             self, atoms, properties, system_changes)
         self.write_dftb_in()
         write('geo_end.gen', atoms)
-
+    
     def read_results(self):
         """ all results are read from results.tag file
             It will be destroyed after it is read to avoid
             reading it once again after some runtime error """
         from ase.io import read
         from os import remove
-
+        
         myfile = open('results.tag', 'r')
         self.lines = myfile.readlines()
         myfile.close()
         if self.first_time:
             self.first_time = False
+            self.solved_hvr = {'HA':False, 'CPA':False}
             # Energy line index
             for iline, line in enumerate(self.lines):
                 estring = 'total_energy'
@@ -201,8 +222,15 @@ class Dftb(FileIOCalculator):
                     self.nk = int(line1.split(',')[-2])
                     self.nOrbs = int(line1.split(',')[-3])
                     break
-            ## read further information (Martin Stoehr)
-            self.read_additional_info()
+            
+            ## read further information for SCC calculations (Martin Stoehr)
+            ## where is this information for non-SCC calculations
+            hSCC = 'Hamiltonian_SCC'
+            if self.parameters.has_key(hSCC):
+                if (self.parameters[hSCC] == 'YES'):
+                    self.read_additional_info()
+            else:
+                print('You started a non-SCC calculation. No additional Information available.')
             
             try:
                 myfile = open('eigenvec.out','r')
@@ -212,8 +240,8 @@ class Dftb(FileIOCalculator):
                 self.read_eigenvectors()
             except IOError:
                 print("No file name 'eigenvec.out', set WriteEigenvectors = Yes,\n \
-                       if you wish to use additional electronic structure properties.\n \
-                       For density dependent dispersion corrections, for instance!")
+if you wish to use additional electronic structure properties.\n \
+For density dependent dispersion corrections, for instance!")
                 
         self.read_energy()
         # read geometry from file in case dftb+ has done steps
@@ -279,17 +307,16 @@ class Dftb(FileIOCalculator):
         myfile = open('dftb_in.hsd','r')
         linesin = myfile.readlines()
         myfile.close()
-        self.pbc = False
         self.wk = np.ones(self.nk)
         self.kpts = np.zeros((self.nk,3))
         for iline, line in enumerate(linesin):
             if 'KPointsAndWeights =' in line:
-                self.pbc = True
                 for ik in xrange(self.nk):
                     self.wk[ik] = float(linesin[iline+1+ik].split()[3])
                     self.kpts[ik,:] = np.array(linesin[iline+1+ik].split()[:3], dtype=float)
                 break
         ## normalize k-point weighting factors (sum_k wk = 1)
+        ## In principle, this should not be neccessary. Anyway, ...
         self.wk /= np.sum(self.wk)
         
     
@@ -341,44 +368,50 @@ class Dftb(FileIOCalculator):
             raise RuntimeError('Problem in reading forces')
         
     
-    #-------------------------------------------------#
-    #  Approach(es) to atomic polarizabilities        #
-    #  by Martin Stoehr, martin.stoehr@tum.de (M.S.)  #
-    #-------------------------------------------------#
+    #-------------------------------------------#
+    #  Approach(es) to atomic polarizabilities  #
+    #  by Martin Stoehr, martin.stoehr@tum.de   #
+    #-------------------------------------------#
     
     def set_hvr_approach(self, approach):
         """ set approach for obtaining (approximate) Hirshfeld ratios """
-        valid_approaches = ['const', 'OPA', 'HA']
+        valid_approaches = ['const', 'CPA', 'HA']
         
         if approach in valid_approaches:
             self.hvr_approach = approach
         else:
             print('\033[91m'+"WARNING: '"+str(approach)+"' is not a valid identifier. \
-                   Defaulting to constant ratios of 1 instead..."+'\033[0m')
-            self.hvr_approach = 'const'
+                   Defaulting to ratios as obtained by charge population approach instead..."+'\033[0m')
+            self.hvr_approach = 'CPA'
         
     
     def get_hirsh_volrat(self):
         """
         Return Hirshfeld volume ratios using method <approach>
         
-        parameters (hard-coded so far):
-        ===============================
+        parameters:
+        ===========
             approach:  . 'HA'     actual Hirshfeld analysis using confined basis confinement
                                   (see ext_HA_DFTB.py)
-                       . 'OPA'    approx. ratios as obtained by overlap population analysis
-                                  (see ext_OPA_DFTB.py)
+                       . 'CPA'    ratios as obtained by charge population approach
+                                  (see ext_CPA_DFTB.py)
                        . 'const'  return constant ratios of 1.
         """
         if self.hvr_approach == 'const':
-            self.hirsh_volrat = self.get_hvr_const()
+            self.rescaling = self.get_hvr_const()
         elif self.hvr_approach == 'HA':
-            self.hirsh_volrat = self.get_hvr_HA()
-        elif self.hvr_approach == 'OPA':
-            self.hirsh_volrat = self.get_hvr_OPA()
+            self.rescaling = self.get_hvr_HA()
+        elif self.hvr_approach == 'CPA':
+            self.rescaling = self.get_hvr_CPA()
         else:
             raise NotImplementedError("Sorry dude, I don't know about a scheme called '"+approach+"'.")
-        return self.hirsh_volrat
+        return self.rescaling
+        
+    
+    def get_hvr_const(self):
+        """  Return constant rescaling (use free atom parameters).  """
+        
+        return np.ones(self.nAtoms)
         
     
     def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='Both'):
@@ -392,31 +425,33 @@ class Dftb(FileIOCalculator):
             nPhis(opt):    number of discrete polar angles, default: 72
             cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
             conf(opt):     confinement for basis functions in density construction in Angstroms,
-                           default: 'default' = (R_conf[symbol] .or. 5*R_cov[symbol] from box.data).
-                           Alternative:
-                             . 'None': use free radial wave functions throughout,
-                             . 'Both': use confined radial wave functions throughout,
+                             . 'None':     use free radial wave functions throughout,
+                             . 'Both':     use confined radial wave functions throughout (DEFAULT),
                              . list of confinement radii in Angstroms to use per atom.
         """
-        Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
         
+        Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
         HA = HirshfeldWrapper(self.atoms, self.wk, self.wf, self.f, self.otypes, Atom2OrbsF, self.Orb2Atom, \
                               dr=dr, nThetas=nThetas, nPhis=nPhis, cutoff=cutoff,conf=conf)
-        return HA.get_hvr()
+        
+        self.hvr_HA = HA.get_hvr()
+        
+        return self.hvr_HA
         
     
-    def get_hvr_OPA(self):
-        """ Return (approximate) Hirshfeld ratios as obtained by on-site overlap population """
-        syms = self.atoms.get_chemical_symbols()
-        n_el_atom = np.zeros(self.nAtoms)
-#        n_el_core = np.zeros(self.nAtoms)
-        for iAtom in xrange(self.nAtoms):
-#            Z = data[syms[iAtom]]['Z']
-            n_el_atom[iAtom] = data[syms[iAtom]]['valence_number'] #Z
-#            n_el_core[iAtom] = Z - data[syms[iAtom]]['valence_number']
+    def get_hvr_CPA(self):
+        """  Return rescaling ratios as obtained by charge population approach.  """
         
-        OPA = OverlapPopulationVolumeAnalysis(self.wf, self.f, self.wk, n_el_atom, self.Orb2Atom)
-        return OPA.get_hvr()
+        syms = self.atoms.get_chemical_symbols()
+        n_el_atom, ZAtoms = np.zeros(self.nAtoms), np.zeros(self.nAtoms)
+        for iAtom in xrange(self.nAtoms):
+            n_el_atom[iAtom] = data[syms[iAtom]]['valence_number']
+            ZAtoms[iAtom] = data[syms[iAtom]]['Z']
+        
+        CPA = ChargePopulationAnalysis(self.wf, self.f, self.wk, n_el_atom, ZAtoms, self.Orb2Atom)
+        self.hvr_CPA = CPA.get_a_div_a0()
+        
+        return self.hvr_CPA
         
     
 

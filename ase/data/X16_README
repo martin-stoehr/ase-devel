@@ -1,0 +1,8 @@
+X16 data set contains PBE+TS optimized geometries and unit cells.
+Experimental reference values for lattice energies derived from
+enthalpies of sublimation.
+
+Gas phase monomers are constructed in a unit cell of 100 Angstroms cubed
+and also optimized using PBE+TS.
+
+Calculations done by A. Tkatchenko, implementation in ASE by M. Stoehr.

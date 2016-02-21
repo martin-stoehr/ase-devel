@@ -436,7 +436,7 @@ class qmme(Calculator):
                         self.generate_hirshpart(iregion=immreg) )
                 except AttributeError:
                     pass
-                    # Be silent.
+                    ## Be silent.
                     #print self.mm_calculators[immreg].__class__.__name__ + \
                         #"calculator does not yet support Hirshfeld -\n" + \
                         #"partitioning assisted calculation. This is only\n" + \
@@ -655,20 +655,22 @@ class qmme(Calculator):
         an exception will be thrown. It will return an array with floats of
         the Hirshfeld-ration v_hirsh/v_free .
         """
-        try:
-            if self.solved_hirshfeld[i_current_qm]==False:
-                self.hirshfeld_ratios[i_current_qm] = self.qm_calculators[i_current_qm].get_hirsh_volrat()
-                self.solved_hirshfeld[i_current_qm]=True
-            return self.hirshfeld_ratios[i_current_qm]
-                #self.qm_regions[i_current_qm])
-        except AttributeError:
-            # Be silent and take default data.
-            #print self.qm_calculators[i_current_qm].__class__.__name__ + \
-                #" calculator does not yet support Hirshfeld-partitioning. " + \
-                #" Defaulting to v_hirsh/v_free = 1."
-            return [1.0 for i in range(self.qm_regions[i_current_qm].
-                                       get_number_of_atoms())]
-
+        if (not self.solved_hvr_qm[i_current_qm]):
+            try:
+                self.hvrs_qm_calc[i_current_qm] = self.qm_calculators[i_current_qm].get_hirsh_volrat()
+            except AttributeError:
+                # !DO NOT! be silent and take default data.
+                print self.qm_calculators[i_current_qm].__class__.__name__ + \
+                    " calculator does not yet support Hirshfeld-partitioning. " + \
+                    " Defaulting to v_hirsh/v_free = 1."
+                self.hvrs_qm_calc[i_current_qm] = [1.0 for i in \
+                                  range(self.qm_regions[i_current_qm].get_number_of_atoms())]
+            
+            self.solved_hvr_qm[i_current_qm] = True
+        
+        return self.hvrs_qm_calc[i_current_qm]
+        
+    
     def generate_hirshpart(self, iregion):
         """ This function generates an array with all the hirshfeld parameters.
 
@@ -683,10 +685,11 @@ class qmme(Calculator):
                                  in range(self.atoms.get_number_of_atoms())]
 
         # Construct Hirshfeld Partitioning with QM-Results
-        self.solved_hirshfeld = [False,]*self.nqm_regions
-        self.hirshfeld_ratios = {}
+        self.solved_hvr_qm = [False,]*self.nqm_regions
+        self.hvrs_qm_calc = []
         for region in range(self.nqm_regions):
             nelem = np.sum(self.qm_map[region])
+            self.hvrs_qm_calc.append(np.zeros(nelem))
             for atom in range(len(self.atoms)):
                 if (self.qm_map[region][atom]) and (nelem > 0):
                     self.qm_hirshpart[atom] = self.get_hirsh_volrat(region)[
@@ -694,7 +697,9 @@ class qmme(Calculator):
                     nelem -= 1
                 elif (self.qm_hirshpart[atom] == 0):
                     self.qm_hirshpart[atom] = 1.0
-
+        
+        ## reset calculator flag for new evaluation
+        self.solved_hvr_qm = [False,]*self.nqm_regions
         # Correct Hirshfeld-Partitioning for smaller portions of the whole
         # atoms-object if explicit or complementary mode is chosen
         if self.mm_mode in ['explicit', 'complementary']:
