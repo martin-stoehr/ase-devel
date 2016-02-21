@@ -44,7 +44,7 @@ for line in tnew:
     f.write(line)
 f.close()
 
-system('f2py -c --fcompiler=intelem --f90flags="-O3 -debug all -traceback" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
-#system('f2py -c --fcompiler=gfortran --f90flags="-O3 -debug all -traceback" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
+#system('f2py -c --fcompiler=intelem --f90flags="-O3 -debug all -traceback" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
+system('f2py -c --fcompiler=gfortran --f90flags="-O3 -debug all -traceback" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
 
 #--EOF--#

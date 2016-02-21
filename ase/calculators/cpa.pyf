@@ -3,8 +3,8 @@
 
 python module CPA_recode ! in 
     interface  ! in :CPA_recode
-        module cpa_recode ! in :CPA_recode:/data/stoehr/software/myASE/ase/calculators/CPA_recode.f90
-            subroutine get_apt(n_files,n_k_tot,n_basis,natoms,orb2atom,wk,do_pbc,type_evecs,apt) ! in :CPA_recode:/data/stoehr/software/myASE/ase/calculators/CPA_recode.f90:cpa_recode
+        module cpa_recode ! in :CPA_recode:/home/martin/Uni/Forschung/MSc-Thesis/software-codes/ase/ase/calculators/CPA_recode.f90
+            subroutine get_apt(n_files,n_k_tot,n_basis,natoms,orb2atom,wk,do_pbc,type_evecs,apt) ! in :CPA_recode:/home/martin/Uni/Forschung/MSc-Thesis/software-codes/ase/ase/calculators/CPA_recode.f90:cpa_recode
                 integer intent(in) :: n_files
                 integer intent(in) :: n_k_tot
                 integer intent(in) :: n_basis
