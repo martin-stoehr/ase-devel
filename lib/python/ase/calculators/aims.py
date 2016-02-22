@@ -467,7 +467,7 @@ class Aims(FileIOCalculator):
     
     def get_hvr_CPA(self):
         """
-        return (approximate) rescaling ratios for atomic polarizabilities
+        return rescaling ratios for atomic polarizabilities
         as obtained from charge population approach
         (see module ext_CPA_AIMS.py and CPA_recode.f90 for further details).
         by Martin Stoehr (martin.stoehr@tum.de) Oct 2015

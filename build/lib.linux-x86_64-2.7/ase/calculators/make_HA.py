@@ -63,6 +63,7 @@ for line in tnew:
     f.write(line)
 f.close()
 
+#system('f2py -c --fcompiler=intelem -I'+src_loc+' splines.o spherical_harmonics.o --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
 system('f2py -c --fcompiler=intelem -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3 -debug all -traceback" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
 #system('f2py -c --fcompiler=gfortran -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
 
