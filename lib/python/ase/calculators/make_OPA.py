@@ -10,17 +10,17 @@ except IndexError:
     src_loc = './'
 
 curr_files = listdir(src_loc)
-assert ('CPA_recode.f90' in curr_files)
+assert ('HA_recode.f90' in curr_files)
 
-if 'cpa.pyf' in curr_files:
-    remove(src_loc+'cpa.pyf')
-if 'CPA_recode.so' in curr_files:
-    remove(src_loc+'CPA_recode.so')
+if 'opa.pyf' in curr_files:
+    remove(src_loc+'opa.pyf')
+if 'OPA_recode.so' in curr_files:
+    remove(src_loc+'OPA_recode.so')
 
 
-system('f2py '+src_loc+'CPA_recode.f90 -m CPA_recode -h '+src_loc+'cpa.pyf')
+system('f2py '+src_loc+'OPA_recode.f90 -m OPA_recode -h '+src_loc+'opa.pyf')
 
-f = open(src_loc+'cpa.pyf', 'r')
+f = open(src_loc+'opa.pyf', 'r')
 text = f.readlines()
 f.close()
 
@@ -39,12 +39,12 @@ for i, line in enumerate(text):
     elif 'double precision dimension(n_k_tot),intent(in) :: wk' in line:
         tnew[i] = '                double precision dimension(n_k_tot),intent(in),depend(n_k_tot) :: wk\n'
 
-f = open(src_loc+'cpa.pyf', 'w')
+f = open(src_loc+'opa.pyf', 'w')
 for line in tnew:
     f.write(line)
 f.close()
 
-system('f2py -c --fcompiler=intelem --f90flags="-O3 -debug all -traceback" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
-#system('f2py -c --fcompiler=gfortran --f90flags="-O3 -debug all -traceback" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
+system('f2py -c --fcompiler=intelem --f90flags="-O3 -debug all -traceback" '+src_loc+'opa.pyf '+src_loc+'OPA_recode.f90')
+#system('f2py -c --fcompiler=gfortran --f90flags="-O3 -debug all -traceback" '+src_loc+'opa.pyf '+src_loc+'OPA_recode.f90')
 
 #--EOF--#

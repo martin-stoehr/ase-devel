@@ -109,7 +109,11 @@ class KSAllElectron:
         self.nucl=None
         self.exc=None
         if self.xc=='PW92':
-            self.xcf=XC_PW92()
+            self.xcf = XC_PW92()
+            self.gga = False
+        elif self.xc=='PBE':
+            self.xcf = XC_PBE()
+            self.gga = True
         else:
             raise NotImplementedError('Not implemented xc functional: %s' %xc)
 
@@ -128,7 +132,7 @@ class KSAllElectron:
         self.rmin, self.rmax, self.N=( 1E-2/self.Z, rmax, (maxnodes+1)*self.nodegpts )
         if self.scalarrel:
             print >> self.txt, 'Using scalar relativistic corrections.'
-        print>>self.txt, 'max %i nodes, %i grid points' %(maxnodes,self.N)
+        print>>self.txt, 'max %i nodes, %i grid points, rmax=%f' %(maxnodes,self.N,self.rmax)
         self.xgrid=np.linspace(0,np.log(self.rmax/self.rmin),self.N)
         self.rgrid=self.rmin*np.exp(self.xgrid)
         self.grid=RadialGrid(self.rgrid)
@@ -167,7 +171,11 @@ class KSAllElectron:
         for n,l,nl in self.list_states():
             self.bs_energy+=self.occu[nl]*self.enl[nl]
 
-        self.exc=array([self.xcf.exc(self.dens[i]) for i in xrange(self.N)])
+        if self.gga:
+            grad = array( self.grid.derivative(self.dens) )
+            self.exc = array([self.xcf.exc(self.dens[i], grad[i]) for i in xrange(self.N)])
+        else:
+            self.exc=array([self.xcf.exc(self.dens[i]) for i in xrange(self.N)])
         self.Hartree_energy=self.grid.integrate(self.Hartree*self.dens,use_dV=True)/2
         self.vxc_energy=self.grid.integrate(self.vxc*self.dens,use_dV=True)
         self.exc_energy=self.grid.integrate(self.exc*self.dens,use_dV=True)
@@ -251,7 +259,17 @@ class KSAllElectron:
     def calculate_veff(self):
         """ Calculate effective potential. """
         self.timer.start('veff')
-        self.vxc=array([self.xcf.vxc(self.dens[i]) for i in xrange(self.N)])
+        if self.gga:
+            grad = array( self.grid.derivative(self.dens) )
+            ## "non-gradient corrected" exchange correlation potential
+            Vxc = array([self.xcf.vxc(self.dens[i],grad[i]) for i in xrange(self.N)])
+            ## Dexc = d exc/d grad,  NabDexc = Nabla[ d exc/d grad ]
+            Dexc = array([self.xcf.vxc_correction(self.dens[i],grad[i]) for i in xrange(self.N)])
+            NabDexc = array( self.grid.derivative(Dexc) )
+            ## "gradient correction" to Vxc
+            self.vxc = Vxc - self.dens*NabDexc - Dexc*grad
+        else:
+            self.vxc=array([self.xcf.vxc(self.dens[i]) for i in xrange(self.N)])
         self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
@@ -307,7 +325,7 @@ class KSAllElectron:
         N=self.grid.get_N()
 
         # make confinement and nuclear potentials; intitial guess for veff
-        self.conf=array([self.confinement_potential(r) for r in self.rgrid]).flatten()
+        self.conf=array([self.confinement_potential(r) for r in self.rgrid])
         self.nucl=array([self.V_nuclear(r) for r in self.rgrid])
         self.get_veff_and_dens()
         self.calculate_Hartree_potential()
@@ -402,11 +420,12 @@ class KSAllElectron:
                 # u(r)~r**(l+1)   r->0
                 # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1 and use expansion to avoid overflows)
                 u[0:2]=rgrid[0:2]**(l+1)
-                if not (c0[-2]<0 and c0[-1]<0):
-                    pl.plot(c0)
-                    pl.show()
 
-                assert (c0[-2]<0 and c0[-1]<0)
+#                if not(c0[-2]<0 and c0[-1]<0):
+#                    pl.plot(c0)
+#                    pl.show()
+
+                assert c0[-2]<0 and c0[-1]<0
 
                 u, nodes, A, ctp=shoot(u,dx,c2,c1,c0,N)
                 it+=1
@@ -551,17 +570,6 @@ class KSAllElectron:
                 if nl in self.occu:
                     states.append((n,l,nl))
         return states
-    
-    
-    def list_nls(self):
-        """ List all potential states ['1s', '2s', '2p', ...]. """
-        bla=[]
-        for l in range(self.maxl+1):
-            for n in range(1,self.maxn+1):
-                nl=orbit_transform((n,l),string=True)
-                if nl in self.occu:
-                    bla.append(nl)
-        return bla
 
 
     def get_energy(self):
@@ -772,8 +780,18 @@ class RadialGrid:
             return ((f[0:self.N-1]+f[1:self.N])*self.dV).sum()*0.5
         else:
             return ((f[0:self.N-1]+f[1:self.N])*self.dr).sum()*0.5
-
-
+        
+    
+    def derivative(self,f):
+        """ 
+        Calculates the first derivative of function f 
+        """
+        spfit = SplineFunction(self.grid, f)
+        deriv = array([spfit(r, der=1) for r in self.grid])
+        
+        return deriv
+        
+    
 
 class ConfinementPotential:
     def __init__(self,mode,**kwargs):
@@ -785,6 +803,11 @@ class ConfinementPotential:
             self.r0=kwargs['r0']
             self.f=self.quadratic #lambda r:(r/self.r0)**2
             self.comment='quadratic r0=%.3f' %self.r0
+        elif mode=='general':
+            self.r0=kwargs['r0']
+            self.s=kwargs['s']
+            self.f=self.general #lambda r:(r/self.r0)**s
+            self.comment='general r0={0:.3f}  s={1:.3f}'.format(self.r0, self.s)
         else:
             raise NotImplementedError('implement new confinements')
 
@@ -796,6 +819,9 @@ class ConfinementPotential:
 
     def quadratic(self,r):
         return (r/self.r0)**2
+
+    def general(self,r):
+        return (r/self.r0)**self.s
 
     def __call__(self,r):
         return self.f(r)
@@ -815,21 +841,24 @@ class XC_PW92:
         self.b2 = 2*self.c0*self.b1**2
         self.b3 = 1.6382
         self.b4 = 0.49294
-
+        
+    
     def exc(self,n,der=0):
         """ Exchange-correlation with electron density n. """
         if n<self.small:
             return 0.0
         else:
             return self.e_x(n,der=der)+self.e_corr(n,der=der)
-
+        
+    
     def e_x(self,n,der=0):
         """ Exchange. """
         if der==0:
             return -3.0/4*(3*n/pi)**(1.0/3)
         elif der==1:
             return -3.0/(4*pi)*(3*n/pi)**(-2.0/3)
-
+        
+    
     def e_corr(self,n,der=0):
         """ Correlation energy. """
         rs = (3.0/(4*pi*n))**(1.0/3)
@@ -840,7 +869,8 @@ class XC_PW92:
             return ( -2*self.c0*self.a1*log(1+aux**-1) \
                    -2*self.c0*(1+self.a1*rs)*(1+aux**-1)**-1*(-aux**-2)\
                    *2*self.c0*(self.b1/(2*sqrt(rs))+self.b2+3*self.b3*sqrt(rs)/2+2*self.b4*rs) )*( -(4*pi*n**2*rs**2)**-1 )
-
+        
+    
     def vxc(self,n):
         """ Exchange-correlation potential (functional derivative of exc). """
         eps=1E-9*n
@@ -848,8 +878,128 @@ class XC_PW92:
             return 0.0
         else:
             return self.exc(n)+n*self.exc(n,der=1)
+        
+    
 
-
+#TODO check PBE functinoal
+class XC_PBE:
+    def __init__(self):
+        """  The Perdew Burke Ernzerhof functional 1996.  """
+        self.eta = 1E-19
+        self.ax =-0.738558766382022405884230032680836
+        self.gamma = 0.03109069086965489503494086371273
+        self.beta = 0.06672455060314922
+        self.omega = 0.046644
+        self.kappa = 0.8040
+        self.mu = 0.2195149727645171
+        self.mk = self.mu/self.kappa
+        
+    
+    def exc(self,rho,nab,der=0):
+        """
+        PBE Exchange-correlation functional
+        
+        parameters:
+        ===========
+            . rho:   density in e/Bohr**3
+            . nab:   density gradient (Nabla rho) in e/Bohr^4
+            . der:   flag whether to return eps_xc(der=0) or v_xc(der=1), or deps/dnab(der=-1). Default: der=0
+        
+        """
+        if rho<self.eta:
+            return 0.
+        else:
+            return self.e_x(rho,nab,der=der)+self.e_corr(rho,nab,der=der)
+        
+    
+    def e_x(self,rho,nab,der=0):
+        """  Exchange energy (Ex) and functional derivative (Vx).  """
+        C0I = 0.238732414637843
+        C1 = -0.45816529328314287
+        C2 = 0.26053088059892404
+        rs = (C0I/rho)**(1./3.)
+        
+        # lda part
+        ex = C1/rs
+        dexdrs = -ex/rs
+        
+        # gga part
+        bla = (C2*rs/rho)
+        c = bla*bla
+        a2 = abs(nab)*abs(nab)
+        bla2 = a2*c
+        
+        arg = np.maximum(-self.mu*bla2/self.kappa, -5.E2)
+        x = np.exp(arg)
+        Fx = 1. + self.kappa*(1. - x)
+        dFxds2 = self.mu*x
+        if (der==0):
+            return ex*Fx
+        elif (der==1):
+            ds2drs = 8.*c*a2/rs
+            dexdrs = dexdrs*Fx + ex*dFxds2*ds2drs
+            return -(rs*dexdrs)/(3.*rho)
+        elif (der==-1):
+            return ex*dFxds2*c
+        
+    
+    def e_corr(self,rho,nab,der=0):
+        """ Correlation energy (Ec) and functional derivative (Vc). """
+        ## adapted from gpaw.xc.gga PurePythonPBE class
+        C0I = 0.238732414637843
+        C3 = 0.10231023756535741
+        rs = (C0I/rho)**(1./3.)
+        
+        # lda part
+        sqrtrs = rs**0.5
+        Q0 = -2.*self.gamma*(1. + 0.21370*rs)
+        F1 = 1.6382 + sqrtrs*0.49294
+        F2 = 3.5876 + sqrtrs*F1
+        F3 = 7.5957 + sqrtrs*F2
+        Q1 = 2.*self.gamma*sqrtrs*F3
+        ec = Q0*log(1. + 1./Q1)
+        F4 = 4.9146 + 1.97176*sqrtrs
+        dQ1drs = self.gamma*(7.5957/sqrtrs + 7.1752 + sqrtrs*F4)
+        decdrs = -2.*self.gamma*0.21370*ec/Q0 - Q0*dQ1drs/(Q1*(Q1 + 1.))
+        
+        # gga part
+        rho2 = rho*rho
+        t2 = C3*abs(nab)*abs(nab)*rs/rho2
+        y = -ec/self.gamma
+        x = np.exp(y)
+        A = (y>1E-20)*self.beta/(self.gamma*(x - 1.))
+        
+        At2 = A*t2
+        nom = 1. + At2
+        denom = nom + At2*At2
+        H = self.gamma*np.log(1. + self.beta*t2*nom/(denom*self.gamma))
+        tmp = self.gamma*self.beta/(denom*(self.beta*t2*nom + self.gamma*denom))
+        tmp2 = A*A*x/self.beta
+        dAdrs = tmp2*decdrs
+        dHdt2 = (1. + 2.*At2)*tmp
+        dHdA = -At2*t2*t2*(2. + At2)*tmp
+        if (der==0):
+            return ec+H
+        elif (der==-1):
+            return dHdt2*C3*rs/rho2
+        elif (der==1):
+            decdrs += dHdt2*7.*t2/rs + dHdA*dAdrs
+            return -(rs*decdrs)/(3.*rho)
+        
+    
+    def vxc(self,rho,nab):
+        """  (non-corrected!) Exchange-correlation potential.  """
+        eps=1E-9*rho    ## WHAT EXACTLY IS THIS FOR?
+        
+        return self.exc(rho,nab)+rho*self.exc(rho,nab,der=1)
+        
+    
+    def vxc_correction(self,rho,nab):
+        """  Return gradient correction to exchange correlation potential.  """
+        eps=1E-9*rho    ## WHAT EXACTLY IS THIS FOR?
+        
+        return 2.*nab*self.exc(rho,nab,der=-1)
+    
 
 angular_momenta=['s','p','d','f','g','h','i','j','k','l']
 def orbit_transform(nl,string):
