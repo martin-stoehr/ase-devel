@@ -4,7 +4,7 @@ import numpy as np
 
 from ase.units import Bohr
 from ase.calculators.calculator import Calculator, all_changes
-from ase.calculators.d3_recode import d3
+from ase.calculators._d3 import d3
 
 d3_calc = d3.d3_calc
 
