@@ -101,8 +101,9 @@ class kSpace_MBD_calculator(Calculator):
         self.omega_TS = mbd.omega_eff(self.C6_TS, self.alpha_TS)
         self.beta = xc2beta[self.xc]
         
-        self.run_eletrostatic_screening(mode='C')
+        self.run_electrostatic_screening(mode='C')
         self.get_reciprocal_space_mbd_energy()
+        mbd.destroy_grid()
         
     
     def run_electrostatic_screening(self, mode='C'):
@@ -125,7 +126,6 @@ class kSpace_MBD_calculator(Calculator):
                                     self.alpha_0_SCS, self.omega_SCS, k_grid, \
                                     self.UC, r_vdw=self.RvdW_SCS, a=6, beta=self.beta)[0]
         self.E_MBD *= Hartree
-        mbd.destroy_grid()
         
     
     def set_a_div_a0(self, rescaling):
