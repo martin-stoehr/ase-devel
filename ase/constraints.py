@@ -1,32 +1,31 @@
 from math import sqrt
+from ase.utils.geometry import find_mic
 
 import numpy as np
 
 __all__ = ['FixCartesian', 'FixBondLength', 'FixedMode', 'FixConstraintSingle',
            'FixAtoms', 'UnitCellFilter', 'FixScaled', 'StrainFilter',
            'FixedPlane', 'Filter', 'FixConstraint', 'FixedLine',
-           'FixBondLengths', 'FixInternals', 'FixCOM']
+           'FixBondLengths', 'FixInternals', 'Hookean']
 
 
-def slice2enlist(s):
+def dict2constraint(dct):
+    if dct['name'] not in __all__:
+        raise ValueError
+    return globals()[dct['name']](**dct['kwargs'])
+
+            
+def slice2enlist(s, n):
     """Convert a slice object into a list of (new, old) tuples."""
     if isinstance(s, (list, tuple)):
         return enumerate(s)
-    if s.step == None:
-        step = 1
-    else:
-        step = s.step
-    if s.start == None:
-        start = 0
-    else:
-        start = s.start
-    return enumerate(range(start, s.stop, step))
+    return enumerate(range(*s.indices(n)))
 
 
 class FixConstraint:
     """Base class for classes that fix one or more atoms in some way."""
 
-    def index_shuffle(self, ind):
+    def index_shuffle(self, atoms, ind):
         """Change the indices.
 
         When the ordering of the atoms in the Atoms object changes,
@@ -44,18 +43,25 @@ class FixConstraint:
         multiplied constraints to work.
         """
         msg = ("Repeat is not compatible with your atoms' constraints."
-               " Use atoms.set_constraint() before calling repeat to "
-               "remove your constraints.")
+               ' Use atoms.set_constraint() before calling repeat to '
+               'remove your constraints.')
         raise NotImplementedError(msg)
 
+    def adjust_momenta(self, atoms, momenta):
+        """Adjusts momenta in identical manner to forces."""
+        self.adjust_forces(atoms, momenta)
+
+    def copy(self):
+        return dict2constraint(self.todict().copy())
+        
 
 class FixConstraintSingle(FixConstraint):
     """Base class for classes that fix a single atom."""
 
-    def index_shuffle(self, ind):
+    def index_shuffle(self, atoms, ind):
         """The atom index must be stored as self.a."""
         newa = -1   # Signal error
-        for new, old in slice2enlist(ind):
+        for new, old in slice2enlist(ind, len(atoms)):
             if old == self.a:
                 newa = new
                 break
@@ -81,7 +87,8 @@ class FixAtoms(FixConstraint):
         --------
         Fix all Copper atoms:
 
-        >>> c = FixAtoms(mask=[s == 'Cu' for s in atoms.get_chemical_symbols()])
+        >>> mask = [s == 'Cu' for s in atoms.get_chemical_symbols()]
+        >>> c = FixAtoms(mask=mask)
         >>> atoms.set_constraint(c)
 
         Fix all atoms with z-coordinate less than 1.0 Angstrom:
@@ -96,62 +103,47 @@ class FixAtoms(FixConstraint):
             raise ValueError('Use only one of "indices" and "mask".')
 
         if mask is not None:
-            self.index = np.asarray(mask, bool)
+            indices = np.arange(len(mask))[np.asarray(mask, bool)]
         else:
-            # Check for duplicates
+            # Check for duplicates:
             srt = np.sort(indices)
+            assert (srt == indices).all()
             for i in range(len(indices) - 1):
                 if srt[i] == srt[i + 1]:
                     raise ValueError(
                         'FixAtoms: The indices array contained duplicates. '
                         'Perhaps you wanted to specify a mask instead, but '
                         'forgot the mask= keyword.')
-            self.index = np.asarray(indices, int)
+        self.index = np.asarray(indices, int)
 
         if self.index.ndim != 1:
             raise ValueError('Wrong argument to FixAtoms class!')
 
-    def adjust_positions(self, old, new):
-        new[self.index] = old[self.index]
+    def adjust_positions(self, atoms, new):
+        new[self.index] = atoms.positions[self.index]
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         forces[self.index] = 0.0
 
-    def index_shuffle(self, ind):
+    def index_shuffle(self, atoms, ind):
         # See docstring of superclass
-        if self.index.dtype == bool:
-            self.index = self.index[ind]
-        else:
-            index = []
-            for new, old in slice2enlist(ind):
-                if old in self.index:
-                    index.append(new)
-            if len(index) == 0:
-                raise IndexError('All indices in FixAtoms not part of slice')
-            self.index = np.asarray(index, int)
-
-    def copy(self):
-        if self.index.dtype == bool:
-            return FixAtoms(mask=self.index.copy())
-        else:
-            return FixAtoms(indices=self.index.copy())
+        index = []
+        for new, old in slice2enlist(ind, len(atoms)):
+            if old in self.index:
+                index.append(new)
+        if len(index) == 0:
+            raise IndexError('All indices in FixAtoms not part of slice')
+        self.index = np.asarray(index, int)
 
     def __repr__(self):
-        if self.index.dtype == bool:
-            return 'FixAtoms(mask=%s)' % ints2string(self.index.astype(int))
         return 'FixAtoms(indices=%s)' % ints2string(self.index)
 
     def todict(self):
-        dct = {'__name__': 'ase.constraints.FixAtoms'}
-        if self.index.dtype == bool:
-            dct['mask'] = self.index
-        else:
-            dct['indices'] = self.index
-        return dct
+        return {'name': 'FixAtoms',
+                'kwargs': {'indices': self.index}}
 
     def repeat(self, m, n):
         i0 = 0
-        l = len(self.index)
         natoms = 0
         if isinstance(m, int):
             m = (m, m, m)
@@ -160,87 +152,84 @@ class FixAtoms(FixConstraint):
             for m1 in range(m[1]):
                 for m0 in range(m[0]):
                     i1 = i0 + n
-                    if self.index.dtype == bool:
-                        index_new.extend(self.index)
-                    else:
-                        index_new += [i + natoms for i in self.index]
+                    index_new += [i + natoms for i in self.index]
                     i0 = i1
                     natoms += n
-        if self.index.dtype == bool:
-            self.index = np.asarray(index_new, bool)
-        else:
-            self.index = np.asarray(index_new, int)
+        self.index = np.asarray(index_new, int)
         return self
 
     def delete_atom(self, ind):
         """ Removes atom number ind from the index array, if present.
         Required for removing atoms with existing FixAtoms constraints.
         """
-        if self.index.dtype == bool:
-            self.index = np.delete(self.index, ind)
-        else:
-            if ind in self.index:
-                i = list(self.index).index(ind)
-                self.index = np.delete(self.index, i)
-            for i in range(len(self.index)):
-                if self.index[i] >= ind:
-                    self.index[i] -= 1
+        if ind in self.index:
+            i = list(self.index).index(ind)
+            self.index = np.delete(self.index, i)
+        for i in range(len(self.index)):
+            if self.index[i] >= ind:
+                self.index[i] -= 1
 
 
-def ints2string(x, threshold=10):
+def ints2string(x, threshold=None):
     """Convert ndarray of ints to string."""
-    if len(x) <= threshold:
+    if threshold is None or len(x) <= threshold:
         return str(x.tolist())
     return str(x[:threshold].tolist())[:-1] + ', ...]'
 
 
 class FixBondLengths(FixConstraint):
     def __init__(self, pairs, iterations=10):
-        self.constraints = [FixBondLength(a1, a2)
-                            for a1, a2 in pairs]
+        self.constraints = [FixBondLength(a1, a2) for a1, a2 in pairs]
         self.iterations = iterations
 
-    def adjust_positions(self, old, new):
+    def adjust_positions(self, atoms, new):
         for i in range(self.iterations):
             for constraint in self.constraints:
-                constraint.adjust_positions(old, new)
+                constraint.adjust_positions(atoms, new)
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         for i in range(self.iterations):
             for constraint in self.constraints:
-                constraint.adjust_forces(positions, forces)
+                constraint.adjust_forces(atoms, forces)
 
-    def copy(self):
-        return FixBondLengths([constraint.indices
-                               for constraint in self.constraints])
+    def todict(self):
+        return {'name': 'FixBondLengths',
+                'kwargs': {'pairs': [constraint.indices
+                                     for constraint in self.constraints],
+                           'iterations': self.iterations}}
 
 
 class FixBondLength(FixConstraint):
     """Constraint object for fixing a bond length."""
     def __init__(self, a1, a2):
-        """Fix distance between atoms with indices a1 and a2."""
+        """Fix distance between atoms with indices a1 and a2. If mic is
+        True, follows the minimum image convention to keep constant the
+        shortest distance between a1 and a2 in any periodic direction.
+        atoms only needs to be supplied if mic=True.
+        """
         self.indices = [a1, a2]
+        self.constraint_force = None
 
-    def adjust_positions(self, old, new):
-        p1, p2 = old[self.indices]
-        d = p2 - p1
-        p = sqrt(np.dot(d, d))
+    def adjust_positions(self, atoms, new):
+        p1, p2 = atoms.positions[self.indices]
+        d, p = find_mic(np.array([p2 - p1]), atoms._cell, atoms._pbc)
         q1, q2 = new[self.indices]
-        d = q2 - q1
-        q = sqrt(np.dot(d, d))
+        d, q = find_mic(np.array([q2 - q1]), atoms._cell, atoms._pbc)
         d *= 0.5 * (p - q) / q
-        new[self.indices] = (q1 - d, q2 + d)
+        new[self.indices] = (q1 - d[0], q2 + d[0])
 
-    def adjust_forces(self, positions, forces):
-        d = np.subtract.reduce(positions[self.indices])
-        d2 = np.dot(d, d)
-        d *= 0.5 * np.dot(np.subtract.reduce(forces[self.indices]), d) / d2
+    def adjust_forces(self, atoms, forces):
+        d = np.subtract.reduce(atoms.positions[self.indices])
+        d, p = find_mic(np.array([d]), atoms._cell, atoms._pbc)
+        d = d[0]
+        d *= 0.5 * np.dot(np.subtract.reduce(forces[self.indices]), d) / p**2
+        self.constraint_force = d
         forces[self.indices] += (-d, d)
 
-    def index_shuffle(self, ind):
-        'Shuffle the indices of the two atoms in this constraint'
+    def index_shuffle(self, atoms, ind):
+        """Shuffle the indices of the two atoms in this constraint"""
         newa = [-1, -1]  # Signal error
-        for new, old in slice2enlist(ind):
+        for new, old in slice2enlist(ind, len(atoms)):
             for i, a in enumerate(self.indices):
                 if old == a:
                     newa[i] = new
@@ -248,34 +237,36 @@ class FixBondLength(FixConstraint):
             raise IndexError('Constraint not part of slice')
         self.indices = newa
 
-    def copy(self):
-        return FixBondLength(*self.indices)
+    def get_constraint_force(self):
+        """Return the (scalar) force required to maintain the constraint"""
+        return self.constraint_force
 
     def __repr__(self):
         return 'FixBondLength(%d, %d)' % tuple(self.indices)
 
+    def todict(self):
+        return {'name': 'FixBondLength',
+                'kwargs': {'a1': self.indices[0], 'a2': self.indices[1]}}
 
+        
 class FixedMode(FixConstraint):
     """Constrain atoms to move along directions orthogonal to
     a given mode only."""
 
     def __init__(self, mode):
-        self.mode = (np.asarray(mode) / np.sqrt((mode **2).sum())).reshape(-1)
+        self.mode = (np.asarray(mode) / np.sqrt((mode**2).sum())).reshape(-1)
 
-    def adjust_positions(self, oldpositions, newpositions):
+    def adjust_positions(self, atoms, newpositions):
         newpositions = newpositions.ravel()
-        oldpositions = oldpositions.ravel()
+        oldpositions = atoms.positions.ravel()
         step = newpositions - oldpositions
         newpositions -= self.mode * np.dot(step, self.mode)
-        newpositions = newpositions.reshape(-1, 3)
-        oldpositions = oldpositions.reshape(-1, 3)
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         forces = forces.ravel()
         forces -= self.mode * np.dot(forces, self.mode)
-        forces = forces.reshape(-1, 3)
 
-    def index_shuffle(self, ind):
+    def index_shuffle(self, atoms, ind):
         eps = 1e-12
         mode = self.mode.reshape(-1, 3)
         excluded = np.ones(len(mode), dtype=bool)
@@ -284,112 +275,111 @@ class FixedMode(FixConstraint):
             raise IndexError('All nonzero parts of mode not in slice')
         self.mode = mode[ind].ravel()
 
-    def copy(self):
-        return FixedMode(self.mode)
+    def todict(self):
+        return {'name': 'FixedMode',
+                'kwargs': {'mode': self.mode}}
 
     def __repr__(self):
         return 'FixedMode(%s)' % self.mode.tolist()
 
 
 class FixedPlane(FixConstraintSingle):
-    """Constrain an atom *a* to move in a given plane only.
+    """Constrain an atom index *a* to move in a given plane only.
 
-    The plane is defined by its normal: *direction*."""
+    The plane is defined by its normal vector *direction*."""
 
     def __init__(self, a, direction):
         self.a = a
         self.dir = np.asarray(direction) / sqrt(np.dot(direction, direction))
 
-    def adjust_positions(self, oldpositions, newpositions):
-        step = newpositions[self.a] - oldpositions[self.a]
+    def adjust_positions(self, atoms, newpositions):
+        step = newpositions[self.a] - atoms.positions[self.a]
         newpositions[self.a] -= self.dir * np.dot(step, self.dir)
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         forces[self.a] -= self.dir * np.dot(forces[self.a], self.dir)
 
-    def copy(self):
-        return FixedPlane(self.a, self.dir)
-
+    def todict(self):
+        return {'name': 'FixedPlane',
+                'kwargs': {'a': self.a, 'direction': self.dir}}
+        
     def __repr__(self):
         return 'FixedPlane(%d, %s)' % (self.a, self.dir.tolist())
 
 
 class FixedLine(FixConstraintSingle):
-    """Constrain an atom *a* to move on a given line only.
+    """Constrain an atom index *a* to move on a given line only.
 
-    The line is defined by its *direction*."""
+    The line is defined by its vector *direction*."""
 
     def __init__(self, a, direction):
         self.a = a
         self.dir = np.asarray(direction) / sqrt(np.dot(direction, direction))
 
-    def adjust_positions(self, oldpositions, newpositions):
-        step = newpositions[self.a] - oldpositions[self.a]
+    def adjust_positions(self, atoms, newpositions):
+        step = newpositions[self.a] - atoms.positions[self.a]
         x = np.dot(step, self.dir)
-        newpositions[self.a] = oldpositions[self.a] + x * self.dir
+        newpositions[self.a] = atoms.positions[self.a] + x * self.dir
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         forces[self.a] = self.dir * np.dot(forces[self.a], self.dir)
-
-    def copy(self):
-        return FixedLine(self.a, self.dir)
 
     def __repr__(self):
         return 'FixedLine(%d, %s)' % (self.a, self.dir.tolist())
+        
+    def todict(self):
+        return {'name': 'FixedLine',
+                'kwargs': {'a': self.a, 'direction': self.dir}}
 
 
 class FixCartesian(FixConstraintSingle):
-    'Fix an atom in the directions of the cartesian coordinates.'
+    'Fix an atom index *a* in the directions of the cartesian coordinates.'
     def __init__(self, a, mask=(1, 1, 1)):
         self.a = a
-        self.mask = -(np.array(mask) - 1)
+        self.mask = ~np.asarray(mask, bool)
 
-    def adjust_positions(self, old, new):
-        step = new[self.a] - old[self.a]
+    def adjust_positions(self, atoms, new):
+        step = new[self.a] - atoms.positions[self.a]
         step *= self.mask
-        new[self.a] = old[self.a] + step
+        new[self.a] = atoms.positions[self.a] + step
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         forces[self.a] *= self.mask
 
-    def copy(self):
-        return FixCartesian(self.a, 1 - self.mask)
-
     def __repr__(self):
-        return 'FixCartesian(indice=%s mask=%s)' % (self.a, self.mask)
+        return 'FixCartesian(a={0}, mask={1})'.format(self.a,
+                                                      list(~self.mask))
 
+    def todict(self):
+        return {'name': 'FixCartesian',
+                'kwargs': {'a': self.a, 'mask': ~self.mask}}
 
-class fix_cartesian(FixCartesian):
-    'Backwards compatibility for FixCartesian.'
-    def __init__(self, a, mask=(1, 1, 1)):
-        import warnings
-        super(fix_cartesian, self).__init__(a, mask)
-        warnings.warn('fix_cartesian is deprecated. Please use FixCartesian'
-                      ' instead.', DeprecationWarning, stacklevel=2)
-
-
+        
 class FixScaled(FixConstraintSingle):
-    'Fix an atom in the directions of the unit vectors.'
+    'Fix an atom index *a* in the directions of the unit vectors.'
     def __init__(self, cell, a, mask=(1, 1, 1)):
-        self.cell = cell
+        self.cell = np.asarray(cell)
         self.a = a
         self.mask = np.array(mask)
 
-    def adjust_positions(self, old, new):
-        scaled_old = np.linalg.solve(self.cell.T, old.T).T
+    def adjust_positions(self, atoms, new):
+        scaled_old = np.linalg.solve(self.cell.T, atoms.positions.T).T
         scaled_new = np.linalg.solve(self.cell.T, new.T).T
         for n in range(3):
             if self.mask[n]:
                 scaled_new[self.a, n] = scaled_old[self.a, n]
         new[self.a] = np.dot(scaled_new, self.cell)[self.a]
 
-    def adjust_forces(self, positions, forces):
+    def adjust_forces(self, atoms, forces):
         scaled_forces = np.linalg.solve(self.cell.T, forces.T).T
         scaled_forces[self.a] *= -(self.mask - 1)
         forces[self.a] = np.dot(scaled_forces, self.cell)[self.a]
 
-    def copy(self):
-        return FixScaled(self.cell, self.a, self.mask)
+    def todict(self):
+        return {'name': 'FixScaled',
+                'kwargs': {'a': self.a,
+                           'cell': self.cell,
+                           'mask': self.mask}}
 
     def __repr__(self):
         return 'FixScaled(%s, %d, %s)' % (repr(self.cell),
@@ -397,89 +387,82 @@ class FixScaled(FixConstraintSingle):
                                           repr(self.mask))
 
 
-class fix_scaled(FixScaled):
-    'Backwards compatibility for FixScaled.'
-    def __init__(self, cell, a, mask=(1, 1, 1)):
-        import warnings
-        super(fix_scaled, self).__init__(cell, a, mask)
-        warnings.warn('fix_scaled is deprecated. Please use FixScaled '
-                      'instead.', DeprecationWarning, stacklevel=2)
-
-
 # TODO: Better interface might be to use dictionaries in place of very
 # nested lists/tuples
 class FixInternals(FixConstraint):
     """Constraint object for fixing multiple internal coordinates.
 
-    Allows fixing bonds, angles, dihedrals, and planes in which atoms can move
-    """
-    def __init__(self, atoms=None, bonds=None, angles=None, dihedrals=None, planes=None,
-             epsilon=1.e-7, _copy_init=None):
-        if _copy_init is None:
-            if atoms is None:
-                raise ValueError('Atoms object has to be defined.')
-            masses = atoms.get_masses()
-            if bonds is None:
-                bonds = []
-            if angles is None:
-                angles = []
-            if dihedrals is None:
-                dihedrals = []
-            if planes is None:
-                planes = []
-            self.n = len(bonds) + len(angles) + len(dihedrals) + len(planes)
-            self.constraints = []
-            for bond in bonds:
-                masses_bond = masses.take(bond[1])
-                self.constraints.append(self.FixBondLengthAlt(bond[0], bond[1],
-                                                              masses_bond))
-            for angle in angles:
-                masses_angle = masses.take(angle[1])
-                self.constraints.append(self.FixAngle(angle[0], angle[1],
-                                                      masses_angle))
-            for dihedral in dihedrals:
-                masses_dihedral = masses.take(dihedral[1])
-                self.constraints.append(self.FixDihedral(dihedral[0],
-                                                         dihedral[1],
-                                                         masses_dihedral))
-            for plane in planes:
-                old_pos = atoms.positions[plane[1],:]
-                self.constraints.append(self.FixedPlaneAlt(plane[1],plane[0], old_pos))
+    Allows fixing bonds, angles, and dihedrals."""
+    def __init__(self, bonds=None, angles=None, dihedrals=None,
+                 epsilon=1.e-7):
+        self.bonds = bonds or []
+        self.angles = angles or []
+        self.dihedrals = dihedrals or []
+        
+        # Initialize these at run-time:
+        self.n = 0
+        self.constraints = []
+        self.epsilon = epsilon
+        
+        self.initialized = False
+    
+    def initialize(self, atoms):
+        if self.initialized:
+            return
+        masses = atoms.get_masses()
+        self.n = len(self.bonds) + len(self.angles) + len(self.dihedrals)
+        self.constraints = []
+        for bond in self.bonds:
+            masses_bond = masses.take(bond[1])
+            self.constraints.append(self.FixBondLengthAlt(bond[0], bond[1],
+                                                          masses_bond))
+        for angle in self.angles:
+            masses_angle = masses.take(angle[1])
+            self.constraints.append(self.FixAngle(angle[0], angle[1],
+                                                  masses_angle))
+        for dihedral in self.dihedrals:
+            masses_dihedral = masses.take(dihedral[1])
+            self.constraints.append(self.FixDihedral(dihedral[0],
+                                                     dihedral[1],
+                                                     masses_dihedral))
+        self.initialized = True
 
-            self.epsilon = epsilon
-
-        #copy case for __init__
-        else:
-            self.constraints = _copy_init
-            self.n = len(self.constraints)
-            self.epsilon = epsilon
-
-    def adjust_positions(self, old, new):
+    def todict(self):
+        return {'name': 'FixInternals',
+                'kwargs': {'bonds': self.bonds,
+                           'angles': self.angles,
+                           'dihedrals': self.dihedrals,
+                           'epsilon': self.epsilon}}
+        
+    def adjust_positions(self, atoms, new):
+        self.initialize(atoms)
         for constraint in self.constraints:
-            constraint.set_h_vectors(old)
-        for j in range(100):
+            constraint.set_h_vectors(atoms.positions)
+        for j in range(50):
             maxerr = 0.0
             for constraint in self.constraints:
-                constraint.adjust_positions(old, new)
+                constraint.adjust_positions(atoms.positions, new)
                 maxerr = max(abs(constraint.sigma), maxerr)
             if maxerr < self.epsilon:
                 return
         raise ValueError('Shake did not converge.')
 
-    def adjust_forces(self, positions, forces):
-        #Project out translations and rotations and all other constraints
+    def adjust_forces(self, atoms, forces):
+        """Project out translations and rotations and all other constraints"""
+        self.initialize(atoms)
+        positions = atoms.positions
         N = len(forces)
         list2_constraints = list(np.zeros((6, N, 3)))
         tx, ty, tz, rx, ry, rz = list2_constraints
 
         list_constraints = [r.ravel() for r in list2_constraints]
-
+        
         tx[:, 0] = 1.0
         ty[:, 1] = 1.0
         tz[:, 2] = 1.0
         ff = forces.ravel()
-
-        #Calculate the center of mass
+        
+        # Calculate the center of mass
         center = positions.sum(axis=0) / N
 
         rx[:, 1] = -(positions[:, 2] - center[2])
@@ -488,21 +471,21 @@ class FixInternals(FixConstraint):
         ry[:, 2] = -(positions[:, 0] - center[0])
         rz[:, 0] = -(positions[:, 1] - center[1])
         rz[:, 1] = positions[:, 0] - center[0]
-
-        #Normalizing transl., rotat. constraints
+        
+        # Normalizing transl., rotat. constraints
         for r in list2_constraints:
             r /= np.linalg.norm(r.ravel())
-
-        #Add all angle, etc. constraint vectors
+        
+        # Add all angle, etc. constraint vectors
         for constraint in self.constraints:
             constraint.adjust_forces(positions, forces)
             list_constraints.insert(0, constraint.h)
-        #QR DECOMPOSITION - GRAM SCHMIDT
+        # QR DECOMPOSITION - GRAM SCHMIDT
 
         list_constraints = [r.ravel() for r in list_constraints]
         aa = np.column_stack(list_constraints)
-        (aa, bb) = np.linalg.qr(aa, mode='full')
-        #Projektion
+        (aa, bb) = np.linalg.qr(aa)
+        # Projection
         hh = []
         for i, constraint in enumerate(self.constraints):
             hh.append(aa[:, i] * np.row_stack(aa[:, i]))
@@ -519,20 +502,15 @@ class FixInternals(FixConstraint):
         ff = np.dot(T, np.row_stack(ff))
         forces[:, :] -= np.dot(T, np.row_stack(ff)).reshape(-1, 3)
 
-    def copy(self):
-        return FixInternals(epsilon=self.epsilon, _copy_init=self.constraints)
-
     def __repr__(self):
         constraints = repr(self.constraints)
         return 'FixInternals(_copy_init=%s, epsilon=%s)' % (constraints,
                                                             repr(self.epsilon))
-    def index_shuffle(self, ind):
-        pass
-
+    
     def __str__(self):
         return '\n'.join([repr(c) for c in self.constraints])
 
-    #Classes for internal use in FixInternals
+    # Classes for internal use in FixInternals
     class FixBondLengthAlt:
         """Constraint subobject for fixing bond length within FixInternals."""
         def __init__(self, bond, indices, masses, maxstep=0.01):
@@ -561,8 +539,8 @@ class FixInternals(FixConstraint):
             new[self.indices[1]] += lamda * h2
 
         def adjust_forces(self, positions, forces):
-            self.h1 = positions[self.indices[0]] - positions[self.indices[1]]
-            self.h1 /= np.linalg.norm(self.h1)
+            self.h1 = 2 * (positions[self.indices[0]] -
+                           positions[self.indices[1]])
             self.h2 = -self.h1
             self.h = np.zeros([len(forces) * 3])
             self.h[(self.indices[0]) * 3] = self.h1[0]
@@ -576,7 +554,6 @@ class FixInternals(FixConstraint):
         def __repr__(self):
             return 'FixBondLengthAlt(%s, %d, %d)' % \
                 (repr(self.bond), self.indices[0], self.indices[1])
-
 
     class FixAngle:
         """Constraint object for fixing an angle within
@@ -653,7 +630,7 @@ class FixInternals(FixConstraint):
         def __repr__(self):
             return 'FixAngle(%s, %f)' % (tuple(self.indices),
                                          np.arccos(self.angle))
-
+ 
     class FixDihedral:
         """Constraint object for fixing an dihedral using
         the shake algorithm. This one allows also other constraints."""
@@ -668,14 +645,10 @@ class FixInternals(FixConstraint):
 
         def set_h_vectors(self, pos):
             r12 = pos[self.indices[1]] - pos[self.indices[0]]
-            r12_len = np.linalg.norm(r12)
-            e12 = r12 / r12_len
             r23 = pos[self.indices[2]] - pos[self.indices[1]]
             r23_len = np.linalg.norm(r23)
             e23 = r23 / r23_len
             r34 = pos[self.indices[3]] - pos[self.indices[2]]
-            r34_len = np.linalg.norm(r34)
-            e34 = r34 / r34_len
             a = -r12 - np.dot(-r12, e23) * e23
             a_len = np.linalg.norm(a)
             ea = a / a_len
@@ -692,14 +665,8 @@ class FixInternals(FixConstraint):
 
         def adjust_positions(self, oldpositions, newpositions):
             r12 = newpositions[self.indices[1]] - newpositions[self.indices[0]]
-            r12_len = np.linalg.norm(r12)
-            e12 = r12 / r12_len
             r23 = newpositions[self.indices[2]] - newpositions[self.indices[1]]
-            r23_len = np.linalg.norm(r23)
-            e23 = r23 / r23_len
             r34 = newpositions[self.indices[3]] - newpositions[self.indices[2]]
-            r34_len = np.linalg.norm(r34)
-            e34 = r34 / r34_len
             n1 = np.cross(r12, r23)
             n1_len = np.linalg.norm(n1)
             n1e = n1 / n1_len
@@ -731,14 +698,10 @@ class FixInternals(FixConstraint):
 
         def adjust_forces(self, positions, forces):
             r12 = positions[self.indices[1]] - positions[self.indices[0]]
-            r12_len = np.linalg.norm(r12)
-            e12 = r12 / r12_len
             r23 = positions[self.indices[2]] - positions[self.indices[1]]
             r23_len = np.linalg.norm(r23)
             e23 = r23 / r23_len
             r34 = positions[self.indices[3]] - positions[self.indices[2]]
-            r34_len = np.linalg.norm(r34)
-            e34 = r34 / r34_len
             a = -r12 - np.dot(-r12, e23) * e23
             a_len = np.linalg.norm(a)
             ea = a / a_len
@@ -767,103 +730,10 @@ class FixInternals(FixConstraint):
             self.h[(self.indices[3]) * 3 + 1] = self.h4[1]
             self.h[(self.indices[3]) * 3 + 2] = self.h4[2]
             self.h /= np.linalg.norm(self.h)
-
+        
         def __repr__(self):
             return 'FixDihedral(%s, %f)' % (tuple(self.indices), self.angle)
 
-    class FixedPlaneAlt:
-        """Constrain an atom *a* to move in a given plane only.
-
-        The plane is defined by its normal: *direction*."""
-
-        def __init__(self, a, direction, old_pos):
-            if isinstance(a , list):
-                self.index = a[0]
-            else:
-                self.index = int(a)
-            self.old_pos = old_pos
-            self.h = []
-            self.h1 = None
-            self.sigma = 1.
-            if direction is None:
-                self.dir = np.array([0.,0.,1.])
-            else:
-                self.dir = np.asarray(direction) / sqrt(np.dot(direction, direction))
-
-        def set_h_vectors(self, pos):
-            self.h1 = self.dir
-
-        def adjust_positions(self, oldpositions, newpositions):
-            step = newpositions[self.index] - self.old_pos
-            self.sigma = np.dot(step,self.dir)
-            #print self.sigma
-            newpositions[self.index] -= self.dir * np.dot(step, self.dir)
-
-        def adjust_forces(self, positions, forces):
-            self.h1 = self.dir
-            self.h = np.zeros([len(forces) * 3])
-            self.h[self.index * 3] = self.h1[0]
-            self.h[self.index * 3 + 1] = self.h1[1]
-            self.h[self.index * 3 + 2] = self.h1[2]
-            self.h /= np.linalg.norm(self.h)
-
-        def __repr__(self):
-            return 'FixedPlaneAlt(%d, %s)' % (self.index, self.dir.tolist())
-
-class FixCOM(FixConstraint):
-    """
-    This subclass fixes the center of mass of a list of atoms within an atoms object
-    the "CoM" can also be defined as the com of a subset of this list of atoms
-    """
-
-    def __init__(self, indices, masses, old_com, com_indices=None, xyz='xyz'):
-        self.indices = indices
-        self.masses = masses
-        if com_indices is None:
-            self.com_indices = indices
-        else:
-            self.com_indices = com_indices
-        self.old_com = old_com
-        self.xyz = xyz
-
-    def adjust_positions(self, oldpositions, newpositions):
-        com = np.dot(self.masses, newpositions[self.com_indices]) / self.masses.sum()
-        step = com - self.old_com
-        #self.sigma = np.linalg.norm(step)
-        #newpositions[self.indices] -= step
-        if 'x' in self.xyz:
-            newpositions[self.indices, 0] -= step[0]
-        if 'y' in self.xyz:
-            newpositions[self.indices, 1] -= step[1]
-        if 'z' in self.xyz:
-            newpositions[self.indices, 2] -= step[2]
-
-    def adjust_forces(self, positions, forces):
-        unit_vec = np.zeros([len(forces)*3,3])
-        if 'x' in self.xyz:
-            for a in self.indices:
-                unit_vec[a*3 + 0, 0] = 1.0
-            unit_vec[:,0] /= np.linalg.norm(unit_vec[:,0])
-            forces -= (unit_vec[:,0] * np.dot(forces.flatten(),unit_vec[:,0])).reshape(-1,3)
-        if 'y' in self.xyz:
-            for a in self.indices:
-                unit_vec[a*3 + 1, 1] = 1.0
-            unit_vec[:,1] /= np.linalg.norm(unit_vec[:,1])
-            forces -= (unit_vec[:,1] * np.dot(forces.flatten(),unit_vec[:,1])).reshape(-1,3)
-        if 'z' in self.xyz:
-            for a in self.indices:
-                unit_vec[a*3 + 2, 2] = 1.0
-            unit_vec[:,2] /= np.linalg.norm(unit_vec[:,2])
-            forces -= (unit_vec[:,2] * np.dot(forces.flatten(),unit_vec[:,2])).reshape(-1,3)
-
-    def __repr__(self):
-        return 'FixedCOM(%s, %s, %s)' % (repr(tuple(self.indices)), repr(self.old_com), repr(self.xyz) )
-
-    def index_shuffle(self, ind):
-        pass
-
-    def copy(self):
-        return FixCOM(self.indices, self.masses, self.old_com, self.xyz)
 
 class Hookean(FixConstraint):
     """Applies a Hookean restorative force between a pair of atoms, an atom
@@ -872,12 +742,10 @@ class Hookean(FixConstraint):
     def __init__(self, a1, a2, k, rt=None):
         """Forces two atoms to stay close together by applying no force if
         they are below a threshold length, rt, and applying a Hookean
-        restorative force when the distance between them exceeds rt. Can also be
-        used to tether an atom to a fixed point in space or to a distance above
-        a plane.
+        restorative force when the distance between them exceeds rt. Can
+        also be used to tether an atom to a fixed point in space or to a
+        distance above a plane.
 
-        Parameters
-        ----------
         a1 : int
            Index of atom 1
         a2 : one of three options
@@ -886,11 +754,11 @@ class Hookean(FixConstraint):
            3) a plane given as (A, B, C, D) in A x + B y + C z + D = 0.
         k : float
            Hooke's law (spring) constant to apply when distance
-           exceeds threshold_length.
+           exceeds threshold_length. Units of eV A^-2.
         rt : float
            The threshold length below which there is no force. The
            length is 1) between two atoms, 2) between atom and point.
-           This argument is not supplied in case 3.
+           This argument is not supplied in case 3. Units of A.
 
         If a plane is specified, the Hooke's law force is applied if the atom
         is on the normal side of the plane. For instance, the plane with
@@ -901,7 +769,7 @@ class Hookean(FixConstraint):
         the -z direction would be given by (A, B, C, D) = (0, 0, -1, 7).
         """
 
-        if type(a2) == int:
+        if isinstance(a2, int):
             self._type = 'two atoms'
             self.indices = [a1, a2]
         elif len(a2) == 3:
@@ -917,10 +785,31 @@ class Hookean(FixConstraint):
         self.threshold = rt
         self.spring = k
 
-    def adjust_positions(self, oldpositions, newpositions):
+    def todict(self):
+        dct = {'name': 'Hookean'}
+        dct['kwargs'] = {'rt': self.threshold,
+                         'k': self.spring}
+        if self._type == 'two atoms':
+            dct['kwargs']['a1'] = self.indices[0]
+            dct['kwargs']['a2'] = self.indices[1]
+        elif self._type == 'point':
+            dct['kwargs']['a1'] = self.index
+            dct['kwargs']['a2'] = self.origin
+        elif self._type == 'plane':
+            dct['kwargs']['a1'] = self.index
+            dct['kwargs']['a2'] = self.plane
+        else:
+            raise NotImplementedError('Bad type: %s' % self._type)
+        return dct
+
+    def adjust_positions(self, atoms, newpositions):
         pass
 
-    def adjust_forces(self, positions, forces):
+    def adjust_momenta(self, atoms, momenta):
+        pass
+
+    def adjust_forces(self, atoms, forces):
+        positions = atoms.positions
         if self._type == 'plane':
             A, B, C, D = self.plane
             x, y, z = positions[self.index]
@@ -939,7 +828,7 @@ class Hookean(FixConstraint):
             p2 = self.origin
         displace = p2 - p1
         bondlength = np.linalg.norm(displace)
-        if (bondlength > self.threshold) and (self.threshold > 0):
+        if bondlength > self.threshold:
             magnitude = self.spring * (bondlength - self.threshold)
             direction = displace / np.linalg.norm(displace)
             if self._type == 'two atoms':
@@ -948,9 +837,11 @@ class Hookean(FixConstraint):
             else:
                 forces[self.index] += direction * magnitude
 
-    def adjust_potential_energy(self, positions, forces):
+    def adjust_potential_energy(self, atoms):
         """Returns the difference to the potential energy due to an active
-        constraint."""
+        constraint. (That is, the quantity returned is to be added to the
+        potential energy.)"""
+        positions = atoms.positions
         if self._type == 'plane':
             A, B, C, D = self.plane
             x, y, z = positions[self.index]
@@ -960,9 +851,27 @@ class Hookean(FixConstraint):
                 return 0.5 * self.spring * d**2
             else:
                 return 0.
+        if self._type == 'two atoms':
+            p1, p2 = positions[self.indices]
+        elif self._type == 'point':
+            p1 = positions[self.index]
+            p2 = self.origin
+        displace = p2 - p1
+        bondlength = np.linalg.norm(displace)
+        if bondlength > self.threshold:
+            return 0.5 * self.spring * (bondlength - self.threshold)**2
         else:
-            raise NotImplementedError('Adjust potential energy only '
-                                      'implemented for plane.')
+            return 0.
+
+    def index_shuffle(self, atoms, ind):
+        # See docstring of superclass
+        if self._type == 'two atoms':
+            self.indices = [ind.index(self.indices[0]),
+                            ind.index(self.indices[1])]
+        elif self._type == 'point':
+            self.index = ind.index(self.index)
+        elif self._type == 'plane':
+            self.index = ind.index(self.index)
 
     def __repr__(self):
         if self._type == 'two atoms':
@@ -971,24 +880,6 @@ class Hookean(FixConstraint):
             return 'Hookean(%d) to cartesian' % self.index
         else:
             return 'Hookean(%d) to plane' % self.index
-
-    def copy(self):
-        if self._type == 'two atoms':
-            return Hookean(a1=self.indices[0], a2=self.indices[1],
-                           rt=self.threshold, k=self.spring)
-        elif self._type == 'point':
-            return Hookean(a1=self.index, a2=self.origin,
-                           rt=self.threshold, k=self.spring)
-        else:
-            return Hookean(a1=self.index, a2=self.plane,
-                           k=self.spring)
-
-
-class BondSpring(FixConstraint):
-    """Deprecated in favor of Hookean constraint."""
-    def __init__(self, a1, a2, threshhold_length, springconstant):
-        raise RuntimeError('The BondSpring constraint has been deprecated.'
-                           ' Use Hookean instead.')
 
 
 class Filter:
@@ -1006,10 +897,16 @@ class Filter:
         mask : list of bool
            One boolean per atom indicating if the atom should remain
            visible or not.
+
+        If a Trajectory tries to save this object, it will instead
+        save the underlying Atoms object.  To prevent this, delete
+        the atoms_for_saving attribute.
         """
 
         self.atoms = atoms
         self.constraints = []
+        # Make self.info a reference to the underlying atoms' info dictionary.
+        self.info = self.atoms.info
 
         if indices is None and mask is None:
             raise ValueError('Use "indices" or "mask".')
@@ -1022,6 +919,9 @@ class Filter:
         else:
             self.index = np.asarray(indices, int)
             self.n = len(self.index)
+
+        # Present the real atoms object to Trajectory and friends
+        self.atoms_for_saving = self.atoms
 
     def get_cell(self):
         """Returns the computational cell.
@@ -1054,11 +954,11 @@ class Filter:
         'Return the momenta of the visible atoms.'
         return self.atoms.get_momenta()[self.index]
 
-    def set_momenta(self, momenta):
+    def set_momenta(self, momenta, **kwargs):
         'Set the momenta of the visible atoms.'
         mom = self.atoms.get_momenta()
         mom[self.index] = momenta
-        self.atoms.set_momenta(mom)
+        self.atoms.set_momenta(mom, **kwargs)
 
     def get_atomic_numbers(self):
         'Return the atomic numbers of the visible atoms.'
@@ -1092,12 +992,12 @@ class Filter:
     def get_masses(self):
         return self.atoms.get_masses()[self.index]
 
-    def get_potential_energy(self):
+    def get_potential_energy(self, **kwargs):
         """Calculate potential energy.
 
         Returns the potential energy of the full system.
         """
-        return self.atoms.get_potential_energy()
+        return self.atoms.get_potential_energy(**kwargs)
 
     def get_chemical_symbols(self):
         return self.atoms.get_chemical_symbols()
@@ -1112,7 +1012,7 @@ class Filter:
         different number of atoms.
         """
         return self.atoms.get_calculator()
-
+    
     def get_celldisp(self):
         return self.atoms.get_celldisp()
 
@@ -1127,7 +1027,7 @@ class Filter:
     def __getitem__(self, i):
         'Return an atom.'
         return self.atoms[self.index[i]]
-
+    
 
 class StrainFilter(Filter):
     """Modify the supercell while keeping the scaled positions fixed.
@@ -1225,7 +1125,7 @@ class UnitCellFilter(Filter):
         >>> atoms = Atoms(...)
         >>> ucf = UnitCellFilter(atoms)
         >>> qn = QuasiNewton(ucf)
-        >>> traj = PickleTrajectory('TiO2.traj', 'w', atoms)
+        >>> traj = Trajectory('TiO2.traj', 'w', atoms)
         >>> qn.attach(traj)
         >>> qn.run(fmax=0.05)
 

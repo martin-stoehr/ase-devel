@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
+import numpy as np
 
-try:
-    import numpy as np
-except ImportError:
-    # required due to ase/test/eoswoase.py
-    pass
-
+    
 class EquationOfStateSJEOS:
     """Fit equation of state for bulk systems.
 
@@ -29,7 +25,7 @@ class EquationOfStateSJEOS:
 
     """
     def __init__(self, volumes, energies, eos='sjeos'):
-        assert eos == 'sjeos', eos + ' eos not available. Probably scipy missing.'
+        assert eos == 'sjeos', eos + ' not available. Probably scipy missing.'
         self.v = np.array(volumes)
         self.e = np.array(energies)
         self.eos_string = 'sjeos'
@@ -39,12 +35,12 @@ class EquationOfStateSJEOS:
     def fit(self):
         """Calculate volume, energy, and bulk modulus.
 
-        Returns the optimal volume, the minumum energy, and the bulk
+        Returns the optimal volume, the minimum energy, and the bulk
         modulus.  Notice that the ASE units for the bulk modulus is
         eV/Angstrom^3 - to get the value in GPa, do this::
 
           v0, e0, B = eos.fit()
-          print B / kJ * 1.0e24, 'GPa'
+          print(B / kJ * 1.0e24, 'GPa')
 
         """
 
@@ -74,8 +70,7 @@ class EquationOfStateSJEOS:
         show the figure and *filename='abc.png'* or
         *filename='abc.eps'* to save the figure to a file."""
 
-        #import matplotlib.pyplot as plt
-        import pylab as plt
+        import matplotlib.pyplot as plt
 
         if self.v0 is None:
             self.fit()
@@ -83,7 +78,7 @@ class EquationOfStateSJEOS:
         if filename is None and show is None:
             show = True
 
-        x = 3.95
+        x = 4.95
         f = plt.figure(figsize=(x * 2.5**0.5, x))
         f.subplots_adjust(left=0.12, right=0.9, top=0.9, bottom=0.15)
         plt.plot(self.v, self.e, 'o')
@@ -108,17 +103,3 @@ class EquationOfStateSJEOS:
             f.savefig(filename)
 
         return f
-
-if __name__ == '__main__':
-    try:
-        import numpy as np
-        # from ase/test/eos.py
-        volumes = [29.205536, 30.581492, 32.000000, 33.461708, 34.967264]
-        energies = [0.0190898, -0.0031172, -0.0096925, -0.0004014, 0.0235753]
-        sjeos = (31.867118229937798, -0.0096410046694188622, 0.23984474782755572)
-        eos = EquationOfStateSJEOS(volumes, energies)
-        v0, e0, B = eos.fit()
-        assert abs(v0 - sjeos[0]) < 5.e-6
-        assert abs(B - sjeos[2]) < 5.e-6
-    except ImportError:
-        pass

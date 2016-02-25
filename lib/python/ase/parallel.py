@@ -1,12 +1,31 @@
+from __future__ import print_function
+import atexit
+import functools
+import pickle
 import sys
 import time
-import atexit
-import pickle
 
 import numpy as np
 
+from ase.utils import devnull
 
-def paropen(name, mode='r', buffering=0):
+
+def get_txt(txt, rank):
+    if hasattr(txt, 'write'):
+        # Note: User-supplied object might write to files from many ranks.
+        return txt
+    elif rank == 0:
+        if txt is None:
+            return devnull
+        elif txt == '-':
+            return sys.stdout
+        else:
+            return open(txt, 'w', 1)
+    else:
+        return devnull
+
+
+def paropen(name, mode='r', buffering=-1):
     """MPI-safe version of open function.
 
     In read mode, the file is opened on all nodes.  In write and
@@ -19,33 +38,15 @@ def paropen(name, mode='r', buffering=0):
 
 
 def parprint(*args, **kwargs):
-    """MPI-safe print - prints only from master.
-
-    Tries to adopt python 3 behaviour.
-    """
-    if rank > 0:
-        return
-    defaults = {'end': '\n',
-                'file': sys.stdout }
-    for key in defaults:
-        if not key in kwargs:
-            kwargs[key] = defaults[key]
-
-    for arg in args[:-1]:
-        print >> kwargs['file'], arg,
-    if len(args):
-        last = args[-1]
-    else:
-        last = ''
-    if kwargs['end'] == '\n':
-        print >> kwargs['file'], last
-    else:
-        print >> kwargs['file'], last,
+    """MPI-safe print - prints only from master. """
+    if rank == 0:
+        print(*args, **kwargs)
 
 
 class DummyMPI:
     rank = 0
     size = 1
+
     def sum(self, a):
         if isinstance(a, np.ndarray) and a.ndim > 0:
             pass
@@ -80,13 +81,12 @@ class MPI4PY:
 
 
 # Check for special MPI-enabled Python interpreters:
-if '_gpaw' in sys.modules:
+if '_gpaw' in sys.builtin_module_names:
     # http://wiki.fysik.dtu.dk/gpaw
     from gpaw.mpi import world
 elif 'asapparallel3' in sys.modules:
     # http://wiki.fysik.dtu.dk/Asap
     # We cannot import asap3.mpi here, as that creates an import deadlock
-    #from asap3.mpi import world
     import asapparallel3
     world = asapparallel3.Communicator()
 elif 'Scientific_mpi' in sys.modules:
@@ -122,6 +122,64 @@ def broadcast(obj, root=0, comm=world):
         return pickle.loads(string.tostring())
 
 
+def parallel_function(func):
+    """Decorator for broadcasting from master to slaves using MPI."""
+    if world.size == 1:
+        return func
+        
+    @functools.wraps(func)
+    def new_func(*args, **kwargs):
+        # Hook to disable.  Use self.serial = True
+        if args and getattr(args[0], 'serial', False):
+            return func(*args, **kwargs)
+        ex = None
+        result = None
+        if world.rank == 0:
+            try:
+                result = func(*args, **kwargs)
+            except Exception as ex:
+                pass
+        ex, result = broadcast((ex, result))
+        if ex is not None:
+            raise ex
+        return result
+    return new_func
+
+
+def parallel_generator(generator):
+    """Decorator for broadcasting yields from master to slaves using MPI."""
+    if world.size == 1:
+        return generator
+        
+    @functools.wraps(generator)
+    def new_generator(*args, **kwargs):
+        # Hook to disable.  Use self.serial = True
+        if args and getattr(args[0], 'serial', False):
+            for result in generator(*args, **kwargs):
+                yield result
+            return
+        if world.rank == 0:
+            try:
+                for result in generator(*args, **kwargs):
+                    ex, result = broadcast((None, result))
+                    yield result
+            except Exception as ex:
+                pass
+            broadcast((ex, None))
+            if ex is not None:
+                raise ex
+        else:
+            ex, result = broadcast((None, None))
+            if ex is not None:
+                raise ex
+            while result is not None:
+                yield result
+                ex, result = broadcast((None, None))
+                if ex is not None:
+                    raise ex
+    return new_generator
+
+
 def register_parallel_cleanup_function():
     """Call MPI_Abort if python crashes.
 
@@ -144,6 +202,7 @@ def register_parallel_cleanup_function():
 
     atexit.register(cleanup)
 
+    
 def distribute_cpus(size, comm):
     """Distribute cpus to tasks and calculators.
 
@@ -164,4 +223,4 @@ def distribute_cpus(size, comm):
     ranks = np.arange(r0, r0 + size)
     mycomm = comm.new_communicator(ranks)
 
-    return mycomm, comm.size / size, tasks_rank 
+    return mycomm, comm.size // size, tasks_rank

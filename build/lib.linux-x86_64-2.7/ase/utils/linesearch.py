@@ -1,7 +1,6 @@
 import numpy as np
-import __builtin__
-pymin = __builtin__.min
-pymax = __builtin__.max
+pymin = min
+pymax = max
 
 class LineSearch:
     def __init__(self,  xtol=1e-14):
@@ -20,7 +19,7 @@ class LineSearch:
                      stpmax=50., stpmin=1e-8, args=()):
         self.stpmin = stpmin
         self.pk = pk
-        p_size = np.sqrt((pk **2).sum())
+        # ??? p_size = np.sqrt((pk **2).sum())
         self.stpmax = stpmax
         self.xtrapl = xtrapl
         self.xtrapu = xtrapu
@@ -34,9 +33,9 @@ class LineSearch:
         self.no_update = False
 
         if isinstance(myfprime,type(())):
-            eps = myfprime[1]
+            # eps = myfprime[1]
             fprime = myfprime[0]
-            newargs = (f,eps) + args
+            # ??? newargs = (f,eps) + args
             gradient = False
         else:
             fprime = myfprime
@@ -47,7 +46,7 @@ class LineSearch:
         gval = gfk
         self.steps=[]
 
-        while 1:
+        while True:
             stp = self.step(alpha1, phi0, derphi0, c1, c2,
                                              self.xtol,
                                              self.isave, self.dsave)

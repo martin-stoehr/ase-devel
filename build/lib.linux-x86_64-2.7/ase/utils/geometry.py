@@ -1,15 +1,74 @@
+from __future__ import print_function
 # Copyright (C) 2010, Jesper Friis
 # (see accompanying license files for details).
 
-"""Utility tools for convenient creation of slabs and interfaces of
-different orientations."""
+"""Utility tools for atoms/geometry manipulations.
+   - convenient creation of slabs and interfaces of
+different orientations.
+   - detection of duplicate atoms / atoms within cutoff radius
+"""
 
 import numpy as np
 
 
+def wrap_positions(positions, cell, pbc=True, center=(0.5, 0.5, 0.5),
+                   eps=1e-7):
+    """Wrap positions to unit cell.
+
+    Returns positions changed by a multiple of the unit cell vectors to
+    fit inside the space spanned by these vectors.  See also the
+    :meth:`ase.atoms.Atoms.wrap` method.
+
+    Parameters:
+
+    positions: float ndarray of shape (n, 3)
+        Positions of the atoms
+    cell: float ndarray of shape (3, 3)
+        Unit cell vectors.
+    pbc: one or 3 bool
+        For each axis in the unit cell decides whether the positions
+        will be moved along this axis.
+    center: three float
+        The positons in fractional coordinates that the new positions
+        will be nearest possible to.
+    eps: float
+        Small number to prevent slightly negative coordinates from being
+        wrapped.
+
+    Example:
+
+    >>> from ase.utils.geometry import wrap_positions
+    >>> wrap_positions([[-0.1, 1.01, -0.5]],
+    ...                [[1, 0, 0], [0, 1, 0], [0, 0, 4]],
+    ...                pbc=[1, 1, 0])
+    array([[ 0.9 ,  0.01, -0.5 ]])
+    """
+
+    if not hasattr(pbc, '__len__'):
+        pbc = (pbc,) * 3
+
+    if not hasattr(center, '__len__'):
+        center = (center,) * 3
+
+    shift = np.asarray(center) - 0.5 - eps
+
+    # Don't change coordinates when pbc is False
+    shift[np.logical_not(pbc)] = 0.0
+
+    fractional = np.linalg.solve(np.asarray(cell).T,
+                                 np.asarray(positions).T).T - shift
+
+    for i, periodic in enumerate(pbc):
+        if periodic:
+            fractional[:, i] %= 1.0
+            fractional[:, i] += shift[i]
+
+    return np.dot(fractional, cell)
+
+
 def get_layers(atoms, miller, tolerance=0.001):
     """Returns two arrays describing which layer each atom belongs
-    to and the distance between the layers and origo. 
+    to and the distance between the layers and origo.
 
     Parameters:
 
@@ -47,7 +106,7 @@ def get_layers(atoms, miller, tolerance=0.001):
     metric = np.dot(atoms.cell, atoms.cell.T)
     c = np.linalg.solve(metric.T, miller.T).T
     miller_norm = np.sqrt(np.dot(c, miller))
-    d = np.dot(atoms.get_scaled_positions(), miller)/miller_norm
+    d = np.dot(atoms.get_scaled_positions(), miller) / miller_norm
 
     keys = np.argsort(d)
     ikeys = np.argsort(keys)
@@ -60,10 +119,8 @@ def get_layers(atoms, miller, tolerance=0.001):
     return tags, levels
 
 
-
-
-def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None, 
-        origo=(0, 0, 0), nlayers=None, extend=1.0, tolerance=0.01, 
+def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
+        origo=(0, 0, 0), nlayers=None, extend=1.0, tolerance=0.01,
         maxatoms=None):
     """Cuts out a cell defined by *a*, *b*, *c* and *origo* from a
     sufficiently repeated copy of *atoms*.
@@ -77,7 +134,7 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
     directions (and will be treated correctly).
 
     Parameters:
-    
+
     atoms: Atoms instance
         This should correspond to a repeatable unit cell.
     a: int | 3 floats
@@ -89,13 +146,13 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
         integer, the b-vector will be the scaled vector from *origo* to the
         atom with index *b*.
     c: None | int | 3 floats
-        The c-vector in scaled coordinates of the cell to cut out. 
-        if integer, the c-vector will be the scaled vector from *origo* to 
-        the atom with index *c*. 
+        The c-vector in scaled coordinates of the cell to cut out.
+        if integer, the c-vector will be the scaled vector from *origo* to
+        the atom with index *c*.
         If *None* it will be along cross(a, b) converted to real space
         and normalised with the cube root of the volume. Note that this
         in general is not perpendicular to a and b for non-cubic
-        systems. For cubic systems however, this is redused to 
+        systems. For cubic systems however, this is redused to
         c = cross(a, b).
     clength: None | float
         If not None, the length of the c-vector will be fixed to
@@ -113,7 +170,7 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
         float scaling all 3 directions.  By setting to a value just
         above one, e.g. 1.05, it is possible to all the corner and
         edge atoms in the returned cell.  This will of cause make the
-        returned cell non-repeatable, but is very usefull for
+        returned cell non-repeatable, but is very useful for
         visualisation.
     tolerance: float
         Determines what is defined as a plane.  All atoms within
@@ -146,14 +203,14 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
     # Then cut out the slab
     >>> al111 = cut(aluminium, (1,-1,0), (0,1,-1), nlayers=3)
     >>>
-    # Visualisation of the skutterudite unit cell 
+    # Visualisation of the skutterudite unit cell
     #
     # Again, create a skutterudite unit cell
     >>> a = 9.04
     >>> skutterudite = crystal(
-    ...     ('Co', 'Sb'), 
-    ...     basis=[(0.25,0.25,0.25), (0.0, 0.335, 0.158)], 
-    ...     spacegroup=204, 
+    ...     ('Co', 'Sb'),
+    ...     basis=[(0.25,0.25,0.25), (0.0, 0.335, 0.158)],
+    ...     spacegroup=204,
     ...     cellpar=[a, a, a, 90, 90, 90])
     >>>
     # Then use *origo* to put 'Co' at the corners and *extend* to
@@ -168,8 +225,8 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
         origo = atoms.get_scaled_positions()[origo]
     origo = np.array(origo, dtype=float)
 
-    scaled = (atoms.get_scaled_positions() - origo)%1.0
-    scaled %= 1.0 # needed to ensure that all numbers are *less* than one
+    scaled = (atoms.get_scaled_positions() - origo) % 1.0
+    scaled %= 1.0   # needed to ensure that all numbers are *less* than one
     atoms.set_scaled_positions(scaled)
 
     if isinstance(a, int):
@@ -184,19 +241,19 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
     if c is None:
         metric = np.dot(cell, cell.T)
         vol = np.sqrt(np.linalg.det(metric))
-        h = np.cross(a, b) 
+        h = np.cross(a, b)
         H = np.linalg.solve(metric.T, h.T)
-        c = vol*H/vol**(1./3.)
+        c = vol * H / vol**(1. / 3.)
     c = np.array(c, dtype=float)
 
     if nlayers:
         # Recursive increase the length of c until we have at least
-        # *nlayers* atomic layers parallell to the a-b plane
+        # *nlayers* atomic layers parallel to the a-b plane
         while True:
-            at = cut(atoms, a, b, c, origo=origo, extend=extend, 
-                        tolerance=tolerance)
+            at = cut(atoms, a, b, c, origo=origo, extend=extend,
+                     tolerance=tolerance)
             scaled = at.get_scaled_positions()
-            d = scaled[:,2]
+            d = scaled[:, 2]
             keys = np.argsort(d)
             ikeys = np.argsort(keys)
             tol = tolerance
@@ -204,11 +261,11 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
                 mask = np.concatenate(([True], np.diff(d[keys]) > tol))
                 tags = np.cumsum(mask)[ikeys] - 1
                 levels = d[keys][mask]
-                if (maxatoms is None or len(at) < maxatoms or 
-                    len(levels) > nlayers): 
+                if (maxatoms is None or len(at) < maxatoms or
+                    len(levels) > nlayers):
                     break
                 tol *= 0.9
-            if len(levels) > nlayers: 
+            if len(levels) > nlayers:
                 break
             c *= 2
 
@@ -217,15 +274,15 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
 
     newcell = np.dot(np.array([a, b, c]), cell)
     if nlayers is None and clength is not None:
-        newcell[2,:] *= clength/np.linalg.norm(newcell[2])
+        newcell[2, :] *= clength / np.linalg.norm(newcell[2])
 
     # Create a new atoms object, repeated and translated such that
     # it completely covers the new cell
-    scorners_newcell = np.array([[0., 0., 0.], [0., 0., 1.], 
-                                 [0., 1., 0.], [0., 1., 1.], 
-                                 [1., 0., 0.], [1., 0., 1.], 
+    scorners_newcell = np.array([[0., 0., 0.], [0., 0., 1.],
+                                 [0., 1., 0.], [0., 1., 1.],
+                                 [1., 0., 0.], [1., 0., 1.],
                                  [1., 1., 0.], [1., 1., 1.]])
-    corners = np.dot(scorners_newcell, newcell*extend)
+    corners = np.dot(scorners_newcell, newcell * extend)
     scorners = np.linalg.solve(cell.T, corners.T).T
     rep = np.ceil(scorners.ptp(axis=0)).astype('int') + 1
     trans = np.dot(np.floor(scorners.min(axis=0)), cell)
@@ -234,10 +291,10 @@ def cut(atoms, a=(1, 0, 0), b=(0, 1, 0), c=None, clength=None,
     atoms.set_cell(newcell)
 
     # Mask out atoms outside new cell
-    stol = 0.1*tolerance  # scaled tolerance, XXX
-    maskcell = atoms.cell*extend
+    stol = 0.1 * tolerance  # scaled tolerance, XXX
+    maskcell = atoms.cell * extend
     sp = np.linalg.solve(maskcell.T, (atoms.positions).T).T
-    mask = np.all(np.logical_and(-stol <= sp, sp < 1-stol), axis=1)
+    mask = np.all(np.logical_and(-stol <= sp, sp < 1 - stol), axis=1)
     atoms = atoms[mask]
     return atoms
 
@@ -248,7 +305,7 @@ class IncompatibleCellError(ValueError):
     pass
 
 
-def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,  
+def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
           maxstrain=0.5, distance=None, reorder=False,
           output_strained=False):
     """Return a new Atoms instance with *atoms2* stacked on top of
@@ -278,7 +335,7 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
 
     If *reorder* is True, then the atoms will be reordred such that
     all atoms with the same symbol will follow sequensially after each
-    other, eg: 'Al2MnAl10Fe' -> 'Al12FeMn'.    
+    other, eg: 'Al2MnAl10Fe' -> 'Al12FeMn'.
 
     If *output_strained* is True, then the strained versions of
     *atoms1* and *atoms2* are returned in addition to the stacked
@@ -290,14 +347,14 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
     >>> from ase.lattice.spacegroup import crystal
     >>>
     # Create an Ag(110)-Si(110) interface with three atomic layers
-    # on each side. 
+    # on each side.
     >>> a_ag = 4.09
-    >>> ag = crystal(['Ag'], basis=[(0,0,0)], spacegroup=225, 
+    >>> ag = crystal(['Ag'], basis=[(0,0,0)], spacegroup=225,
     ...              cellpar=[a_ag, a_ag, a_ag, 90., 90., 90.])
     >>> ag110 = cut(ag, (0, 0, 3), (-1.5, 1.5, 0), nlayers=3)
     >>>
     >>> a_si = 5.43
-    >>> si = crystal(['Si'], basis=[(0,0,0)], spacegroup=227, 
+    >>> si = crystal(['Si'], basis=[(0,0,0)], spacegroup=227,
     ...              cellpar=[a_si, a_si, a_si, 90., 90., 90.])
     >>> si110 = cut(si, (0, 0, 2), (-1, 1, 0), nlayers=3)
     >>>
@@ -306,7 +363,7 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
     >>>
     # Once more, this time adjusted such that the distance between
     # the closest Ag and Si atoms will be 2.3 Angstrom (requires scipy).
-    >>> interface2 = stack(ag110, si110, 
+    >>> interface2 = stack(ag110, si110,
     ...                    maxstrain=1, distance=2.3)   # doctest:+ELLIPSIS
     Optimization terminated successfully.
         ...
@@ -315,7 +372,7 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
     atoms1 = atoms1.copy()
     atoms2 = atoms2.copy()
 
-    if (np.sign(np.linalg.det(atoms1.cell)) != 
+    if (np.sign(np.linalg.det(atoms1.cell)) !=
         np.sign(np.linalg.det(atoms2.cell))):
         raise IncompatibleCellError('*atoms1* amd *atoms2* must both either '
                                     'have a lefthanded or a righanded cell.')
@@ -327,7 +384,7 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
         cell2 = atoms2.cell.copy()
         cell1[axis] /= c1
         cell2[axis] /= c2
-        cell = cell1 + fix*(cell2 - cell1)
+        cell = cell1 + fix * (cell2 - cell1)
     cell[axis] /= np.linalg.norm(cell[axis])
     cell1 = cell.copy()
     cell2 = cell.copy()
@@ -340,7 +397,7 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
         if strain1 > maxstrain or strain2 > maxstrain:
             raise IncompatibleCellError(
                 '*maxstrain* exceeded. *atoms1* strained %f and '
-                '*atoms2* strained %f.'%(strain1, strain2))
+                '*atoms2* strained %f.' % (strain1, strain2))
 
     atoms1.set_cell(cell1, scale_atoms=True)
     atoms2.set_cell(cell2, scale_atoms=True)
@@ -350,19 +407,22 @@ def stack(atoms1, atoms2, axis=2, cell=None, fix=0.5,
 
     if distance is not None:
         from scipy.optimize import fmin
+
         def mindist(pos1, pos2):
             n1 = len(pos1)
             n2 = len(pos2)
             idx1 = np.arange(n1).repeat(n2)
             idx2 = np.tile(np.arange(n2), n1)
             return np.sqrt(((pos1[idx1] - pos2[idx2])**2).sum(axis=1).min())
+
         def func(x):
             t1, t2, h1, h2 = x[0:3], x[3:6], x[6], x[7]
             pos1 = atoms1.positions + t1
             pos2 = atoms2.positions + t2
-            d1 = mindist(pos1, pos2 + (h1 + 1.0)*atoms1.cell[axis])
-            d2 = mindist(pos2, pos1 + (h2 + 1.0)*atoms2.cell[axis])
+            d1 = mindist(pos1, pos2 + (h1 + 1.0) * atoms1.cell[axis])
+            d2 = mindist(pos2, pos1 + (h2 + 1.0) * atoms2.cell[axis])
             return (d1 - distance)**2 + (d2 - distance)**2
+
         atoms1.center()
         atoms2.center()
         x0 = np.zeros((8,))
@@ -392,18 +452,16 @@ def sort(atoms, tags=None):
     None, it will be used instead. A stable sorting algorithm is used.
 
     Example:
-    >>> import ase
-    >>> from ase.lattice.spacegroup import crystal
-    >>>
-    # Two unit cells of NaCl
+
+    >>> from ase.lattice import bulk
+    >>> # Two unit cells of NaCl:
     >>> a = 5.64
-    >>> nacl = crystal(['Na', 'Cl'], [(0, 0, 0), (0.5, 0.5, 0.5)], 
-    ... spacegroup=225, cellpar=[a, a, a, 90, 90, 90]).repeat((2, 1, 1))
+    >>> nacl = bulk('NaCl', 'rocksalt', a=a) * (2, 1, 1)
     >>> nacl.get_chemical_symbols()
-    ['Na', 'Na', 'Na', 'Na', 'Cl', 'Cl', 'Cl', 'Cl', 'Na', 'Na', 'Na', 'Na', 'Cl', 'Cl', 'Cl', 'Cl']
+    ['Na', 'Cl', 'Na', 'Cl']
     >>> nacl_sorted = sort(nacl)
     >>> nacl_sorted.get_chemical_symbols()
-    ['Cl', 'Cl', 'Cl', 'Cl', 'Cl', 'Cl', 'Cl', 'Cl', 'Na', 'Na', 'Na', 'Na', 'Na', 'Na', 'Na', 'Na']
+    ['Cl', 'Cl', 'Na', 'Na']
     >>> np.all(nacl_sorted.cell == nacl.cell)
     True
     """
@@ -411,8 +469,7 @@ def sort(atoms, tags=None):
         tags = atoms.get_chemical_symbols()
     else:
         tags = list(tags)
-    deco = [(tag, i) for i, tag in enumerate(tags)]
-    deco.sort()
+    deco = sorted([(tag, i) for i, tag in enumerate(tags)])
     indices = [i for tag, i in deco]
     return atoms[indices]
 
@@ -420,27 +477,26 @@ def sort(atoms, tags=None):
 def rotation_matrix(a1, a2, b1, b2):
     """Returns a rotation matrix that rotates the vectors *a1* in the
     direction of *a2* and *b1* in the direction of *b2*.
-    
+
     In the case that the angle between *a2* and *b2* is not the same
     as between *a1* and *b1*, a proper rotation matrix will anyway be
     constructed by first rotate *b2* in the *b1*, *b2* plane.
     """
-    from numpy.linalg import norm, det
-    a1 = np.asarray(a1, dtype=float)/norm(a1)
-    b1 = np.asarray(b1, dtype=float)/norm(b1)
+    a1 = np.asarray(a1, dtype=float) / np.linalg.norm(a1)
+    b1 = np.asarray(b1, dtype=float) / np.linalg.norm(b1)
     c1 = np.cross(a1, b1)
-    c1 /= norm(c1)      # clean out rounding errors...
+    c1 /= np.linalg.norm(c1)      # clean out rounding errors...
 
-    a2 = np.asarray(a2, dtype=float)/norm(a2)
-    b2 = np.asarray(b2, dtype=float)/norm(b2)
+    a2 = np.asarray(a2, dtype=float) / np.linalg.norm(a2)
+    b2 = np.asarray(b2, dtype=float) / np.linalg.norm(b2)
     c2 = np.cross(a2, b2)
-    c2 /= norm(c2)      # clean out rounding errors...
+    c2 /= np.linalg.norm(c2)      # clean out rounding errors...
 
     # Calculate rotated *b2*
     theta = np.arccos(np.dot(a2, b2)) - np.arccos(np.dot(a1, b1))
-    b3 = np.sin(theta)*a2 + np.cos(theta)*b2
-    b3 /= norm(b3)      # clean out rounding errors...
-    
+    b3 = np.sin(theta) * a2 + np.cos(theta) * b2
+    b3 /= np.linalg.norm(b3)      # clean out rounding errors...
+
     A1 = np.array([a1, b1, c1])
     A2 = np.array([a2, b3, c2])
     R = np.linalg.solve(A1, A2).T
@@ -461,7 +517,7 @@ def rotate(atoms, a1, a2, b1, b2, rotate_cell=True, center=(0, 0, 0)):
     """
     if isinstance(center, str) and center.lower() == 'com':
         center = atoms.get_center_of_mass()
-    
+
     R = rotation_matrix(a1, a2, b1, b2)
     atoms.positions[:] = np.dot(atoms.positions - center, R.T) + center
 
@@ -469,15 +525,13 @@ def rotate(atoms, a1, a2, b1, b2, rotate_cell=True, center=(0, 0, 0)):
         atoms.cell[:] = np.dot(atoms.cell, R.T)
 
 
-
-
 def minimize_tilt_ij(atoms, modified=1, fixed=0, fold_atoms=True):
     """Minimize the tilt angle for two given axes.
 
-    The problem is underdetermined. Therefore one can choose one axis 
+    The problem is underdetermined. Therefore one can choose one axis
     that is kept fixed.
     """
-    
+
     orgcell_cc = atoms.get_cell()
     pbc_c = atoms.get_pbc()
     i = fixed
@@ -501,18 +555,330 @@ def minimize_tilt_ij(atoms, modified=1, fixed=0, fold_atoms=True):
     if fold_atoms:
         atoms.set_scaled_positions(atoms.get_scaled_positions())
 
+
 def minimize_tilt(atoms, order=range(3), fold_atoms=True):
     """Minimize the tilt angles of the unit cell."""
     pbc_c = atoms.get_pbc()
-    
+
     for i1, c1 in enumerate(order):
         for c2 in order[i1 + 1:]:
             if pbc_c[c1] and pbc_c[c2]:
                 minimize_tilt_ij(atoms, c1, c2, fold_atoms)
 
 
-#-----------------------------------------------------------------
+def find_mic(D, cell, pbc=True):
+    """Finds the minimum-image representation of vector(s) D"""
+    # Calculate the 4 unique unit cell diagonal lengths
+    diags = np.sqrt((np.dot([[1, 1, 1],
+                             [-1, 1, 1],
+                             [1, -1, 1],
+                             [-1, -1, 1],
+                             ], cell)**2).sum(1))
+
+    # calculate 'mic' vectors (D) and lengths (D_len) using simple method
+    Dr = np.dot(D, np.linalg.inv(cell))
+    D = np.dot(Dr - np.round(Dr) * pbc, cell)
+    D_len = np.sqrt((D**2).sum(1))
+    # return mic vectors and lengths for only orthorhombic cells,
+    # as the results may be wrong for non-orthorhombic cells
+    if (max(diags) - min(diags)) / max(diags) < 1e-9:
+        return D, D_len
+
+    # The cutoff radius is the longest direct distance between atoms
+    # or half the longest lattice diagonal, whichever is smaller
+    cutoff = min(max(D_len), max(diags) / 2.)
+
+    # The number of neighboring images to search in each direction is
+    # equal to the ceiling of the cutoff distance (defined above) divided
+    # by the length of the projection of the lattice vector onto its
+    # corresponding surface normal. a's surface normal vector is e.g.
+    # b x c / (|b| |c|), so this projection is (a . (b x c)) / (|b| |c|).
+    # The numerator is just the lattice volume, so this can be simplified
+    # to V / (|b| |c|). This is rewritten as V |a| / (|a| |b| |c|)
+    # for vectorization purposes.
+    latt_len = np.sqrt((cell**2).sum(1))
+    V = abs(np.linalg.det(cell))
+    n = pbc * np.array(np.ceil(cutoff * np.prod(latt_len) /
+                               (V * latt_len)), dtype=int)
+
+    # Construct a list of translation vectors. For example, if we are
+    # searching only the nearest images (27 total), tvecs will be a
+    # 27x3 array of translation vectors. This is the only nested loop
+    # in the routine, and it takes a very small fraction of the total
+    # execution time, so it is not worth optimizing further.
+    tvecs = []
+    for i in range(-n[0], n[0] + 1):
+        latt_a = i * cell[0]
+        for j in range(-n[1], n[1] + 1):
+            latt_ab = latt_a + j * cell[1]
+            for k in range(-n[2], n[2] + 1):
+                tvecs.append(latt_ab + k * cell[2])
+    tvecs = np.array(tvecs)
+
+    # Translate the direct displacement vectors by each translation
+    # vector, and calculate the corresponding lengths.
+    D_trans = tvecs[np.newaxis] + D[:, np.newaxis]
+    D_trans_len = np.sqrt((D_trans**2).sum(2))
+
+    # Find mic distances and corresponding vector(s) for each given pair
+    # of atoms. For symmetrical systems, there may be more than one
+    # translation vector corresponding to the MIC distance; this finds the
+    # first one in D_trans_len.
+    D_min_len = np.min(D_trans_len, axis=1)
+    D_min_ind = D_trans_len.argmin(axis=1)
+    D_min = D_trans[range(len(D_min_ind)), D_min_ind]
+
+    return D_min, D_min_len
+
+
+def niggli_reduce(atoms):
+    """Convert the supplied atoms object's unit cell into its
+    maximally-reduced Niggli unit cell. Even if the unit cell is already
+    maximally reduced, it will be converted into its unique Niggli unit cell.
+    This will also wrap all atoms into the new unit cell.
+
+    References:
+
+    Niggli, P. "Krystallographische und strukturtheoretische Grundbegriffe.
+    Handbuch der Experimentalphysik", 1928, Vol. 7, Part 1, 108-176.
+
+    Krivy, I. and Gruber, B., "A Unified Algorithm for Determining the
+    Reduced (Niggli) Cell", Acta Cryst. 1976, A32, 297-298.
+
+    Grosse-Kunstleve, R.W.; Sauter, N. K.; and Adams, P. D. "Numerically
+    stable algorithms for the computation of reduced unit cells", Acta Cryst.
+    2004, A60, 1-6.
+    """
+
+    assert all(atoms.pbc), 'Can only reduce 3d periodic unit cells!'
+    C = np.eye(3, dtype=int)
+
+    class _gtensor(object):
+        """The G tensor as defined in Grosse-Kunstleve."""
+        def __init__(self, atoms):
+
+            self.atoms = atoms
+
+            self.epsilon = 1e-5 * atoms.get_volume()**(1. / 3.)
+
+            self.a = np.dot(atoms.cell[0], atoms.cell[0])
+            self.b = np.dot(atoms.cell[1], atoms.cell[1])
+            self.c = np.dot(atoms.cell[2], atoms.cell[2])
+
+            self.x = 2 * np.dot(atoms.cell[1], atoms.cell[2])
+            self.y = 2 * np.dot(atoms.cell[0], atoms.cell[2])
+            self.z = 2 * np.dot(atoms.cell[0], atoms.cell[1])
+
+            self._G = np.array([[self.a, self.z / 2., self.y / 2.],
+                                [self.z / 2., self.b, self.x / 2.],
+                                [self.y / 2., self.x / 2., self.c]])
+
+            self._lmn()
+
+        def update(self, C):
+            """Procedure A0 as defined in Krivy."""
+            self._G = np.dot(C.T, np.dot(self._G, C))
+
+            self.a = self._G[0][0]
+            self.b = self._G[1][1]
+            self.c = self._G[2][2]
+
+            self.x = 2 * self._G[1][2]
+            self.y = 2 * self._G[0][2]
+            self.z = 2 * self._G[0][1]
+
+            self._lmn()
+
+        def _lmn(self):
+            """Updates G-tensor l, m, n values"""
+            self.l = 0
+            self.m = 0
+            self.n = 0
+
+            if self.x < -self.epsilon:
+                self.l = -1
+            elif self.x > self.epsilon:
+                self.l = 1
+            if self.y < -self.epsilon:
+                self.m = -1
+            elif self.y > self.epsilon:
+                self.m = 1
+            if self.z < -self.epsilon:
+                self.n = -1
+            elif self.z > self.epsilon:
+                self.n = 1
+
+        def get_new_cell(self):
+            """Returns new basis vectors"""
+            a = np.sqrt(self.a)
+            b = np.sqrt(self.b)
+            c = np.sqrt(self.c)
+
+            ad = self.atoms.cell[0] / np.linalg.norm(self.atoms.cell[0])
+
+            Z = np.cross(self.atoms.cell[0], self.atoms.cell[1])
+            Z /= np.linalg.norm(Z)
+            X = ad - np.dot(ad, Z) * Z
+            X /= np.linalg.norm(X)
+            Y = np.cross(Z, X)
+
+            alpha = np.arccos(self.x / (2 * b * c))
+            beta = np.arccos(self.y / (2 * a * c))
+            gamma = np.arccos(self.z / (2 * a * b))
+
+            va = a * np.array([1, 0, 0])
+            vb = b * np.array([np.cos(gamma), np.sin(gamma), 0])
+            cx = np.cos(beta)
+            cy = (np.cos(alpha) - np.cos(beta) * np.cos(gamma)) \
+                / np.sin(gamma)
+            cz = np.sqrt(1. - cx * cx - cy * cy)
+            vc = c * np.array([cx, cy, cz])
+
+            abc = np.vstack((va, vb, vc))
+            T = np.vstack((X, Y, Z))
+            return np.dot(abc, T)
+    G = _gtensor(atoms)
+
+    # Once A2 and A5-A8 all evaluate to False, the unit cell will have
+    # been fully reduced.
+    for count in range(10000):
+        if (G.a > G.b + G.epsilon or
+            (not np.abs(G.a - G.b) > G.epsilon and
+             np.abs(G.x) > np.abs(G.y) + G.epsilon)):
+            # Procedure A1
+            A = np.array([[0, -1, 0],
+                          [-1, 0, 0],
+                          [0, 0, -1]])
+            G.update(A)
+            C = np.dot(C, A)
+
+        if (G.b > G.c + G.epsilon or
+            (not np.abs(G.b - G.c) > G.epsilon and
+             np.abs(G.y) > np.abs(G.z) + G.epsilon)):
+            # Procedure A2
+            A = np.array([[-1, 0, 0],
+                          [0, 0, -1],
+                          [0, -1, 0]])
+            G.update(A)
+            C = np.dot(C, A)
+            continue
+
+        if G.l * G.m * G.n == 1:
+            # Procedure A3
+            i = -1 if G.l == -1 else 1
+            j = -1 if G.m == -1 else 1
+            k = -1 if G.n == -1 else 1
+            A = np.array([[i, 0, 0],
+                          [0, j, 0],
+                          [0, 0, k]])
+            G.update(A)
+            C = np.dot(C, A)
+        else:
+            # Procedure A4
+            i = -1 if G.l == 1 else 1
+            j = -1 if G.m == 1 else 1
+            k = -1 if G.n == 1 else 1
+
+            if i * j * k == -1:
+                if G.l == 0:
+                    i = -1
+                if G.m == 0:
+                    j = -1
+                if G.n == 0:
+                    k = -1
+            A = np.array([[i, 0, 0],
+                          [0, j, 0],
+                          [0, 0, k]])
+            G.update(A)
+            C = np.dot(C, A)
+
+        if (np.abs(G.x) > G.b + G.epsilon or
+            (not np.abs(G.b - G.x) > G.epsilon and
+             2 * G.y < G.z - G.epsilon) or
+            (not np.abs(G.b + G.x) > G.epsilon and
+             G.z < -G.epsilon)):
+            # Procedure A5
+            A = np.array([[1, 0, 0],
+                          [0, 1, -np.sign(G.x)],
+                          [0, 0, 1]], dtype=int)
+            G.update(A)
+            C = np.dot(C, A)
+        elif (np.abs(G.y) > G.a + G.epsilon or
+              (not np.abs(G.a - G.y) > G.epsilon and
+               2 * G.x < G.z - G.epsilon) or
+              (not np.abs(G.a + G.y) > G.epsilon and
+               G.z < -G.epsilon)):
+            # Procedure A6
+            A = np.array([[1, 0, -np.sign(G.y)],
+                          [0, 1, 0],
+                          [0, 0, 1]], dtype=int)
+            G.update(A)
+            C = np.dot(C, A)
+        elif (np.abs(G.z) > G.a + G.epsilon or
+              (not np.abs(G.a - G.z) > G.epsilon and
+               2 * G.x < G.y - G.epsilon) or
+              (not np.abs(G.a + G.z) > G.epsilon and
+               G.y < -G.epsilon)):
+            # Procedure A7
+            A = np.array([[1, -np.sign(G.z), 0],
+                          [0, 1, 0],
+                          [0, 0, 1]], dtype=int)
+            G.update(A)
+            C = np.dot(C, A)
+        elif (G.x + G.y + G.z + G.a + G.b < -G.epsilon or
+              (not np.abs(G.x + G.y + G.z + G.a + G.b) > G.epsilon and
+               2 * (G.a + G.y) + G.z > G.epsilon)):
+            # Procedure A8
+            A = np.array([[1, 0, 1],
+                          [0, 1, 1],
+                          [0, 0, 1]])
+            G.update(A)
+            C = np.dot(C, A)
+        else:
+            break
+    else:
+        raise RuntimeError('Niggli did not converge \
+                in {n} iterations!'.format(n=count))
+    scpos = np.dot(atoms.get_scaled_positions(), np.linalg.inv(C).T)
+    scpos %= 1.0
+    scpos %= 1.0
+
+    atoms.set_cell(G.get_new_cell())
+    atoms.set_scaled_positions(scpos)
+
+
+def get_duplicate_atoms(atoms, cutoff=0.1, delete=False):
+    """Get list of duplicate atoms and delete them if requested.
+
+    Identify all atoms which lie within the cutoff radius of each other.
+    Delete one set of them if delete == True.
+    """
+    from scipy.spatial.distance import pdist
+    dists = pdist(atoms.get_positions(), 'sqeuclidean')
+    dup = np.nonzero(dists < cutoff**2)
+    rem = np.array(_row_col_from_pdist(atoms.get_number_of_atoms(), dup[0]))
+    if delete:
+        if rem.size != 0:
+            del atoms[rem[:, 0]]
+    else:
+        return rem
+
+
+def _row_col_from_pdist(dim, i):
+    """Calculate the i,j index in the square matrix for an index in a
+    condensed (triangular) matrix.
+    """
+    i = np.array(i)
+    b = 1 - 2 * dim
+    x = (np.floor((-b - np.sqrt(b**2 - 8 * i)) / 2)).astype(int)
+    y = (i + x * (b + x + 2) / 2 + 1).astype(int)
+    if i.shape:
+        return list(zip(x, y))
+    else:
+        return [(x, y)]
+
+
 # Self test
 if __name__ == '__main__':
     import doctest
-    print 'doctest: ', doctest.testmod()
+    print('doctest: ', doctest.testmod())

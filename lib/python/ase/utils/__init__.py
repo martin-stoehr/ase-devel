@@ -1,12 +1,57 @@
+import errno
 import os
 import sys
 import time
+import warnings
 from math import sin, cos, radians, atan2, degrees
+from contextlib import contextmanager
 
 import numpy as np
 
+from ase.data import chemical_symbols
 
+
+# Python 2+3 compatibility stuff:
+if sys.version_info[0] == 3:
+    import builtins
+    exec_ = getattr(builtins, 'exec')
+    basestring = str
+else:
+    def exec_(code, dct):
+        exec('exec code in dct')
+    basestring = basestring
+    
+if sys.version_info >= (2, 7):
+    from importlib import import_module
+else:
+    # Python 2.6:
+    def import_module(name):
+        module = __import__(name)
+        for part in name.split('.')[1:]:
+            module = getattr(module, part)
+        return module
+    
+
+@contextmanager
+def seterr(**kwargs):
+    """Set how floating-point errors are handled.
+    
+    See np.seterr() for more details.
+    """
+    old = np.seterr(**kwargs)
+    yield
+    np.seterr(**old)
+
+
+def plural(n, word):
+    if n == 1:
+        return '1 ' + word
+    return '%d %ss' % (n, word)
+
+    
 class DevNull:
+    encoding = 'UTF-8'
+    
     def write(self, string):
         pass
 
@@ -21,8 +66,33 @@ class DevNull:
 
     def close(self):
         pass
+    
+    def isatty(self):
+        return False
+        
 
 devnull = DevNull()
+
+
+def convert_string_to_fd(name, world=None):
+    """Create a file-descriptor for text output.
+    
+    Will open a file for writing with given name.  Use None for no output and
+    '-' for sys.stdout.
+    """
+    if world is None:
+        from ase.parallel import world
+    if name is None or world.rank != 0:
+        return devnull
+    if name == '-':
+        return sys.stdout
+    if isinstance(name, str):
+        return open(name, 'w')
+    return name  # we assume name is already a file-descriptor
+
+    
+# Only Windows has O_BINARY:
+CEW_FLAGS = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, 'O_BINARY', 0)
 
 
 def opencew(filename, world=None):
@@ -38,21 +108,23 @@ def opencew(filename, world=None):
         
     if world.rank == 0:
         try:
-            fd = os.open(filename, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except OSError:
-            ok = 0
+            fd = os.open(filename, CEW_FLAGS)
+        except OSError as ex:
+            error = ex.errno
         else:
-            ok = 1
-            fd = os.fdopen(fd, 'w')
+            error = 0
+            fd = os.fdopen(fd, 'wb')
     else:
-        ok = 0
+        error = 0
         fd = devnull
 
     # Syncronize:
-    if world.sum(ok) == 0:
+    error = world.sum(error)
+    if error == errno.EEXIST:
         return None
-    else:
-        return fd
+    if error:
+        raise OSError(error, 'Error', filename)
+    return fd
 
 
 class Lock:
@@ -96,8 +168,27 @@ class OpenLock:
         pass
 
 
+def hill(numbers):
+    """Convert list of atomic numbers to a chemical formula as a string.
+    
+    Elements are alphabetically ordered with C and H first."""
+    
+    if isinstance(numbers, dict):
+        count = dict(numbers)
+    else:
+        count = {}
+        for Z in numbers:
+            symb = chemical_symbols[Z]
+            count[symb] = count.get(symb, 0) + 1
+    result = [(s, count.pop(s)) for s in 'CH' if s in count]
+    result += [(s, count[s]) for s in sorted(count)]
+    return ''.join('{0}{1}'.format(symbol, n) if n > 1 else symbol
+                   for symbol, n in result)
+
+
 def prnt(*args, **kwargs):
     """Python 3 style print function."""
+    warnings.warn('Use from __future__ import print_function')
     fd = kwargs.pop('file', sys.stdout)
     fd.write(
         kwargs.pop('sep', ' ').join(str(arg) for arg in args) +
@@ -152,7 +243,7 @@ def givens(a, b):
       [    ] . [ ] = [ ]
       [-s c]   [b]   [0]
     """
-    sgn = lambda x: cmp(x, 0)
+    sgn = np.sign
     if b == 0:
         c = sgn(a)
         s = 0
@@ -227,12 +318,12 @@ def hsv(array, s=.9, v=.9):
         rgb[:] = hsv2rgb(h, s, v)
     return np.reshape(result, array.shape + (3,))
 
-## This code does the same, but requires pylab
-## def cmap(array, name='hsv'):
-##     import pylab
-##     a = (array + array.min()) / array.ptp()
-##     rgba = getattr(pylab.cm, name)(a)
-##     return rgba[:-1] # return rgb only (not alpha)
+# This code does the same, but requires pylab
+# def cmap(array, name='hsv'):
+#     import pylab
+#     a = (array + array.min()) / array.ptp()
+#     rgba = getattr(pylab.cm, name)(a)
+#     return rgba[:-1] # return rgb only (not alpha)
 
 ON_POSIX = 'posix' in sys.builtin_module_names
 
