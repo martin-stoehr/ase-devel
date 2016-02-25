@@ -1,5 +1,6 @@
 import time
 from math import sqrt
+from distutils.version import LooseVersion
 
 import numpy as np
 
@@ -19,7 +20,7 @@ class EPS:
 
         if radii is None:
             radii = covalent_radii[self.numbers]
-        elif type(radii) is float:
+        elif isinstance(radii, float):
             radii = covalent_radii[self.numbers] * radii
         else:
             radii = np.array(radii)
@@ -140,12 +141,11 @@ class EPS:
 
     def write_header(self):
         import matplotlib
-        if matplotlib.__version__ <= '0.8':
+        if LooseVersion(matplotlib.__version__) <= '0.8':
             raise RuntimeError('Your version of matplotlib (%s) is too old' %
                                matplotlib.__version__)
 
-        from matplotlib.backends.backend_ps import RendererPS, \
-             GraphicsContextPS, psDefs
+        from matplotlib.backends.backend_ps import RendererPS, psDefs
 
         self.fd = open(self.filename, 'w')
         self.fd.write('%!PS-Adobe-3.0 EPSF-3.0\n')

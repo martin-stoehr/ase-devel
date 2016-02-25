@@ -30,29 +30,30 @@ class MinimaHopping:
         'timestep': 1.0,  # fs, timestep for MD simulations
         'optimizer': QuasiNewton,  # local optimizer to use
         'minima_traj': 'minima.traj',  # storage file for minima list
-        'fmax': 0.05,  # eV/A, max force for optimizations
-                          }
+        'fmax': 0.05}  # eV/A, max force for optimizations
 
     def __init__(self, atoms, **kwargs):
         """Initialize with an ASE atoms object and keyword arguments."""
         self._atoms = atoms
         for key in kwargs:
-            if not key in self._default_settings:
+            if key not in self._default_settings:
                 raise RuntimeError('Unknown keyword: %s' % key)
         for k, v in self._default_settings.items():
             setattr(self, '_%s' % k, kwargs.pop(k, v))
 
-        self._passedminimum = PassedMinimum()  # when a MD sim. has passed
-                                               # a local minimum
+        # when a MD sim. has passed a local minimum:
+        self._passedminimum = PassedMinimum()
+        
         # Misc storage.
         self._previous_optimum = None
         self._previous_energy = None
         self._temperature = self._T0
         self._Ediff = self._Ediff0
 
-    def __call__(self, totalsteps=None):
-        """Run the minima hopping algorithm. The total number of steps can
-        be specified, other wise runs indefinitely (or until stopped by
+    def __call__(self, totalsteps=None, maxtemp=None):
+        """Run the minima hopping algorithm. Can specify stopping criteria
+        with total steps allowed or maximum searching temperature allowed.
+        If neither is specified, runs indefinitely (or until stopped by
         batching software)."""
         self._startup()
         while True:
@@ -61,6 +62,12 @@ class MinimaHopping:
                           '%i allowed. Increase totalsteps if resuming.'
                           % (self._counter, totalsteps))
                 return
+            if (maxtemp and self._temperature >= maxtemp):
+                self._log('msg', 'Run terminated. Temperature is %.2f K;'
+                          ' max temperature allowed %.2f K.'
+                          % (self._temperature, maxtemp))
+                return
+
             self._previous_optimum = self._atoms.copy()
             self._previous_energy = self._atoms.get_potential_energy()
             self._molecular_dynamics()
@@ -254,7 +261,7 @@ class MinimaHopping:
 
     def _record_minimum(self):
         """Adds the current atoms configuration to the minima list."""
-        traj = io.PickleTrajectory(self._minima_traj, 'a')
+        traj = io.Trajectory(self._minima_traj, 'a')
         traj.write(self._atoms)
         self._read_minima()
         self._log('msg', 'Recorded minima #%i.' % (len(self._minima) - 1))
@@ -266,7 +273,7 @@ class MinimaHopping:
             empty = os.path.getsize(self._minima_traj) == 0
         if os.path.exists(self._minima_traj):
             if not empty:
-                traj = io.PickleTrajectory(self._minima_traj, 'r')
+                traj = io.Trajectory(self._minima_traj, 'r')
                 self._minima = [atoms for atoms in traj]
             else:
                 self._minima = []
@@ -289,7 +296,7 @@ class MinimaHopping:
                           'qn%05i.traj.' % (resume, resume - 1))
                 atoms = io.read('qn%05i.traj' % (resume - 1), index=-1)
             else:
-                images = io.PickleTrajectory('md%05i.traj' % resume, 'r')
+                images = io.Trajectory('md%05i.traj' % resume, 'r')
                 for atoms in images:
                     energies.append(atoms.get_potential_energy())
                     oldpositions.append(atoms.positions.copy())
@@ -305,8 +312,8 @@ class MinimaHopping:
             MaxwellBoltzmannDistribution(self._atoms,
                                          temp=self._temperature * units.kB,
                                          force_temp=True)
-        traj = io.PickleTrajectory('md%05i.traj' % self._counter, 'a',
-                                self._atoms)
+        traj = io.Trajectory('md%05i.traj' % self._counter, 'a',
+                             self._atoms)
         dyn = VelocityVerlet(self._atoms, dt=self._timestep * units.fs)
         log = MDLogger(dyn, self._atoms, 'md%05i.log' % self._counter,
                        header=True, stress=False, peratom=False)
@@ -378,7 +385,7 @@ class ComparePositions:
         comparisons = []
         repeat = []
         for bc in atoms2.pbc:
-            if bc == True:
+            if bc:
                 repeat.append(3)
             else:
                 repeat.append(1)
@@ -408,8 +415,8 @@ class ComparePositions:
         least = ['', np.inf]
         for element in set(symbols):
             count = symbols.count(element)
-            if symbols.count(element) < least[1]:
-                least = [element, symbols.count(element)]
+            if count < least[1]:
+                least = [element, count]
         return least
 
     def _indistinguishable_compare(self, atoms1, atoms2):
@@ -551,9 +558,9 @@ class MHPlot:
             ax.set_xticklabels([])
         ax1.set_xlabel('step')
         tempax.set_ylabel('$T$, K')
-        ediffax.set_ylabel('$E_\mathrm{diff}$, eV')
+        ediffax.set_ylabel(r'$E_\mathrm{diff}$, eV')
         for ax in [ax1, ax2]:
-            ax.set_ylabel('$E_\mathrm{pot}$, eV')
+            ax.set_ylabel('r$E_\mathrm{pot}$, eV')
         ax = CombinedAxis(ax1, ax2, tempax, ediffax)
         self._set_zoomed_range(ax)
         ax1.spines['top'].set_visible(False)
@@ -587,14 +594,14 @@ class MHPlot:
         self._ax.plot([step, step + 0.5], [energy] * 2, '-',
                       color='k', linewidth=2.)
         if status == 'accepted':
-            self._ax.text(step + 0.51, energy, '$\checkmark$')
+            self._ax.text(step + 0.51, energy, r'$\checkmark$')
         elif status == 'rejected':
-            self._ax.text(step + 0.51, energy, '$\Uparrow$', color='red')
+            self._ax.text(step + 0.51, energy, r'$\Uparrow$', color='red')
         elif status == 'previously found minimum':
-            self._ax.text(step + 0.51, energy, '$\hookleftarrow$',
+            self._ax.text(step + 0.51, energy, r'$\hookleftarrow$',
                           color='red', va='center')
         elif status == 'previous minimum':
-            self._ax.text(step + 0.51, energy, '$\leftarrow$',
+            self._ax.text(step + 0.51, energy, r'$\leftarrow$',
                           color='red', va='center')
 
     def _plot_md(self, step, line):
@@ -603,7 +610,7 @@ class MHPlot:
             return
         energies = [self._data[step - 1][0]]
         file = os.path.join(self._rundirectory, 'md%05i.traj' % step)
-        traj = io.PickleTrajectory(file, 'r')
+        traj = io.Trajectory(file, 'r')
         for atoms in traj:
             energies.append(atoms.get_potential_energy())
         xi = step - 1 + .5
@@ -623,7 +630,7 @@ class MHPlot:
         file = os.path.join(self._rundirectory, 'qn%05i.traj' % index)
         if os.path.getsize(file) == 0:
             return
-        traj = io.PickleTrajectory(file, 'r')
+        traj = io.Trajectory(file, 'r')
         energies = [traj[0].get_potential_energy(),
                     traj[-1].get_potential_energy()]
         if index > 0:
@@ -665,7 +672,7 @@ class CombinedAxis:
         self.ax2 = ax2
         self.tempax = tempax
         self.ediffax = ediffax
-        self._ymax = None
+        self._ymax = -np.inf
 
     def set_ax1_range(self, ylim):
         self._ax1_ylim = ylim

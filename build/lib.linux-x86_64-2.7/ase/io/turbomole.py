@@ -1,12 +1,9 @@
-import numpy as np
-
-from ase.atoms import Atoms
 from ase.units import Bohr
 
 
-def read_turbomole(filename='coord'):
+def read_turbomole(f='coord'):
     """Method to read turbomole coord file
-
+    
     coords in bohr, atom types in lowercase, format:
     $coord
     x y z atomtype
@@ -14,17 +11,14 @@ def read_turbomole(filename='coord'):
     $end
     Above 'f' means a fixed atom.
     """
-    from ase import Atoms, Atom
+    from ase import Atoms
     from ase.constraints import FixAtoms
-
-    if isinstance(filename, str):
-        f = open(filename)
 
     lines = f.readlines()
     atoms_pos = []
     atom_symbols = []
     myconstraints=[]
-
+    
     # find $coord section;
     # does not necessarily have to be the first $<something> in file...
     for i, l in enumerate(lines):
@@ -50,23 +44,15 @@ def read_turbomole(filename='coord'):
                     myconstraints.append(False)
             else:
                 myconstraints.append(False)
-
-    if type(filename) == str:
-        f.close()
-
+            
     atoms = Atoms(positions = atoms_pos, symbols = atom_symbols, pbc = False)
     c = FixAtoms(mask = myconstraints)
     atoms.set_constraint(c)
-    #print c
-
-
     return atoms
 
-def read_turbomole_gradient(filename='gradient', index=-1):
+    
+def read_turbomole_gradient(f='gradient', index=-1):
     """ Method to read turbomole gradient file """
-
-    if isinstance(filename, str):
-        f = open(filename)
 
     # read entire file
     lines = [x.strip() for x in f.readlines()]
@@ -83,11 +69,11 @@ def read_turbomole_gradient(filename='gradient', index=-1):
             break
 
     if end <= start:
-        raise RuntimeError('File %s does not contain a valid \'$grad\' section' % (filename))
+        raise RuntimeError('File does not contain a valid \'$grad\' section')
 
     def formatError():
-        raise RuntimeError('Data format in file %s does not correspond to known Turbomole gradient format' % (filename))
-
+        raise RuntimeError('Data format in file does not correspond to known '
+                           'Turbomole gradient format')
 
     # trim lines to $grad
     del lines[:start+1]
@@ -103,12 +89,12 @@ def read_turbomole_gradient(filename='gradient', index=-1):
         # cycle =      1    SCF energy =     -267.6666811409   |dE/dxyz| =  0.157112
         fields = lines[0].split('=')
         try:
-            cycle = int(fields[1].split()[0])
+            # cycle = int(fields[1].split()[0])
             energy = float(fields[2].split()[0])
-            gradient = float(fields[3].split()[0])
+            # gradient = float(fields[3].split()[0])
         except (IndexError, ValueError):
             formatError()
-
+        
         # coordinates/gradient
         atoms = Atoms()
         forces = []
@@ -118,7 +104,7 @@ def read_turbomole_gradient(filename='gradient', index=-1):
                 # 0.00000000000000      0.00000000000000      0.00000000000000      c
                 try:
                     symbol = fields[3].lower().capitalize()
-                    position = tuple([bohr2angstrom(float(x)) for x in fields[0:3] ])
+                    position = tuple([Bohr * float(x) for x in fields[0:3] ])
                 except ValueError:
                     formatError()
                 atoms.append(Atom(symbol, position))
@@ -152,26 +138,27 @@ def write_turbomole(filename, atoms):
     import numpy as np
     from ase.constraints import FixAtoms
 
-    if isinstance(filename, str):
-        f = open(filename, 'w')
-    else:  # Assume it's a 'file-like object'
-        f = filename
+    f = filename
 
     coord = atoms.get_positions()
     symbols = atoms.get_chemical_symbols()
 
-    fix_index = []
-    #if atoms.constraints:
-        #for constr in atoms.constraints:
-            #if isinstance(constr, FixAtoms):
-                #fix_index.extend(np.flatnonzero(constr.index))
-    #fix_index = np.unique(fix_index)
+    fix_index = {'indices': [], 'mask': np.zeros(len(symbols),dtype=bool)}
+    if atoms.constraints:
+        for constr in atoms.constraints:
+            if isinstance(constr, FixAtoms):
+                if 'indices' in constr.todict().keys():
+                    fix_index['indices'].extend(constr.todict()['indices'])
+                if 'mask' in constr.todict().keys():
+                    fix_index['mask'] += constr.todict()['mask']
+
+    fix_index['indices'] = np.unique(fix_index['indices'])
+    fix_index['mask'] = np.transpose(np.nonzero(fix_index['mask']))
 
     fix_str = []
     for i in range(len(atoms)):
-        if i in fix_index:
-            pass
-            #fix_str.append('f')
+        if i in fix_index['mask'] or i in fix_index['indices']:
+            fix_str.append('f')
         else:
             fix_str.append('')
 

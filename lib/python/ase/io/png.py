@@ -1,4 +1,6 @@
+from distutils.version import LooseVersion
 from ase.io.eps import EPS
+import numpy as np
 
 
 class PNG(EPS):
@@ -27,21 +29,23 @@ class PNG(EPS):
             # buffer_rgba does not accept arguments from version 1.2.0
             # https://github.com/matplotlib/matplotlib/commit/f4fee350f9fbc639853bee76472d8089a10b40bd
             import matplotlib
-            if matplotlib.__version__ < '1.2.0':
-                x = renderer._renderer.buffer_rgba(0, 0)
-                _png.write_png(renderer._renderer.buffer_rgba(0, 0),
+            if LooseVersion(matplotlib.__version__) < '1.2.0':
+                _png.write_png(renderer.buffer_rgba(0, 0),
                                renderer.width, renderer.height,
                                self.filename, 72)
             else:
-                x = renderer._renderer.buffer_rgba()
-                _png.write_png(renderer._renderer.buffer_rgba(),
-                               renderer.width, renderer.height,
-                               self.filename, 72)
+                x = renderer.buffer_rgba()
+                try:
+                    _png.write_png(x, self.w, self.h, self.filename, 72)
+                except TypeError:
+                    buf = np.reshape(x, (int(self.h), int(self.w), 4))
+                    _png.write_png(buf, self.filename, 72)
+
 
 def write_png(filename, atoms, **parameters):
     if isinstance(atoms, list):
         if len(atoms) > 1:
-            raise RuntimeError("Don't know how to save more than "+
+            raise RuntimeError("Don't know how to save more than " +
                                "one image to PNG image!")
         else:
             atoms = atoms[0]

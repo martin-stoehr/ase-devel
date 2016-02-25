@@ -8,8 +8,8 @@ import os
 import numpy as np
 
 from ase.io.eps import EPS
-from ase.data import chemical_symbols
 from ase.constraints import FixAtoms
+
 
 def pa(array):
     """Povray array syntax"""
@@ -18,9 +18,9 @@ def pa(array):
 
 def pc(array):
     """Povray color syntax"""
-    if type(array) == str:
+    if isinstance(array, str):
         return 'color ' + array
-    if type(array) == float:
+    if isinstance(array, float):
         return 'rgb <%.2f>*3' % array
     if len(array) == 3:
         return 'rgb <%.2f, %.2f, %.2f>' % tuple(array)
@@ -68,7 +68,7 @@ class POVRAY(EPS):
         'pause'          : True, # Pause when done rendering (only if display)
         'transparent'    : True, # Transparent background
         'canvas_width'   : None, # Width of canvas in pixels
-        'canvas_height'  : None, # Height of canvas in pixels 
+        'canvas_height'  : None, # Height of canvas in pixels
         'camera_dist'    : 50.,  # Distance from camera to front atom
         'image_plane'    : None, # Distance from front atom to image plane
         'camera_type'    : 'orthographic', # perspective, ultra_wide_angle
@@ -106,7 +106,7 @@ class POVRAY(EPS):
             else:
                 self.canvas_width = self.canvas_height * ratio
         elif self.canvas_height is not None:
-            raise RuntimeError, "Can't set *both* width and height!"
+            raise RuntimeError("Can't set *both* width and height!")
 
         # Distance to image plane from camera
         if self.image_plane is None:
@@ -161,7 +161,7 @@ class POVRAY(EPS):
         w('#declare simple = finish {phong 0.7}\n')
         w('#declare pale = finish {'
           'ambient .5 '
-          'diffuse .85 '   
+          'diffuse .85 '
           'roughness .001 '
           'specular 0.200 }\n')
         w('#declare intermediate = finish {'
@@ -279,5 +279,5 @@ def write_pov(filename, atoms, run_povray=False, **parameters):
         cmd = 'povray %s.ini 2> /dev/null' % filename[:-4]
         errcode = os.system(cmd)
         if errcode != 0:
-            raise OSError('Povray command ' + cmd + 
+            raise OSError('Povray command ' + cmd +
                           ' failed with error code %d' % errcode)

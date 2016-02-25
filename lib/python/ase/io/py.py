@@ -1,10 +1,6 @@
-from ase.atoms import Atoms
 
-
-def write_py(fileobj, images, **kwargs):
-    if isinstance(fileobj, str):
-        fileobj = open(fileobj, 'w')
-
+def write_py(fileobj, images):
+    """Write to ASE-compatible python script."""
     fileobj.write('from ase import Atoms\n\n')
     fileobj.write('import numpy as np\n\n')
     
@@ -17,9 +13,9 @@ def write_py(fileobj, images, **kwargs):
                       "          pbc=np.%s,\n"
                       "          cell=np.array(\n      %s,\n"
                       "          positions=np.array(\n      %s),\n" % (
-            image.get_chemical_symbols(reduce=True),
-            repr(image.pbc),
-            repr(image.cell)[6:],
-            repr(image.positions)[6:]))
+                          image.get_chemical_formula(mode='reduce'),
+                          repr(image.pbc),
+                          repr(image.cell)[6:],
+                          repr(image.positions)[6:]))
         
     fileobj.write(']')

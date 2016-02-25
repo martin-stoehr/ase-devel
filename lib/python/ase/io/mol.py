@@ -1,13 +1,11 @@
-from math import pi, cos, sin, sqrt, acos
+"""Reads chemical data in MDL Molfile format. 
 
+See https://en.wikipedia.org/wiki/Chemical_table_file
+"""
 from ase.atoms import Atoms
-from ase.parallel import paropen
 
 
-def read_mol(fileobj, index=-1):
-    if isinstance(fileobj, str):
-        fileobj = open(fileobj)
-
+def read_mol(fileobj):
     lines = fileobj.readlines()
     del(lines[:3])
     L1 = lines[0].split()
@@ -20,4 +18,3 @@ def read_mol(fileobj, index=-1):
             symbols.append(symbol)
             positions.append([float(x), float(y), float(z)])
     return Atoms(symbols=symbols, positions=positions)
-

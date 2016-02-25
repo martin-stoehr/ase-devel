@@ -4,11 +4,11 @@ from ase.optimize.optimize import Dynamics
 from ase.optimize.fire import FIRE
 from ase.units import kB
 from ase.parallel import world
-from ase.io.trajectory import PickleTrajectory
+from ase.io.trajectory import Trajectory
 
 
 class BasinHopping(Dynamics):
-    """Basin hopping algorythm.
+    """Basin hopping algorithm.
 
     After Wales and Doye, J. Phys. Chem. A, vol 101 (1997) 5111-5116
 
@@ -27,6 +27,18 @@ class BasinHopping(Dynamics):
                  optimizer_logfile='-',
                  local_minima_trajectory='local_minima.traj',
                  adjust_cm=True):
+        """Parameters:
+
+        atoms: Atoms object
+            The Atoms object to operate on.
+
+        trajectory: string
+            Pickle file used to store trajectory of atomic movement.
+
+        logfile: file object or str
+            If *logfile* is a string, a file with that name will be opened.
+            Use '-' for stdout.
+        """
         Dynamics.__init__(self, atoms, logfile, trajectory)
         self.kT = temperature
         self.optimizer = optimizer
@@ -40,7 +52,7 @@ class BasinHopping(Dynamics):
         self.optimizer_logfile = optimizer_logfile
         self.lm_trajectory = local_minima_trajectory
         if isinstance(local_minima_trajectory, str):
-            self.lm_trajectory = PickleTrajectory(local_minima_trajectory,
+            self.lm_trajectory = Trajectory(local_minima_trajectory,
                                                   'w', atoms)
 
         self.initialize()

@@ -6,15 +6,16 @@ Atoms object in VASP POSCAR format.
 
 import os
 
+
 def get_atomtypes(fname):
-    """Given a file name, get the atomic symbols. 
+    """Given a file name, get the atomic symbols.
 
     The function can get this information from OUTCAR and POTCAR
     format files.  The files can also be compressed with gzip or
     bzip2.
 
     """
-    atomtypes=[]
+    atomtypes = []
     if fname.find('.gz') != -1:
         import gzip
         f = gzip.open(fname)
@@ -28,8 +29,9 @@ def get_atomtypes(fname):
             atomtypes.append(line.split()[3].split('_')[0].split('.')[0])
     return atomtypes
 
+
 def atomtypes_outpot(posfname, numsyms):
-    """Try to retreive chemical symbols from OUTCAR or POTCAR
+    """Try to retrieve chemical symbols from OUTCAR or POTCAR
     
     If getting atomtypes from the first line in POSCAR/CONTCAR fails, it might
     be possible to find the data in OUTCAR or POTCAR, if these files exist.
@@ -44,7 +46,7 @@ def atomtypes_outpot(posfname, numsyms):
 
     # First check files with exactly same name except POTCAR/OUTCAR instead
     # of POSCAR/CONTCAR.
-    fnames = [posfname.replace('POSCAR', 'POTCAR').replace('CONTCAR', 
+    fnames = [posfname.replace('POSCAR', 'POTCAR').replace('CONTCAR',
                                                            'POTCAR')]
     fnames.append(posfname.replace('POSCAR', 'OUTCAR').replace('CONTCAR',
                                                                'OUTCAR'))
@@ -73,8 +75,8 @@ def atomtypes_outpot(posfname, numsyms):
             if len(at) == numsyms:
                 return at
 
-    raise IOError('Could not determine chemical symbols. Tried files ' 
-                  + str(tried))
+    raise IOError('Could not determine chemical symbols. Tried files ' +
+                  str(tried))
 
 
 def get_atomtypes_from_formula(formula):
@@ -85,7 +87,8 @@ def get_atomtypes_from_formula(formula):
     symbols = string2symbols(formula.split('_')[0])
     atomtypes = [symbols[0]]
     for s in symbols[1:]:
-        if s != atomtypes[-1]: atomtypes.append(s)
+        if s != atomtypes[-1]:
+            atomtypes.append(s)
     return atomtypes
 
 
@@ -97,14 +100,14 @@ def read_vasp(filename='CONTCAR'):
     the atom types are read from OUTCAR or POTCAR file.
     """
  
-    from ase import Atoms, Atom
+    from ase import Atoms
     from ase.constraints import FixAtoms, FixScaled
     from ase.data import chemical_symbols
     import numpy as np
 
     if isinstance(filename, str):
         f = open(filename)
-    else: # Assume it's a file-like object
+    else:  # Assume it's a file-like object
         f = filename
 
     # The first line is in principle a comment line, however in VASP
@@ -165,30 +168,30 @@ def read_vasp(filename='CONTCAR'):
         else:
             try:
                 for atype in atomtypes[:numsyms]:
-                    if not atype in chemical_symbols:
+                    if atype not in chemical_symbols:
                         raise KeyError
             except KeyError:
                 atomtypes = atomtypes_outpot(f.name, numsyms)
 
     for i, num in enumerate(numofatoms):
         numofatoms[i] = int(num)
-        [atom_symbols.append(atomtypes[i]) for na in xrange(numofatoms[i])]
+        [atom_symbols.append(atomtypes[i]) for na in range(numofatoms[i])]
 
     # Check if Selective dynamics is switched on
     sdyn = f.readline()
-    selective_dynamics = sdyn[0].lower() == "s"
+    selective_dynamics = sdyn[0].lower() == 's'
 
     # Check if atom coordinates are cartesian or direct
     if selective_dynamics:
         ac_type = f.readline()
     else:
         ac_type = sdyn
-    cartesian = ac_type[0].lower() == "c" or ac_type[0].lower() == "k"
+    cartesian = ac_type[0].lower() == 'c' or ac_type[0].lower() == 'k'
     tot_natoms = sum(numofatoms)
     atoms_pos = np.empty((tot_natoms, 3))
     if selective_dynamics:
         selective_flags = np.empty((tot_natoms, 3), dtype=bool)
-    for atom in xrange(tot_natoms):
+    for atom in range(tot_natoms):
         ac = f.readline().split()
         atoms_pos[atom] = (float(ac[0]), float(ac[1]), float(ac[2]))
         if selective_dynamics:
@@ -197,11 +200,11 @@ def read_vasp(filename='CONTCAR'):
                 curflag.append(flag == 'F')
             selective_flags[atom] = curflag
     # Done with all reading
-    if type(filename) == str:
+    if isinstance(filename, str):
         f.close()
     if cartesian:
         atoms_pos *= lattice_constant
-    atoms = Atoms(symbols = atom_symbols, cell = basis_vectors, pbc = True)
+    atoms = Atoms(symbols=atom_symbols, cell=basis_vectors, pbc=True)
     if cartesian:
         atoms.set_positions(atoms_pos)
     else:
@@ -220,18 +223,18 @@ def read_vasp(filename='CONTCAR'):
             atoms.set_constraint(constraints)
     return atoms
 
-def read_vasp_out(filename='OUTCAR',index = -1):
+
+def read_vasp_out(filename='OUTCAR', index=-1):
     """Import OUTCAR type file.
 
     Reads unitcell, atom positions, energies, and forces from the OUTCAR file
-    and attempts to read constraints (if any) from CONTCAR/POSCAR, if present. 
+    and attempts to read constraints (if any) from CONTCAR/POSCAR, if present.
     """
-    import os
     import numpy as np
     from ase.calculators.singlepoint import SinglePointCalculator
     from ase import Atoms, Atom
 
-    try:          # try to read constraints, first from CONTCAR, then from POSCAR
+    try:  # try to read constraints, first from CONTCAR, then from POSCAR
         constr = read_vasp('CONTCAR').constraints
     except Exception:
         try:
@@ -241,13 +244,13 @@ def read_vasp_out(filename='OUTCAR',index = -1):
 
     if isinstance(filename, str):
         f = open(filename)
-    else: # Assume it's a file-like object
+    else:  # Assume it's a file-like object
         f = filename
-    data    = f.readlines()
-    natoms  = 0
-    images  = []
-    atoms   = Atoms(pbc = True, constraint = constr)
-    energy  = 0
+    data = f.readlines()
+    natoms = 0
+    images = []
+    atoms = Atoms(pbc=True, constraint=constr)
+    energy = 0
     species = []
     species_num = []
     symbols = []
@@ -255,33 +258,34 @@ def read_vasp_out(filename='OUTCAR',index = -1):
     poscount = 0
     magnetization = []
 
-    for n,line in enumerate(data):
+    for n, line in enumerate(data):
         if 'POTCAR:' in line:
             temp = line.split()[2]
-            for c in ['.','_','1']:
+            for c in ['.', '_', '1']:
                 if c in temp:
                     temp = temp[0:temp.find(c)]
             species += [temp]
         if 'ions per type' in line:
-            species = species[:len(species)/2]
+            species = species[:len(species) // 2]
             temp = line.split()
             for ispecies in range(len(species)):
-                species_num += [int(temp[ispecies+4])]
+                species_num += [int(temp[ispecies + 4])]
                 natoms += species_num[-1]
                 for iatom in range(species_num[-1]):
                     symbols += [species[ispecies]]
         if 'direct lattice vectors' in line:
             cell = []
             for i in range(3):
-                temp = data[n+1+i].split()
+                temp = data[n + 1 + i].split()
                 cell += [[float(temp[0]), float(temp[1]), float(temp[2])]]
             atoms.set_cell(cell)
         if 'FREE ENERGIE OF THE ION-ELECTRON SYSTEM' in line:
-            energy = float(data[n+4].split()[6])
+            energy = float(data[n + 4].split()[6])
             if ecount < poscount:
                 # reset energy for LAST set of atoms, not current one -
                 # VASP 5.11? and up
                 images[-1].calc.results['energy'] = energy
+                images[-1].calc.set(energy=energy)
             ecount += 1
         if 'magnetization (x)' in line:
             magnetization = []
@@ -289,20 +293,21 @@ def read_vasp_out(filename='OUTCAR',index = -1):
                 magnetization += [float(data[n + 4 + i].split()[4])]
         if 'POSITION          ' in line:
             forces = []
+            positions = []
             for iatom in range(natoms):
-                temp = data[n+2+iatom].split()
+                temp = data[n + 2 + iatom].split()
                 atoms += Atom(symbols[iatom],
                               [float(temp[0]), float(temp[1]), float(temp[2])])
-                forces += [[float(temp[3]),float(temp[4]),float(temp[5])]]
+                forces += [[float(temp[3]), float(temp[4]), float(temp[5])]]
+                positions += [[float(temp[0]), float(temp[1]), float(temp[2])]]
                 atoms.set_calculator(SinglePointCalculator(atoms,
                                                            energy=energy,
                                                            forces=forces))
             images += [atoms]
             if len(magnetization) > 0:
                 images[-1].calc.magmoms = np.array(magnetization, float)
-            atoms = Atoms(pbc = True, constraint = constr)
+            atoms = Atoms(pbc=True, constraint=constr)
             poscount += 1
-
 
     # return requested images, code borrowed from ase/io/trajectory.py
     if isinstance(index, int):
@@ -331,12 +336,201 @@ def read_vasp_out(filename='OUTCAR',index = -1):
                     stop += len(images)
         return [images[i] for i in range(start, stop, step)]
 
-def write_vasp(filename, atoms, label='', direct=False, sort=None, symbol_count = None, long_format=True, vasp5=False):
+
+def read_vasp_xdatcar(filename, index=-1):
+    """Import XDATCAR file
+
+       Reads all positions from the XDATCAR and returns a list of
+       Atoms objects.  Useful for viewing optimizations runs
+       from VASP5.x
+
+       Constraints ARE NOT stored in the XDATCAR, and as such, Atoms
+       objects retrieved from the XDATCAR will not have constraints set.
+    """
+
+    import numpy as np
+    from ase import Atoms
+
+    images = list()
+
+    with open(filename, 'r') as xdatcar:
+        xdatcar.readline()
+        xdatcar.readline()
+
+        xx = [float(x) for x in xdatcar.readline().split()]
+        yy = [float(y) for y in xdatcar.readline().split()]
+        zz = [float(z) for z in xdatcar.readline().split()]
+        cell = np.array([xx, yy, zz])
+
+        symbols = xdatcar.readline().split()
+        numbers = [int(n) for n in xdatcar.readline().split()]
+        total = sum(numbers)
+
+        atomic_formula = str()
+        for n, sym in enumerate(symbols):
+            atomic_formula += '%s%s' % (sym, numbers[n])
+
+        count = 0
+        nimage = 0
+        coords = list()
+
+        for line in xdatcar:
+            if 'Direct configuration=' in line:
+                nimage += 1
+            else:
+                coord = [float(x) for x in line.split()]
+                coords.append(coord)
+                count += 1
+
+            if count == total:
+                image = Atoms(atomic_formula, cell=cell, pbc=True)
+                image.set_scaled_positions(coords)
+                images.append(image)
+
+                count = 0
+                coords = list()
+
+    if not index:
+        return images
+    else:
+        return images[index]
+
+
+def read_vasp_xml(filename='vasprun.xml', index=-1):
+    """Parse vasprun.xml file.
+
+    Reads unit cell, atom positions, energies, forces, and constraints
+    from vasprun.xml file
+    """
+
+    import numpy as np
+    import xml.etree.ElementTree as ET
+    from ase import Atoms
+    from ase.constraints import FixAtoms, FixScaled
+    from ase.calculators.singlepoint import SinglePointCalculator
+    from ase.units import GPa
+
+    tree = ET.iterparse(filename)
+
+    atoms_init = None
+    calculation = []
+
+    try:
+        for event, elem in tree:
+            if elem.tag == 'atominfo':
+                species = []
+
+                for entry in elem.find("array[@name='atoms']/set"):
+                    species.append(entry[0].text.strip())
+                natoms = len(species)
+            elif (elem.tag == 'structure' and
+                  elem.attrib.get('name') == 'initialpos'):
+                cell_init = np.zeros((3, 3), dtype=float)
+
+                for i, v in enumerate(elem.find(
+                        "crystal/varray[@name='basis']")):
+                    cell_init[i] = np.array([
+                        float(val) for val in v.text.split()])
+
+                scpos_init = np.zeros((natoms, 3), dtype=float)
+                for i, v in enumerate(elem.find(
+                        "varray[@name='positions']")):
+                    scpos_init[i] = np.array([
+                        float(val) for val in v.text.split()])
+
+                constraints = []
+                fixed_indices = []
+
+                for i, entry in enumerate(elem.findall(
+                        "varray[@name='selective']/v")):
+                    flags = (np.array(entry.text.split() ==
+                                      np.array(['F', 'F', 'F'])))
+                    if flags.all():
+                        fixed_indices.append(i)
+                    elif flags.any():
+                        constraints.append(FixScaled(cell_init, i, flags))
+
+                if fixed_indices:
+                    constraints.append(FixAtoms(fixed_indices))
+
+                atoms_init = Atoms(species,
+                                   cell=cell_init,
+                                   scaled_positions=scpos_init,
+                                   constraint=constraints,
+                                   pbc=True)
+            elif elem.tag == 'calculation':
+                calculation.append(elem)
+    except ET.ParseError as parse_error:
+        if atoms_init is None:
+            raise parse_error
+        elif not calculation:
+            yield atoms_init
+
+    if calculation:
+        if isinstance(index, int):
+            steps = [calculation[index]]
+        else:
+            steps = calculation[index]
+    else:
+        steps = []
+
+    for step in steps:
+        # Workaround for VASP bug, e_0_energy contains the wrong value
+        # in calculation/energy, but calculation/scstep/energy does not
+        # include classical VDW corrections. So, first calculate
+        # e_0_energy - e_fr_energy from calculation/scstep/energy, then
+        # apply that correction to e_fr_energy from calculation/energy.
+        lastscf = step.findall('scstep/energy')[-1]
+
+        de = (float(lastscf.find('i[@name="e_0_energy"]').text) -
+              float(lastscf.find('i[@name="e_fr_energy"]').text))
+
+        energy = float(step.find('energy/i[@name="e_fr_energy"]').text) + de
+
+        cell = np.zeros((3, 3), dtype=float)
+        for i, vector in enumerate(step.find(
+                'structure/crystal/varray[@name="basis"]')):
+            cell[i] = np.array([float(val) for val in vector.text.split()])
+
+        scpos = np.zeros((natoms, 3), dtype=float)
+        for i, vector in enumerate(step.find(
+                'structure/varray[@name="positions"]')):
+            scpos[i] = np.array([float(val) for val in vector.text.split()])
+
+        forces = None
+        fblocks = step.find('varray[@name="forces"]')
+        if fblocks is not None:
+            forces = np.zeros((natoms, 3), dtype=float)
+            for i, vector in enumerate(fblocks):
+                forces[i] = np.array([float(val)
+                                      for val in vector.text.split()])
+
+        stress = None
+        sblocks = step.find('varray[@name="stress"]')
+        if sblocks is not None:
+            stress = np.zeros((3, 3), dtype=float)
+            for i, vector in enumerate(sblocks):
+                stress[i] = np.array([float(val)
+                                      for val in vector.text.split()])
+            stress *= -0.1 * GPa
+            stress = stress.reshape(9)[[0, 4, 8, 5, 2, 1]]
+
+        atoms = atoms_init.copy()
+        atoms.set_cell(cell)
+        atoms.set_scaled_positions(scpos)
+        atoms.set_calculator(
+            SinglePointCalculator(atoms, energy=energy, forces=forces,
+                                  stress=stress))
+        yield atoms
+
+
+def write_vasp(filename, atoms, label='', direct=False, sort=None,
+               symbol_count=None, long_format=True, vasp5=False):
     """Method to write VASP position (POSCAR/CONTCAR) files.
 
     Writes label, scalefactor, unitcell, # of various kinds of atoms,
     positions in cartesian or scaled coordinates (Direct), and constraints
-    to file. Cartesian coordiantes is default and default label is the 
+    to file. Cartesian coordiantes is default and default label is the
     atomic species, e.g. 'C N H Cu'.
     """
     
@@ -345,13 +539,13 @@ def write_vasp(filename, atoms, label='', direct=False, sort=None, symbol_count 
 
     if isinstance(filename, str):
         f = open(filename, 'w')
-    else: # Assume it's a 'file-like object'
+    else:  # Assume it's a 'file-like object'
         f = filename
     
     if isinstance(atoms, (list, tuple)):
         if len(atoms) > 1:
-            raise RuntimeError("Don't know how to save more than "+
-                               "one image to VASP input")
+            raise RuntimeError('Don\'t know how to save more than ' +
+                               'one image to VASP input')
         else:
             atoms = atoms[0]
 
@@ -400,7 +594,7 @@ def write_vasp(filename, atoms, label='', direct=False, sort=None, symbol_count 
             label += '%2s ' % sym
     f.write(label + '\n')
 
-    # Write unitcell in real coordinates and adapt to VASP convention 
+    # Write unitcell in real coordinates and adapt to VASP convention
     # for unit cell
     # ase Atoms doesn't store the lattice constant separately, so always
     # write 1.0.
@@ -451,5 +645,5 @@ def write_vasp(filename, atoms, label='', direct=False, sort=None, symbol_count 
                 f.write('%4s' % s)
         f.write('\n')
 
-    if type(filename) == str:
+    if isinstance(filename, str):
         f.close()

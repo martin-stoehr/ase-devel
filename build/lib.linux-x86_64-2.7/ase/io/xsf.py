@@ -19,14 +19,19 @@ def write_xsf(fileobj, images, data=None):
     numbers = images[0].get_atomic_numbers()
     
     pbc = images[0].get_pbc()
+    npbc = sum(pbc)
     if pbc[2]:
         fileobj.write('CRYSTAL\n')
+        assert npbc == 3
     elif pbc[1]:
         fileobj.write('SLAB\n')
+        assert npbc == 2
     elif pbc[0]:
         fileobj.write('POLYMER\n')
+        assert npbc == 1
     else:
-        fileobj.write('MOLECULE\n')
+        fileobj.write('ATOMS\n')
+        assert npbc == 0
 
     for n, atoms in enumerate(images):
         if pbc.any():
@@ -35,7 +40,7 @@ def write_xsf(fileobj, images, data=None):
             for i in range(3):
                 fileobj.write(' %.14f %.14f %.14f\n' % tuple(cell[i]))
 
-        fileobj.write('PRIMCOORD %d\n' % (n + 1))
+            fileobj.write('PRIMCOORD %d\n' % (n + 1))
 
         # Get the forces if it's not too expensive:
         calc = atoms.get_calculator()
@@ -49,7 +54,8 @@ def write_xsf(fileobj, images, data=None):
 
         pos = atoms.get_positions()
 
-        fileobj.write(' %d 1\n' % len(pos))
+        if pbc.any():
+            fileobj.write(' %d 1\n' % len(pos))
         for a in range(len(pos)):
             fileobj.write(' %2d' % numbers[a])
             fileobj.write(' %20.14f %20.14f %20.14f' % tuple(pos[a]))
@@ -112,20 +118,21 @@ def read_xsf(fileobj, index=-1, read_data=False):
         nimages = 1
 
     if 'CRYSTAL' in line:
-        pbc = True
+        pbc = (True, True, True)
     elif 'SLAB' in line:
         pbc = (True, True, False)
     elif 'POLYMER' in line:
         pbc = (True, False, False)
     else:
-        pbc = False
+        assert 'ATOMS' in line
+        pbc = (False, False, False)
 
     images = []
     for n in range(nimages):
         cell = None
-        if pbc:
+        if any(pbc):
             line = readline().strip()
-            assert 'PRIMVEC' in line
+            assert 'PRIMVEC' in line, line
             cell = []
             for i in range(3):
                 cell.append([float(x) for x in readline().split()])
@@ -136,19 +143,32 @@ def read_xsf(fileobj, index=-1, read_data=False):
                 readline()
             line = readline().strip()
 
-        assert 'PRIMCOORD' in line
+        if any(pbc):
+            assert 'PRIMCOORD' in line
+            natoms = int(readline().split()[0])
+            lines = [readline() for _ in range(natoms)]
+        else:
+            lines = []
+            while line != '' and not line.startswith('BEGIN'):
+                lines.append(line)
+                line = readline()
+                if line.startswith('BEGIN'):
+                    # We read "too far" and accidentally got the header
+                    # of the data section.  This happens only when parsing
+                    # ATOMS blocks, because one cannot infer their length.
+                    # We will remember the line until later then.
+                    data_header_line = line
 
-        natoms = int(readline().split()[0])
         numbers = []
         positions = []
-        for a in range(natoms):
-            line = readline().split()
-            symbol = line[0]
+        for line in lines:
+            tokens = line.split()
+            symbol = tokens[0]
             if symbol.isdigit():
                 numbers.append(int(symbol))
             else:
                 numbers.append(atomic_numbers[symbol])
-            positions.append([float(x) for x in line[1:]])
+            positions.append([float(x) for x in tokens[1:]])
 
         positions = np.array(positions)
         if len(positions[0]) == 3:
@@ -164,18 +184,22 @@ def read_xsf(fileobj, index=-1, read_data=False):
         images.append(image)
 
     if read_data:
+        if any(pbc):
+            line = readline()
+        else:
+            line = data_header_line
+        assert 'BEGIN_BLOCK_DATAGRID_3D' in line, line
+        readline()  # name
         line = readline()
-        assert 'BEGIN_BLOCK_DATAGRID_3D' in line
-        line = readline()
-        assert 'BEGIN_DATAGRID_3D' in line
+        assert 'BEGIN_DATAGRID_3D' in line, line
 
         shape = [int(x) for x in readline().split()]
-        start = [float(x) for x in readline().split()]
+        readline()  # start
 
         for i in range(3):
             readline()
             
-        n_data = shape[0]*shape[1]*shape[2]
+        n_data = shape[0] * shape[1] * shape[2]
         data = np.array([float(readline())
                          for s in range(n_data)]).reshape(shape[::-1])
         data = np.swapaxes(data, 0, 2)

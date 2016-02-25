@@ -19,11 +19,21 @@ class SciPyOptimizer(Optimizer):
     Only the call to the optimizer is still needed
     """
     def __init__(self, atoms, logfile='-', trajectory=None,
-                 callback_always=False, alpha=70.0):
+                 callback_always=False, alpha=70.0, master=None):
         """Initialize object
 
         Parameters:
 
+        atoms: Atoms object
+            The Atoms object to relax.
+
+        trajectory: string
+            Pickle file used to store trajectory of atomic movement.
+
+        logfile: file object or str
+            If *logfile* is a string, a file with that name will be opened.
+            Use '-' for stdout.
+        
         callback_always: book
             Should the callback be run after each force call (also in the
             linesearch)
@@ -34,9 +44,12 @@ class SciPyOptimizer(Optimizer):
             steps to converge might be less if a lower value is used. However,
             a lower value also means risk of instability.
 
+        master: boolean
+            Defaults to None, which causes only rank 0 to save files.  If
+            set to true,  this rank will save files.
         """
         restart = None
-        Optimizer.__init__(self, atoms, restart, logfile, trajectory)
+        Optimizer.__init__(self, atoms, restart, logfile, trajectory, master)
         self.force_calls = 0
         self.callback_always = callback_always
         self.H0 = alpha
@@ -112,7 +125,7 @@ class SciPyFminCG(SciPyOptimizer):
                              maxiter=steps,
                              full_output=1,
                              disp=0,
-                             #retall=0, 
+                             #retall=0,
                              callback=self.callback
                             )
         warnflag = output[-1]
@@ -126,14 +139,14 @@ class SciPyFminBFGS(SciPyOptimizer):
         output = opt.fmin_bfgs(self.f,
                                self.x0(),
                                fprime=self.fprime,
-                               #args=(), 
+                               #args=(),
                                gtol=fmax * 0.1, #Should never be reached
                                norm=np.inf,
-                               #epsilon=1.4901161193847656e-08, 
+                               #epsilon=1.4901161193847656e-08,
                                maxiter=steps,
                                full_output=1,
                                disp=0,
-                               #retall=0, 
+                               #retall=0,
                                callback=self.callback
                               )
         warnflag = output[-1]
@@ -146,22 +159,44 @@ class SciPyGradientlessOptimizer(Optimizer):
 
     Only the call to the optimizer is still needed
 
-    Note: If you redefien x0() and f(), you don't even need an atoms object.
+    Note: If you redefine x0() and f(), you don't even need an atoms object.
     Redefining these also allows you to specify an arbitrary objective
     function.
 
     XXX: This is still a work in progress
     """
     def __init__(self, atoms, logfile='-', trajectory=None,
-                 callback_always=False):
-        """Parameters:
+                 callback_always=False, master=None):
+        """Initialize object
+
+        Parameters:
+
+        atoms: Atoms object
+            The Atoms object to relax.
+
+        trajectory: string
+            Pickle file used to store trajectory of atomic movement.
+
+        logfile: file object or str
+            If *logfile* is a string, a file with that name will be opened.
+            Use '-' for stdout.
 
         callback_always: book
             Should the callback be run after each force call (also in the
             linesearch)
+
+        alpha: float
+            Initial guess for the Hessian (curvature of energy surface). A
+            conservative value of 70.0 is the default, but number of needed
+            steps to converge might be less if a lower value is used. However,
+            a lower value also means risk of instability.
+
+        master: boolean
+            Defaults to None, which causes only rank 0 to save files.  If
+            set to true,  this rank will save files.
         """
         restart = None
-        Optimizer.__init__(self, atoms, restart, logfile, trajectory)
+        Optimizer.__init__(self, atoms, restart, logfile, trajectory, master)
         self.function_calls = 0
         self.callback_always = callback_always
 
@@ -222,18 +257,18 @@ class SciPyFmin(SciPyGradientlessOptimizer):
     XXX: This is still a work in progress
     """
     def call_fmin(self, xtol, ftol, steps):
-        output = opt.fmin(self.f,
-                          self.x0(),
-                          #args=(),
-                          xtol=xtol,
-                          ftol=ftol,
-                          maxiter=steps,
-                          #maxfun=None,
-                          #full_output=1,
-                          disp=0,
-                          #retall=0,
-                          callback=self.callback
-                         )
+        opt.fmin(self.f,
+                 self.x0(),
+                 #args=(),
+                 xtol=xtol,
+                 ftol=ftol,
+                 maxiter=steps,
+                 #maxfun=None,
+                 #full_output=1,
+                 disp=0,
+                 #retall=0,
+                 callback=self.callback)
+
 
 class SciPyFminPowell(SciPyGradientlessOptimizer):
     """Powell's (modified) level set method
@@ -257,16 +292,15 @@ class SciPyFminPowell(SciPyGradientlessOptimizer):
             self.direc = np.eye(len(self.x0()), dtype=float) * direc
 
     def call_fmin(self, xtol, ftol, steps):
-        output = opt.fmin_powell(self.f,
-                                 self.x0(),
-                                 #args=(),
-                                 xtol=xtol,
-                                 ftol=ftol,
-                                 maxiter=steps,
-                                 #maxfun=None,
-                                 #full_output=1,
-                                 disp=0,
-                                 #retall=0,
-                                 callback=self.callback,
-                                 direc=self.direc
-                                )
+        opt.fmin_powell(self.f,
+                        self.x0(),
+                        #args=(),
+                        xtol=xtol,
+                        ftol=ftol,
+                        maxiter=steps,
+                        #maxfun=None,
+                        #full_output=1,
+                        disp=0,
+                        #retall=0,
+                        callback=self.callback,
+                        direc=self.direc)
