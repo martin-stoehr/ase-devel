@@ -1,10 +1,10 @@
 from ase.data.colors import jmol_colors
-from ase.data import covalent_radii, atomic_numbers
+from ase.data import covalent_radii
 
 
 def view_sage_jmol(atoms):
     try:
-        from sage.plot.plot3d.shapes import ColorCube, Sphere
+        from .sage.plot.plot3d.shapes import ColorCube, Sphere
     except:
         raise ImportError(
             'view_sage_jmol requires sage (http://www.sagemath.org/) ' +

@@ -7,14 +7,18 @@ This module defines the central object in the ASE package: the Atoms
 object.
 """
 
+import numbers
 import warnings
 from math import cos, sin
+import copy
 
 import numpy as np
 
+import ase.units as units
 from ase.atom import Atom
 from ase.data import atomic_numbers, chemical_symbols, atomic_masses
-import ase.units as units
+from ase.utils import basestring
+from ase.utils.geometry import wrap_positions, find_mic
 
 
 class Atoms(object):
@@ -128,11 +132,7 @@ class Atoms(object):
 
         atoms = None
 
-        if hasattr(symbols, 'GetUnitCell'):
-            from ase.old import OldASEListOfAtomsWrapper
-            atoms = OldASEListOfAtomsWrapper(symbols)
-            symbols = None
-        elif hasattr(symbols, 'get_positions'):
+        if hasattr(symbols, 'get_positions'):
             atoms = symbols
             symbols = None
         elif (isinstance(symbols, (list, tuple)) and
@@ -173,6 +173,8 @@ class Atoms(object):
                 constraint = [c.copy() for c in atoms.constraints]
             if calculator is None:
                 calculator = atoms.get_calculator()
+            if info is None:
+                info = copy.deepcopy(atoms.info)
 
         self.arrays = {}
 
@@ -213,13 +215,13 @@ class Atoms(object):
 
         self.set_constraint(constraint)
         self.set_tags(default(tags, 0))
-        self.set_momenta(default(momenta, (0.0, 0.0, 0.0)))
         self.set_masses(default(masses, None))
         self.set_initial_magnetic_moments(default(magmoms, 0.0))
         self.set_initial_charges(default(charges, 0.0))
         if pbc is None:
             pbc = False
         self.set_pbc(pbc)
+        self.set_momenta(default(momenta, (0.0, 0.0, 0.0)))
 
         if info is None:
             self.info = {}
@@ -229,7 +231,6 @@ class Atoms(object):
         self.adsorbate_info = {}
 
         self.set_calculator(calculator)
-
 
     def set_calculator(self, calc=None):
         """Attach calculator object."""
@@ -311,11 +312,12 @@ class Atoms(object):
         self._cell = cell
 
     def set_celldisp(self, celldisp):
+        """Set the unit cell displacement vectors."""
         celldisp = np.array(celldisp, float)
         self._celldisp = celldisp
 
     def get_celldisp(self):
-        """Get the unit cell displacement vectors ."""
+        """Get the unit cell displacement vectors."""
         return self._celldisp.copy()
 
     def get_cell(self):
@@ -348,6 +350,8 @@ class Atoms(object):
 
         if dtype is not None:
             a = np.array(a, dtype)
+            if len(a) == 0 and shape is not None:
+                a.shape = (-1,) + shape
         else:
             a = a.copy()
 
@@ -411,26 +415,20 @@ class Atoms(object):
         """Get integer array of atomic numbers."""
         return self.arrays['numbers'].copy()
 
+    def get_chemical_symbols(self):
+        """Get list of chemical symbol strings."""
+        return [chemical_symbols[Z] for Z in self.arrays['numbers']]
+
     def set_chemical_symbols(self, symbols):
         """Set chemical symbols."""
         self.set_array('numbers', symbols2numbers(symbols), int, ())
-
-    def get_chemical_symbols(self, reduce=False):
-        """Get list of chemical symbol strings."""
-        if reduce:
-            warnings.warn('ase.atoms.get_chemical_symbols(reduce=True) is ' +
-                          'deprecated. Please use ase.atoms.get_chemical' +
-                          '_formula(mode="reduce") instead.',
-                          DeprecationWarning, stacklevel=2)
-            return self.get_chemical_formula(mode='reduce')
-        return [chemical_symbols[Z] for Z in self.arrays['numbers']]
 
     def get_chemical_formula(self, mode='hill'):
         """Get the chemial formula as a string based on the chemical symbols.
 
         Parameters:
 
-        mode:
+        mode: str
             There are three different modes available:
 
             'all': The list of chemical symbols are contracted to at string,
@@ -490,7 +488,7 @@ class Atoms(object):
     def set_tags(self, tags):
         """Set tags for all atoms. If only one tag is supplied, it is
         applied to all atoms."""
-        if type(tags) == int:
+        if isinstance(tags, int):
             tags = [tags] * len(self)
         self.set_array('tags', tags, int, ())
 
@@ -501,12 +499,14 @@ class Atoms(object):
         else:
             return np.zeros(len(self), int)
 
-    def set_momenta(self, momenta):
+    def set_momenta(self, momenta, apply_constraint=True):
         """Set momenta."""
-        if len(self.constraints) > 0 and momenta is not None:
+        if (apply_constraint and len(self.constraints) > 0 and
+            momenta is not None):
             momenta = np.array(momenta)  # modify a copy
             for constraint in self.constraints:
-                constraint.adjust_forces(self.arrays['positions'], momenta)
+                if hasattr(constraint, 'adjust_momenta'):
+                    constraint.adjust_momenta(self, momenta)
         self.set_array('momenta', momenta, float, (3,))
 
     def set_velocities(self, velocities):
@@ -527,7 +527,7 @@ class Atoms(object):
         the masses argument is not given or for those elements of the
         masses list that are None, standard values are set."""
 
-        if masses == 'defaults':
+        if isinstance(masses, str) and masses == 'defaults':
             masses = atomic_masses[self.arrays['numbers']]
         elif isinstance(masses, (list, tuple)):
             newmasses = []
@@ -585,13 +585,6 @@ class Atoms(object):
         else:
             self.set_array('charges', charges, float, ())
 
-    def set_charges(self, charges=None):
-        """Deprecated method. Use set_initial_charges."""
-        warnings.warn('ase.atoms.set_charges is deprecated. Please use ase.'
-                      'atoms.set_initial_charges instead.',
-                      DeprecationWarning, stacklevel=2)
-        self.set_initial_charges(charges)
-
     def get_initial_charges(self):
         """Get array of initial charges."""
         if 'charges' in self.arrays:
@@ -604,17 +597,16 @@ class Atoms(object):
         if self._calc is None:
             raise RuntimeError('Atoms object has no calculator.')
         try:
-            charges = self._calc.get_charges(self)
+            return self._calc.get_charges(self)
         except AttributeError:
             raise NotImplementedError
 
     def set_positions(self, newpositions):
         """Set positions, honoring any constraints."""
-        positions = self.arrays['positions']
         if self.constraints:
             newpositions = np.array(newpositions, float)
             for constraint in self.constraints:
-                constraint.adjust_positions(positions, newpositions)
+                constraint.adjust_positions(self, newpositions)
 
         self.set_array('positions', newpositions, shape=(3,))
 
@@ -628,20 +620,30 @@ class Atoms(object):
         else:
             return self.arrays['positions'].copy()
 
-    def get_calculation_done(self):
-        """Let the calculator calculate its thing,
-           using the current input.
-           """
-        if self.calc is None:
-            raise RuntimeError('Atoms object has no calculator.')
-        self.calc.initialize(self)
-        self.calc.calculate(self)
+    def get_potential_energy(self, force_consistent=False,
+                             apply_constraint=True):
+        """Calculate potential energy.
 
-    def get_potential_energy(self):
-        """Calculate potential energy."""
+        Ask the attached calculator to calculate the potential energy and
+        apply constraints.  Use *apply_constraint=False* to get the raw
+        forces.
+
+        When supported by the calculator, either the energy extrapolated
+        to zero Kelvin or the energy consistent with the forces (the free
+        energy) can be returned.
+        """
         if self._calc is None:
             raise RuntimeError('Atoms object has no calculator.')
-        return self._calc.get_potential_energy(self)
+        if force_consistent:
+            energy = self._calc.get_potential_energy(
+                self, force_consistent=force_consistent)
+        else:
+            energy = self._calc.get_potential_energy(self)
+        if apply_constraint:
+            for constraint in self.constraints:
+                if hasattr(constraint, 'adjust_potential_energy'):
+                    energy += constraint.adjust_potential_energy(self)
+        return energy
 
     def get_potential_energies(self):
         """Calculate the potential energies of all the atoms.
@@ -674,19 +676,27 @@ class Atoms(object):
         """Get the total energy - potential plus kinetic energy."""
         return self.get_potential_energy() + self.get_kinetic_energy()
 
-    def get_forces(self, apply_constraint=True):
+    def get_forces(self, apply_constraint=True, md=False):
         """Calculate atomic forces.
 
         Ask the attached calculator to calculate the forces and apply
         constraints.  Use *apply_constraint=False* to get the raw
-        forces."""
+        forces.
+        
+        For molecular dynamics (md=True) we don't apply the constraint
+        to the forces but to the momenta."""
 
         if self._calc is None:
             raise RuntimeError('Atoms object has no calculator.')
         forces = self._calc.get_forces(self)
+        
         if apply_constraint:
+            # We need a special md flag here because for MD we want
+            # to skip real constraints but include special "constraints"
+            # Like Hookean.
             for constraint in self.constraints:
-                constraint.adjust_forces(self.arrays['positions'], forces)
+                if not md or hasattr(constraint, 'adjust_potential_energy'):
+                    constraint.adjust_forces(self, forces)
         return forces
 
     def get_stress(self, voigt=True):
@@ -710,8 +720,8 @@ class Atoms(object):
                           'calculator to the required Voigt form.')
             stress = np.array([stress[0, 0], stress[1, 1], stress[2, 2],
                                stress[1, 2], stress[0, 2], stress[0, 1]])
-        #else:
-        #    assert shape == (6,)
+        else:
+            assert shape == (6,)
 
         if voigt:
             return stress
@@ -744,7 +754,6 @@ class Atoms(object):
 
     def copy(self):
         """Return a copy."""
-        import copy
         atoms = self.__class__(cell=self._cell, pbc=self._pbc, info=self.info)
 
         atoms.arrays = {}
@@ -829,39 +838,6 @@ class Atoms(object):
 
         return self
 
-    def prepend(self, other):
-        """Extend atoms object by prepending atoms from *other*."""
-        if isinstance(other, Atom):
-            other = self.__class__([other])
-
-        n1 = len(self)
-        n2 = len(other)
-
-        for name, a1 in self.arrays.items():
-            a = np.zeros((n1 + n2,) + a1.shape[1:], a1.dtype)
-            a[n2:] = a1
-            if name == 'masses':
-                a2 = other.get_masses()
-            else:
-                a2 = other.arrays.get(name)
-            if a2 is not None:
-                a[:n2] = a2
-            self.arrays[name] = a
-
-        for name, a2 in other.arrays.items():
-            if name in self.arrays:
-                continue
-            a = np.empty((n1 + n2,) + a2.shape[1:], a2.dtype)
-            a[n2:] = a2
-            if name == 'masses':
-                a[n2:] = self.get_masses()[:n1]
-            else:
-                a[n2:] = 0
-
-            self.set_array(name, a)
-
-        return self
-
     __iadd__ = extend
 
     def append(self, atom):
@@ -881,7 +857,7 @@ class Atoms(object):
         the indexing in the subset returned.
 
         """
-        if isinstance(i, int):
+        if isinstance(i, numbers.Integral):
             natoms = len(self)
             if i < -natoms or i >= natoms:
                 raise IndexError('Index out of range.')
@@ -906,7 +882,7 @@ class Atoms(object):
         for con in atoms.constraints:
             if isinstance(con, FixConstraint):
                 try:
-                    con.index_shuffle(i)
+                    con.index_shuffle(self, i)
                 except IndexError:
                     condel.append(con)
         for con in condel:
@@ -918,7 +894,7 @@ class Atoms(object):
         check_constraint = np.array([isinstance(c, FixAtoms)
                                      for c in self._constraints])
         if (len(self._constraints) > 0 and (not check_constraint.all() or
-            type(i) == list)):
+                                            isinstance(i, list))):
             raise RuntimeError('Remove constraint using set_constraint() '
                                'before deleting atoms.')
         mask = np.ones(len(self), bool)
@@ -984,20 +960,22 @@ class Atoms(object):
 
         self.arrays['positions'] += np.array(displacement)
 
-    def center(self, vacuum=None, axis=None):
+    def center(self, vacuum=None, axis=(0, 1, 2), about=None):
         """Center atoms in unit cell.
 
         Centers the atoms in the unit cell, so there is the same
         amount of vacuum on all sides.
 
-        Parameters:
-
-        vacuum (default: None): If specified adjust the amount of
-        vacuum when centering.  If vacuum=10.0 there will thus be 10
-        Angstrom of vacuum on each side.
-
-        axis (default: None): If specified, only act on the specified
-        axis.  Default: Act on all axes.
+        vacuum: float (default: None)
+            If specified adjust the amount of vacuum when centering.
+            If vacuum=10.0 there will thus be 10 Angstrom of vacuum
+            on each side.
+        axis: int or sequence of ints
+            Axis or axes to act on.  Default: Act on all axes.
+        about: float or array (default: None)
+            If specified, center the atoms about <about>.
+            I.e., about=(0., 0., 0.) (or just "about=0.", interpreted
+            identically), to center about the origin.
         """
         # Find the orientations of the faces of the unit cell
         c = self.get_cell()
@@ -1009,10 +987,10 @@ class Atoms(object):
                 dirs[i] *= -1
 
         # Now, decide how much each basis vector should be made longer
-        if axis is None:
-            axes = (0, 1, 2)
-        else:
+        if isinstance(axis, int):
             axes = (axis,)
+        else:
+            axes = axis
         p = self.arrays['positions']
         longer = np.zeros(3)
         shift = np.zeros(3)
@@ -1037,6 +1015,12 @@ class Atoms(object):
             self._cell[i] *= 1 + longer[i] / nowlen
             translation += shift[i] * c[i] / nowlen
         self.arrays['positions'] += translation
+
+        # Optionally, translate to center about a point in space.
+        if about is not None:
+            for vector in self.cell:
+                self.positions -= vector / 2.0
+            self.positions += about
 
     def get_center_of_mass(self, scaled=False):
         """Get the center of mass.
@@ -1063,7 +1047,7 @@ class Atoms(object):
         positions -= com  # translate center of mass to origin
         masses = self.get_masses()
 
-        #initialize elements of the inertial tensor
+        # Initialize elements of the inertial tensor
         I11 = I22 = I33 = I12 = I13 = I23 = 0.0
         for i in range(len(self)):
             x, y, z = positions[i]
@@ -1180,53 +1164,6 @@ class Atoms(object):
                           np.outer(np.dot(rotcell, v), (1.0 - c) * v))
             self.set_cell(rotcell)
 
-    def rotate_plane(self, oplane, tplane=[[1, 1, 0], [1, 2, 0], [2, 1, 0]],
-                     center=(0, 0, 0), rotate_cell=False):
-        """Rotate Atoms into a plane
-
-        Parameters:
-
-        oplane :
-            List of 3 integers, which designate the atomic indexes of the atoms
-            inside the original atoms object to span a plane which should be
-            rotated.
-
-        tplane :
-            List of 3 (x,y,z) coordinates placed inside the target-plane. If
-            none are specified, the default is the X-Y plane (defined via
-            (1,1,0) (1,2,0), (2,1,0)).
-
-        center :
-            The center of rotation. By default (0,0,0). Use 'COM' to fix
-            the center of mass, 'COP' to fix the center of positions or
-            'COU' to fix the center of cell.
-
-        rotate_cell = False:
-            If true the cell is also rotated.
-
-        Examples:
-
-        Rotate a molecule currently in a plane spanned by its atoms 2, 14 and 15
-        into the XY-plane.
-
-        >>> atoms.rotate_plane(oplane=(2, 14, 15))
-        """
-
-        b = [self.positions[i] for i in oplane]
-        tplane = np.array(tplane)
-
-        vec1 = b[2] - b[0]
-        vec2 = b[1] - b[0]
-        nveco = np.cross(vec1, vec2)
-        vec3 = tplane[2] - tplane[1]
-        vec4 = tplane[2] - tplane[0]
-        nvect = np.cross(vec3, vec4)
-
-        self.rotate(v=np.cross(nveco, nvect),
-                a=np.arccos(np.dot(nveco/np.linalg.norm(nveco),
-                                    nvect/np.linalg.norm(nvect))),
-                center=center, rotate_cell=rotate_cell)
-
     def rotate_euler(self, center=(0, 0, 0), phi=0.0, theta=0.0, psi=0.0):
         """Rotate atoms via Euler angles.
 
@@ -1305,7 +1242,7 @@ class Atoms(object):
             angle = 1
         angle = np.arccos(angle)
         if np.vdot(bxa, c) > 0:
-            angle = 2.0 * np.pi - angle
+            angle = 2 * np.pi - angle
         return angle
 
     def _masked_rotate(self, center, axis, diff, mask):
@@ -1328,12 +1265,12 @@ class Atoms(object):
                 self.positions[i] = group[j].position
                 j += 1
 
-    def set_dihedral(self, list, angle, mask=None):
-        """
-        set the dihedral angle between vectors list[0]->list[1] and
+    def set_dihedral(self, list, angle, mask=None, indices=None):
+        """Set the dihedral angle between vectors list[0]->list[1] and
         list[2]->list[3] by changing the atom indexed by list[3]
         if mask is not None, all the atoms described in mask
-        (read: the entire subgroup) are moved
+        (read: the entire subgroup) are moved. Alternatively to the mask,
+        the indices of the atoms to be rotated can be supplied.
 
         example: the following defines a very crude
         ethane-like molecule and twists one half of it by 30 degrees.
@@ -1344,12 +1281,14 @@ class Atoms(object):
         """
         # if not provided, set mask to the last atom in the
         # dihedral description
-        if mask is None:
+        if mask is None and indices is None:
             mask = np.zeros(len(self))
             mask[list[3]] = 1
+        elif indices:
+            mask = [index in indices for index in range(len(self))]
+
         # compute necessary in dihedral change, from current value
         current = self.get_dihedral(list)
-        #diff = current - angle
         diff = angle - current
         axis = self.positions[list[2]] - self.positions[list[1]]
         center = self.positions[list[2]]
@@ -1393,10 +1332,7 @@ class Atoms(object):
             mask[list[2]] = 1
         # Compute necessary in angle change, from current value
         current = self.get_angle(list)
-
-        # This woks when last atom in index list is the one that is moved
-        #diff = current - angle
-        diff =  angle - current
+        diff = angle - current
         # Do rotation of subgroup by copying it to temporary atoms object and
         # then rotating that
         v10 = self.positions[list[0]] - self.positions[list[1]]
@@ -1422,20 +1358,67 @@ class Atoms(object):
         self.set_positions(positions +
                            rs.normal(scale=stdev, size=positions.shape))
 
-    def get_distance(self, a0, a1, mic=False):
+    def get_distance(self, a0, a1, mic=False, vector=False):
         """Return distance between two atoms.
 
         Use mic=True to use the Minimum Image Convention.
+        vector=True gives the distance vector (from a0 to a1).
         """
 
         R = self.arrays['positions']
-        D = R[a1] - R[a0]
+        D = np.array([R[a1] - R[a0]])
         if mic:
-            Dr = np.linalg.solve(self._cell.T, D)
-            D = np.dot(Dr - np.round(Dr) * self._pbc, self._cell)
-        return np.linalg.norm(D)
+            D, D_len = find_mic(D, self._cell, self._pbc)
+        else:
+            D_len = np.array([np.sqrt((D**2).sum())])
+        if vector:
+            return D[0]
 
-    def set_distance(self, a0, a1, distance, fix=0.5):
+        return D_len[0]
+
+    def get_distances(self, a, indices, mic=False, vector=False):
+        """Return distances of atom No.i with a list of atoms.
+
+        Use mic=True to use the Minimum Image Convention.
+        vector=True gives the distance vector (from a to self[indices]).
+        """
+
+        R = self.arrays['positions']
+        D = R[indices] - R[a]
+        if mic:
+            D, D_len = find_mic(D, self._cell, self._pbc)
+        else:
+            D_len = np.sqrt((D**2).sum(1))
+        if vector:
+            return D
+        return D_len
+
+    def get_all_distances(self, mic=False):
+        """Return distances of all of the atoms with all of the atoms.
+
+        Use mic=True to use the Minimum Image Convention.
+        """
+        L = len(self)
+        R = self.arrays['positions']
+
+        D = []
+        for i in range(L - 1):
+            D.append(R[i + 1:] - R[i])
+        D = np.concatenate(D)
+
+        if mic:
+            D, D_len = find_mic(D, self._cell, self._pbc)
+        else:
+            D_len = np.sqrt((D**2).sum(1))
+
+        results = np.zeros((L, L), dtype=float)
+        start = 0
+        for i in range(L - 1):
+            results[i, i + 1:] = D_len[start:start + L - i - 1]
+            start += L - i - 1
+        return results + results.T
+
+    def set_distance(self, a0, a1, distance, fix=0.5, mic=False):
         """Set the distance between two atoms.
 
         Set the distance between atoms *a0* and *a1* to *distance*.
@@ -1444,50 +1427,76 @@ class Atoms(object):
         atom and *fix=0.5* (default) to fix the center of the bond."""
 
         R = self.arrays['positions']
-        D = R[a1] - R[a0]
-        x = 1.0 - distance / np.linalg.norm(D)
-        R[a0] += (x * fix) * D
-        R[a1] -= (x * (1.0 - fix)) * D
+        D = np.array([R[a1] - R[a0]])
 
-    def get_scaled_positions(self):
+        if mic:
+            D, D_len = find_mic(D, self._cell, self._pbc)
+        else:
+            D_len = np.array([np.sqrt((D**2).sum())])
+        x = 1.0 - distance / D_len[0]
+        R[a0] += (x * fix) * D[0]
+        R[a1] -= (x * (1.0 - fix)) * D[0]
+
+    def get_scaled_positions(self, wrap=True):
         """Get positions relative to unit cell.
 
-        Atoms outside the unit cell will be wrapped into the cell in
-        those directions with periodic boundary conditions so that the
-        scaled coordinates are between zero and one."""
+        If wrap is True, atoms outside the unit cell will be wrapped into
+        the cell in those directions with periodic boundary conditions
+        so that the scaled coordinates are between zero and one."""
 
-        scaled = np.linalg.solve(self._cell.T, self.arrays['positions'].T).T
-        for i in range(3):
-            if self._pbc[i]:
-                # Yes, we need to do it twice.
-                # See the scaled_positions.py test
-                scaled[:, i] %= 1.0
-                scaled[:, i] %= 1.0
-        return scaled
+        fractional = np.linalg.solve(self.cell.T, self.positions.T).T
+
+        if wrap:
+            for i, periodic in enumerate(self.pbc):
+                if periodic:
+                    # Yes, we need to do it twice.
+                    # See the scaled_positions.py test.
+                    fractional[:, i] %= 1.0
+                    fractional[:, i] %= 1.0
+
+        return fractional
 
     def set_scaled_positions(self, scaled):
         """Set positions relative to unit cell."""
         self.arrays['positions'][:] = np.dot(scaled, self._cell)
 
+    def wrap(self, center=(0.5, 0.5, 0.5), pbc=None, eps=1e-7):
+        """Wrap positions to unit cell.
+
+        Parameters:
+
+        center: three float
+            The positons in fractional coordinates that the new positions
+            will be nearest possible to.
+        pbc: one or 3 bool
+            For each axis in the unit cell decides whether the positions
+            will be moved along this axis.  By default, the boundary
+            conditions of the Atoms object will be used.
+        eps: float
+            Small number to prevent slightly negative coordinates from being
+            wrapped.
+
+        See also the :func:`ase.utils.geometry.wrap_positions` function.
+        Example:
+
+        >>> a = Atoms('H',
+        ...           [[-0.1, 1.01, -0.5]],
+        ...           cell=[[1, 0, 0], [0, 1, 0], [0, 0, 4]],
+        ...           pbc=[1, 1, 0])
+        >>> a.wrap()
+        >>> a.positions
+        array([[ 0.9 ,  0.01, -0.5 ]])
+        """
+
+        if pbc is None:
+            pbc = self.pbc
+        self.positions[:] = wrap_positions(self.positions, self.cell,
+                                           pbc, center, eps)
+
     def get_temperature(self):
-        """Get the temperature. in Kelvin"""
+        """Get the temperature in Kelvin."""
         ekin = self.get_kinetic_energy() / len(self)
         return ekin / (1.5 * units.kB)
-
-    def get_isotropic_pressure(self, stress):
-        """Get the current calculated pressure, assume isotropic medium.
-            in Bar
-        """
-        if type(stress) == type(1.0) or type(stress) == type(1):
-            return -stress * 1e-5 / units.Pascal
-        elif stress.shape == (3, 3):
-            return (-(stress[0, 0] + stress[1, 1] + stress[2, 2]) / 3.0) * \
-                    1e-5 / units.Pascal
-        elif stress.shape == (6,):
-            return (-(stress[0] + stress[1] + stress[2]) / 3.0) * \
-                   1e-5 / units.Pascal
-        else:
-            raise ValueError('The external stress has the wrong shape.')
 
     def __eq__(self, other):
         """Check for identity of two atoms objects.
@@ -1506,6 +1515,11 @@ class Atoms(object):
             return NotImplemented
 
     def __ne__(self, other):
+        """Check if two atoms objects are not equal.
+
+        Any differences in positions, atomic numbers, unit cell or
+        periodic boundary condtions make atoms objects not equal.
+        """
         eq = self.__eq__(other)
         if eq is NotImplemented:
             return eq
@@ -1544,7 +1558,7 @@ class Atoms(object):
         return self._cell
 
     cell = property(_get_cell, set_cell, doc='Attribute for direct ' +
-                       'manipulation of the unit cell.')
+                    'manipulation of the unit cell.')
 
     def _get_pbc(self):
         """Return reference to pbc-flags for in-place manipulations."""
@@ -1554,15 +1568,12 @@ class Atoms(object):
                    doc='Attribute for direct manipulation ' +
                    'of the periodic boundary condition flags.')
 
-    def get_name(self):
-        import warnings
-        warnings.warn('ase.atoms.get_name is deprecated. Please use ase.' +
-                      'atoms.get_chemical_formula(mode="hill") instead.',
-                      DeprecationWarning, stacklevel=2)
-        return self.get_chemical_formula(mode='hill')
-
     def write(self, filename, format=None, **kwargs):
-        """Write yourself to a file."""
+        """Write atoms object to a file.
+
+        see ase.io.write for formats.
+        kwargs are passed to ase.io.write.
+        """
         from ase.io import write
         write(filename, self, format, **kwargs)
 
@@ -1591,10 +1602,8 @@ class Atoms(object):
         self.extend(edited_atoms)
         self.set_constraint(edited_atoms._get_constraints())
         self.set_cell(edited_atoms.get_cell())
-        # Christoph: The following set_initial_mag... is removed, since this only works when a
-        # valid calculator is set (and wants to calculate that mag moments, which does not
-        # make sense when you only edit a structure (in my oppinion).
-        #self.set_initial_magnetic_moments(edited_atoms.get_magnetic_moments())
+        self.set_initial_magnetic_moments(
+            edited_atoms.get_initial_magnetic_moments())
         self.set_tags(edited_atoms.get_tags())
         return
 
@@ -1653,7 +1662,7 @@ def symbols2numbers(symbols):
         symbols = string2symbols(symbols)
     numbers = []
     for s in symbols:
-        if isinstance(s, (str, unicode)):
+        if isinstance(s, basestring):
             numbers.append(atomic_numbers[s])
         else:
             numbers.append(s)

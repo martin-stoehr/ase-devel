@@ -1,19 +1,15 @@
 import os
 import tempfile
+import subprocess
 
 from ase.io import write
 import ase.parallel as parallel
-from ase.old import OldASEListOfAtomsWrapper
 
 
 def view(atoms, data=None, viewer='ase-gui', repeat=None, block=False):
     # Ignore for parallel calculations:
     if parallel.size != 1:
         return
-
-    if hasattr(atoms, 'GetUnitCell'):
-        # Convert old ASE ListOfAtoms to new style.
-        atoms = OldASEListOfAtomsWrapper(atoms).copy()
 
     vwr = viewer.lower()
     
@@ -47,22 +43,15 @@ def view(atoms, data=None, viewer='ase-gui', repeat=None, block=False):
         raise RuntimeError('Unknown viewer: ' + viewer)
 
     fd, filename = tempfile.mkstemp('.' + format, 'ase-')
-    fd = os.fdopen(fd, 'w')
     if repeat is not None:
         atoms = atoms.repeat()
     if data is None:
-        write(fd, atoms, format=format)
+        write(filename, atoms, format=format)
     else:
-        write(fd, atoms, format=format, data=data)
-    fd.close()
+        write(filename, atoms, format=format, data=data)
     if block:
-        os.system('%s %s' % (command, filename))
+        subprocess.call([command, filename])
         os.remove(filename)
     else:
-        if os.name in ['ce', 'nt']:  # Win
-            # XXX: how to make it non-blocking?
-            os.system('%s %s' % (command, filename))
-            os.remove(filename)
-        else:
-            os.system('%s %s & ' % (command, filename))
-            os.system('(sleep 60; rm %s) &' % filename)
+        subprocess.Popen([command, filename])
+        subprocess.Popen(['sleep 60; rm {0}'.format(filename)], shell=True)
