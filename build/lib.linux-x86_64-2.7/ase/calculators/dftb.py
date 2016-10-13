@@ -96,7 +96,8 @@ class Dftb(FileIOCalculator):
         
         self.pbc = np.any(atoms.pbc)
         ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
-        self.hvr_approach = 'CPA'
+        ## not needed for general use (CPA native in newest DFTB+ versions)
+        self.hvr_approach = 'none' #'CPA'
         
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
@@ -238,11 +239,10 @@ class Dftb(FileIOCalculator):
                 myfile.close()
                 ## read-in LCAO-coefficients (Martin Stoehr)
                 self.read_eigenvectors()
+                self.eigenvectors_missing = False
             except IOError:
-                print("No file name 'eigenvec.out', set WriteEigenvectors = Yes,\n \
-if you wish to use additional electronic structure properties.\n \
-For density dependent dispersion corrections, for instance!")
-                
+                self.eigenvectors_missing = True
+            
         self.read_energy()
         # read geometry from file in case dftb+ has done steps
         # to move atoms, in that case forces are not read
@@ -429,6 +429,8 @@ For density dependent dispersion corrections, for instance!")
                              . 'Both':     use confined radial wave functions throughout (DEFAULT),
                              . list of confinement radii in Angstroms to use per atom.
         """
+        if self.eigenvectors_missing:
+            raise ValueError('No eigenvectors available. Please set WriteEigenvectors = True for DFTB calculation.')
         
         Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
         HA = HirshfeldWrapper(self.atoms, self.wk, self.wf, self.f, self.otypes, Atom2OrbsF, self.Orb2Atom, \
@@ -441,6 +443,8 @@ For density dependent dispersion corrections, for instance!")
     
     def get_hvr_CPA(self):
         """  Return rescaling ratios as obtained by charge population approach.  """
+        if self.eigenvectors_missing:
+            raise ValueError('No eigenvectors available. Please set WriteEigenvectors = True for DFTB calculation.')
         
         syms = self.atoms.get_chemical_symbols()
         n_el_atom, ZAtoms = np.zeros(self.nAtoms), np.zeros(self.nAtoms)

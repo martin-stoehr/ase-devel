@@ -2,7 +2,7 @@ from ase.units import Bohr
 import numpy as np
 from copy import copy
 from ase.calculators.DFT_free_atom import KSAllElectron
-from box.data import data, ValOccs_lm_free
+from hb_box_data import data, ValOccs_lm_free
 import random
 from string import digits
 from os import listdir,system
@@ -87,7 +87,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
                 occs = ValOccs_lm_free[sym]
                 self.free_occs[sym] = occs
             except KeyError:
-                print('Occupation for {0: 2s} not available. Update "ValOccs_lm_free" in "box.data"!'.format(sym))
+                print('Occupation for {0: 2s} not available. Update "ValOccs_lm_free" in "hb_box_data"!'.format(sym))
                 raise
         
         for iAtom in xrange(self.nAtoms):

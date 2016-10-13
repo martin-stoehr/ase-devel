@@ -1,11 +1,11 @@
 import numpy as np
 from scipy.integrate import odeint
-from box.data import data
+from hb_box_data import data
 from copy import copy
-from box.interpolation import Function, SplineFunction
+from hb_box_interpolation import Function, SplineFunction
 import sys
 import os
-from box.timing import Timer
+from hb_box_timing import Timer
 from time import asctime
 import math
 import pickle
@@ -50,8 +50,8 @@ class KSAllElectron:
         -----------
         symbol:         chemical symbol
         configuration:  e.g. {'2s':2,'2p':2}. Overrides (for orbitals given in dict) default
-                        configuration from box.data.
-        valence:        valence orbitals, e.g. ['2s','2p']. Overrides default valence from box.data.
+                        configuration from hb_box_data.
+        valence:        valence orbitals, e.g. ['2s','2p']. Overrides default valence from hb_box_data.
         confinement:    additional confining potential (see ConfinementPotential class)
         etol:           sp energy tolerance for eigensolver (Hartree)
         convergence:    convergence criterion dictionary
