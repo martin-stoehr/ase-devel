@@ -7,36 +7,37 @@ from ase.units import Bohr, Hartree
 from ase.calculators.calculator import Calculator
 
 
-## range-seperation parameter for given xc functional
-xc2beta = {'PBE':0.83}
+## range-seperation parameter for given xc functional or method
+xc2beta = {'PBE':0.83, 'DFTB':1.1}
 
 default_parameters = {'xc':'PBE',
                       'grid_size':25,
-                      'num_tasks':1,
                       'Ggrid':(3,3,3),
                       'Coulomb_SCS':'fermi,dip,gg',
                       'Coulomb_CFDM':'fermi,dip'}
 
 
+try:
+    from mpi4py import MPI
+    default_parameters['ntasks'] = MPI.COMM_WORLD.Get_size()
+    default_parameters['myid'] = MPI.COMM_WORLD.Get_rank()
+except ImportError:
+    sys.stderr.write('warning: Install mpi4py for MPI support\n')
+    default_parameters['ntasks'] = 1
+    default_parameters['myid'] = 0
+
+
 class kSpace_MBD_calculator(Calculator):
     """
     Many-Body Dispersion calculator class for reciprocal space formulation.
-    written by Martin Stoehr (martin.stoehr@tum.de), Feb 2016.
+    written by Martin Stoehr (martin.stoehr@uni.lu), Feb 2016.
     """
     
     
     implemented_properties = ['energy', 'forces']
     
-#    default_parameters = {'xc':'PBE',
-#                          'grid_size':25,
-#                          'num_tasks':1,
-#                          'Ggrid':(3,3,3),
-#                          'Coulomb_SCS':'fermi,dip,gg',
-#                          'Coulomb_CFDM':'fermi,dip'}
-    
     valid_args = ['xc', \
                   'grid_size', \
-                  'num_tasks', \
                   'Ggrid', \
                   'Coulomb_SCS', \
                   'Coulomb_CFDM']
@@ -63,7 +64,6 @@ class kSpace_MBD_calculator(Calculator):
     def get_potential_energy(self, atoms=None):
         """ Return dispersion energy as obtained by MBD calculation. """
         self.update_properties(atoms)
-        
         return self.E_MBD
         
     
@@ -86,7 +86,7 @@ class kSpace_MBD_calculator(Calculator):
         Initialize MBD calculation and evaluate properties.
         """
         mbd.init_grid(self.grid_size)
-        mbd.my_task, mbd.n_tasks = 0, self.num_tasks
+        mbd.my_task, mbd.n_tasks = self.myid, self.ntasks
         
         assert hasattr(self, 'a_div_a0'), \
         "Please provide rescaling to obtain initial dispersion parameters from accurate free atom reference data via 'set_rescaling(rescaling)'!"
@@ -101,17 +101,23 @@ class kSpace_MBD_calculator(Calculator):
         self.omega_TS = mbd.omega_eff(self.C6_TS, self.alpha_TS)
         self.beta = xc2beta[self.xc]
         
+        print('STARTING SCS SUBROUTINE')
         self.run_electrostatic_screening(mode='C')
+        print('SCS SUBROUTINE DONE')
+        print('STARTING EVALUATION')
         self.get_reciprocal_space_mbd_energy()
+        print('EVALUATION DONE')
         mbd.destroy_grid()
         
     
     def run_electrostatic_screening(self, mode='C'):
         self.alpha_dyn_TS = mbd.alpha_dynamic_ts_all(mode, mbd.n_grid_omega, \
                                                      self.alpha_TS, c6=self.C6_TS)
+        print('START SCS')
         self.alpha_dyn_SCS = mbd.run_scs(mode, self.Coulomb_SCS, self.pos, \
                                          self.alpha_dyn_TS, r_vdw=self.RvdW_TS, \
                                          beta=self.beta, a=6, unit_cell=self.UC)
+        print('SCS DONE')
         self.alpha_0_SCS = self.alpha_dyn_SCS[0]
         self.C6_SCS = mbd.get_c6_from_alpha(self.alpha_dyn_SCS)
         self.RvdW_SCS = self.RvdW_TS*(self.alpha_0_SCS/self.alpha_TS)**(1./3.)
