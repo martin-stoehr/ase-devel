@@ -1,5 +1,7 @@
 running build
 running build_py
+copying ase/calculators/dftb.py -> build/lib/ase/calculators
+copying ase/calculators/calculator.py -> build/lib/ase/calculators
 copying ase/calculators/reciprocal_mbd.py -> build/lib/ase/calculators
 msgfmt (GNU gettext-tools) 0.18.1
 Copyright (C) 1995-1998, 2000-2010 Free Software Foundation, Inc.
@@ -46,16 +48,16 @@ unifing config_fc, config, build_clib, build_ext, build commands --fcompiler opt
 running build_src
 build_src
 building extension "HA_recode" sources
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
-creating /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
+creating /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
 f2py options: []
 f2py: /mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ha.pyf
 Reading fortran codes...
@@ -83,13 +85,13 @@ Building modules...
 		  Variables: pi
 			Constructing wrapper function "ha_recode.hirshfeld_main"...
 			  hirsh_volrat = hirshfeld_main(natoms,nkpts,norbs,nthetas,nphis,positions,coeff,wk,f,lrnl_max,dr,nr,len_r,rmins,rnl_id,occ_free,otypes,orb2at,at2orbs)
-	Wrote C/API module "HA_recode" to file "/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.c"
-	Fortran 90 wrappers are saved to "/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.f90"
-  adding '/tmp/tmpq5NIGm/src.linux-x86_64-2.7/fortranobject.c' to sources.
-  adding '/tmp/tmpq5NIGm/src.linux-x86_64-2.7' to include_dirs.
-copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.c -> /tmp/tmpq5NIGm/src.linux-x86_64-2.7
-copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.h -> /tmp/tmpq5NIGm/src.linux-x86_64-2.7
-  adding '/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.f90' to sources.
+	Wrote C/API module "HA_recode" to file "/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.c"
+	Fortran 90 wrappers are saved to "/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.f90"
+  adding '/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/fortranobject.c' to sources.
+  adding '/tmp/tmpUe1Zzd/src.linux-x86_64-2.7' to include_dirs.
+copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.c -> /tmp/tmpUe1Zzd/src.linux-x86_64-2.7
+copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.h -> /tmp/tmpUe1Zzd/src.linux-x86_64-2.7
+  adding '/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.f90' to sources.
 build_src: building npy-pkg config files
 running build_ext
 customize UnixCCompiler
@@ -101,35 +103,35 @@ building 'HA_recode' extension
 compiling C sources
 C compiler: icc -fno-strict-aliasing -fPIC -O3 -xHost -ftz -fp-speculation=safe -fp-model source -DNDEBUG -g -O3 -Wall -Wstrict-prototypes -fPIC
 
-creating /tmp/tmpq5NIGm/tmp
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
-creating /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
-compile options: '-I/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ -I/tmp/tmpq5NIGm/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
-icc: /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.c
+creating /tmp/tmpUe1Zzd/tmp
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
+creating /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
+compile options: '-I/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ -I/tmp/tmpUe1Zzd/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
+icc: /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/fortranobject.c
 In file included from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarraytypes.h(1777),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarrayobject.h(18),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/arrayobject.h(4),
-                 from /tmp/tmpq5NIGm/src.linux-x86_64-2.7/fortranobject.h(13),
-                 from /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.c(19):
+                 from /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/fortranobject.h(13),
+                 from /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/fortranobject.c(2):
 /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/npy_1_7_deprecated_api.h(15): warning #1224: #warning directive: "Using deprecated NumPy API, disable it by "          "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION"
   #warning "Using deprecated NumPy API, disable it by " \
    ^
 
-icc: /tmp/tmpq5NIGm/src.linux-x86_64-2.7/fortranobject.c
+icc: /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.c
 In file included from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarraytypes.h(1777),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarrayobject.h(18),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/arrayobject.h(4),
-                 from /tmp/tmpq5NIGm/src.linux-x86_64-2.7/fortranobject.h(13),
-                 from /tmp/tmpq5NIGm/src.linux-x86_64-2.7/fortranobject.c(2):
+                 from /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/fortranobject.h(13),
+                 from /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.c(19):
 /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/npy_1_7_deprecated_api.h(15): warning #1224: #warning directive: "Using deprecated NumPy API, disable it by "          "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION"
   #warning "Using deprecated NumPy API, disable it by " \
    ^
@@ -138,27 +140,27 @@ compiling Fortran 90 module sources
 Fortran f77 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran f90 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FR -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran fix compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
-creating /tmp/tmpq5NIGm/mnt
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs/mstoehr
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs/mstoehr/bin
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
-creating /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
-compile options: '-I/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ -I/tmp/tmpq5NIGm/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
-extra options: '-module /tmp/tmpq5NIGm/ -I/tmp/tmpq5NIGm/'
+creating /tmp/tmpUe1Zzd/mnt
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs/mstoehr
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs/mstoehr/bin
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
+creating /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
+compile options: '-I/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ -I/tmp/tmpUe1Zzd/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
+extra options: '-module /tmp/tmpUe1Zzd/ -I/tmp/tmpUe1Zzd/'
 ifort:f90: /mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode.f90
 compiling Fortran sources
 Fortran f77 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran f90 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FR -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran fix compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
-compile options: '-I/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ -I/tmp/tmpq5NIGm/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
-extra options: '-module /tmp/tmpq5NIGm/ -I/tmp/tmpq5NIGm/'
-ifort:f90: /tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.f90
-/opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -shared -shared -nofor_main /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.o /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/fortranobject.o /tmp/tmpq5NIGm/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode.o /tmp/tmpq5NIGm/tmp/tmpq5NIGm/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.o splines_alt.o spherical_harmonics.o -L/usr/lib/ -L/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/lib -llapack -lpython2.7 -o ./HA_recode.so
-Removing build directory /tmp/tmpq5NIGm
+compile options: '-I/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/ -I/tmp/tmpUe1Zzd/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
+extra options: '-module /tmp/tmpUe1Zzd/ -I/tmp/tmpUe1Zzd/'
+ifort:f90: /tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.f90
+/opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -shared -shared -nofor_main /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recodemodule.o /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/fortranobject.o /tmp/tmpUe1Zzd/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode.o /tmp/tmpUe1Zzd/tmp/tmpUe1Zzd/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/HA_recode-f2pywrappers2.o splines_alt.o spherical_harmonics.o -L/usr/lib/ -L/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/lib -llapack -lpython2.7 -o ./HA_recode.so
+Removing build directory /tmp/tmpUe1Zzd
 Reading fortran codes...
 	Reading file '/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode.f90' (format:free)
 Post-processing...
@@ -179,16 +181,16 @@ unifing config_fc, config, build_clib, build_ext, build commands --fcompiler opt
 running build_src
 build_src
 building extension "CPA_recode" sources
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
-creating /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
+creating /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
 f2py options: []
 f2py: /mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/cpa.pyf
 Reading fortran codes...
@@ -207,13 +209,13 @@ Building modules...
 		Constructing F90 module support for "cpa_recode"...
 			Constructing wrapper function "cpa_recode.get_apt"...
 			  apt = get_apt(n_files,n_k_tot,n_basis,natoms,orb2atom,wk,do_pbc,type_evecs)
-	Wrote C/API module "CPA_recode" to file "/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.c"
-	Fortran 90 wrappers are saved to "/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.f90"
-  adding '/tmp/tmpuUUxdn/src.linux-x86_64-2.7/fortranobject.c' to sources.
-  adding '/tmp/tmpuUUxdn/src.linux-x86_64-2.7' to include_dirs.
-copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.c -> /tmp/tmpuUUxdn/src.linux-x86_64-2.7
-copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.h -> /tmp/tmpuUUxdn/src.linux-x86_64-2.7
-  adding '/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.f90' to sources.
+	Wrote C/API module "CPA_recode" to file "/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.c"
+	Fortran 90 wrappers are saved to "/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.f90"
+  adding '/tmp/tmpyl2EBw/src.linux-x86_64-2.7/fortranobject.c' to sources.
+  adding '/tmp/tmpyl2EBw/src.linux-x86_64-2.7' to include_dirs.
+copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.c -> /tmp/tmpyl2EBw/src.linux-x86_64-2.7
+copying /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/f2py/src/fortranobject.h -> /tmp/tmpyl2EBw/src.linux-x86_64-2.7
+  adding '/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.f90' to sources.
 build_src: building npy-pkg config files
 running build_ext
 customize UnixCCompiler
@@ -225,35 +227,35 @@ building 'CPA_recode' extension
 compiling C sources
 C compiler: icc -fno-strict-aliasing -fPIC -O3 -xHost -ftz -fp-speculation=safe -fp-model source -DNDEBUG -g -O3 -Wall -Wstrict-prototypes -fPIC
 
-creating /tmp/tmpuUUxdn/tmp
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
-creating /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
-compile options: '-I/tmp/tmpuUUxdn/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
-icc: /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.c
+creating /tmp/tmpyl2EBw/tmp
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
+creating /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
+compile options: '-I/tmp/tmpyl2EBw/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
+icc: /tmp/tmpyl2EBw/src.linux-x86_64-2.7/fortranobject.c
 In file included from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarraytypes.h(1777),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarrayobject.h(18),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/arrayobject.h(4),
-                 from /tmp/tmpuUUxdn/src.linux-x86_64-2.7/fortranobject.h(13),
-                 from /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.c(19):
+                 from /tmp/tmpyl2EBw/src.linux-x86_64-2.7/fortranobject.h(13),
+                 from /tmp/tmpyl2EBw/src.linux-x86_64-2.7/fortranobject.c(2):
 /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/npy_1_7_deprecated_api.h(15): warning #1224: #warning directive: "Using deprecated NumPy API, disable it by "          "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION"
   #warning "Using deprecated NumPy API, disable it by " \
    ^
 
-icc: /tmp/tmpuUUxdn/src.linux-x86_64-2.7/fortranobject.c
+icc: /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.c
 In file included from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarraytypes.h(1777),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/ndarrayobject.h(18),
                  from /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/arrayobject.h(4),
-                 from /tmp/tmpuUUxdn/src.linux-x86_64-2.7/fortranobject.h(13),
-                 from /tmp/tmpuUUxdn/src.linux-x86_64-2.7/fortranobject.c(2):
+                 from /tmp/tmpyl2EBw/src.linux-x86_64-2.7/fortranobject.h(13),
+                 from /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.c(19):
 /home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include/numpy/npy_1_7_deprecated_api.h(15): warning #1224: #warning directive: "Using deprecated NumPy API, disable it by "          "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION"
   #warning "Using deprecated NumPy API, disable it by " \
    ^
@@ -262,24 +264,24 @@ compiling Fortran 90 module sources
 Fortran f77 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran f90 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FR -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran fix compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
-creating /tmp/tmpuUUxdn/mnt
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs/mstoehr
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs/mstoehr/bin
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
-creating /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
-compile options: '-I/tmp/tmpuUUxdn/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
-extra options: '-module /tmp/tmpuUUxdn/ -I/tmp/tmpuUUxdn/'
+creating /tmp/tmpyl2EBw/mnt
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs/mstoehr
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs/mstoehr/bin
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase
+creating /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators
+compile options: '-I/tmp/tmpyl2EBw/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
+extra options: '-module /tmp/tmpyl2EBw/ -I/tmp/tmpyl2EBw/'
 ifort:f90: /mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode.f90
 compiling Fortran sources
 Fortran f77 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran f90 compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FR -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
 Fortran fix compiler: /opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -FI -O3 -debug all -traceback -debug -traceback -O3 -g -xhost -fp-model strict -fPIC
-compile options: '-I/tmp/tmpuUUxdn/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
-extra options: '-module /tmp/tmpuUUxdn/ -I/tmp/tmpuUUxdn/'
-ifort:f90: /tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.f90
-/opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -shared -shared -nofor_main /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.o /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/fortranobject.o /tmp/tmpuUUxdn/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode.o /tmp/tmpuUUxdn/tmp/tmpuUUxdn/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.o -L/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/lib -lpython2.7 -o ./CPA_recode.so
-Removing build directory /tmp/tmpuUUxdn
+compile options: '-I/tmp/tmpyl2EBw/src.linux-x86_64-2.7 -I/home/users/mstoehr/bin/numpy-1.11.2/lib/python2.7/site-packages/numpy-1.11.2-py2.7-linux-x86_64.egg/numpy/core/include -I/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/include/python2.7 -c'
+extra options: '-module /tmp/tmpyl2EBw/ -I/tmp/tmpyl2EBw/'
+ifort:f90: /tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.f90
+/opt/apps/resif/devel/v1.1-20150414/core/software/compiler/ifort/2015.3.187/bin/ifort -shared -shared -nofor_main /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recodemodule.o /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/fortranobject.o /tmp/tmpyl2EBw/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode.o /tmp/tmpyl2EBw/tmp/tmpyl2EBw/src.linux-x86_64-2.7/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase/calculators/CPA_recode-f2pywrappers2.o -L/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/lib -lpython2.7 -o ./CPA_recode.so
+Removing build directory /tmp/tmpyl2EBw

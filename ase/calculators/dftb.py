@@ -44,7 +44,7 @@ from ase.calculators.ext_CPA_DFTB import ChargePopulationAnalysis
 from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
 
 
-## default value of maximal angular momentum to be included in DFTB calculation
+## default value of maximal angular momentum to be included in DFTB calculation (ease calculator init, MS)
 DefaultMaxAngMom = { 'H':'"s"',                                                                  'He':'"s"', \
                     'Li':'"p"','Be':'"p"', 'B':'"p"', 'C':'"p"', 'N':'"p"', 'O':'"p"', 'F':'"p"','Ne':'"p"', \
                     'Na':'"p"','Mg':'"p"','Al':'"p"','Si':'"p"', 'P':'"p"', 'S':'"p"','Cl':'"p"','Ar':'"p"', \
@@ -54,7 +54,13 @@ DefaultMaxAngMom = { 'H':'"s"',                                                 
                     'Tc':'"d"','Ru':'"d"','Rh':'"d"','Pd':'"d"','Ag':'"d"','Cd':'"d"','In':'"p"','Sn':'"p"', \
                     'Sb':'"p"','Te':'"p"', 'I':'"p"','Xe':'"p"','Cs':'"p"','Ba':'"p"','Lu':'"d"','Hf':'"d"', \
                     'Ta':'"d"', 'W':'"d"','Re':'"d"','Os':'"d"','Ir':'"d"','Pt':'"d"','Au':'"d"','Hg':'"d"', \
-                    'Tl':'"p"','Pb':'"p"','Bi':'"p"','Po':'"p"','As':'"p"','Rn':'"p"'}
+                    'Tl':'"p"','Pb':'"p"','Bi':'"p"','Po':'"p"','As':'"p"','Rn':'"p"' }
+
+# calculated reference values for Hubbard Derivatives (required for DFTB3 calculations)
+DefaultdU = { \
+            # from M. Gaus, Q. Cui, M. Elstner JCTC 2011, 7 (4), 931-948:
+            'H':-0.1857, 'C':-0.1495, 'N':-0.1535, 'O':-0.1575, 'P':-0.0702, 'S':-0.0695, \
+            }
 
 
 class Dftb(FileIOCalculator):
@@ -67,8 +73,7 @@ class Dftb(FileIOCalculator):
     implemented_properties = ['energy', 'forces']
     
     def __init__(self, restart=None, ignore_bad_restart_file=False,
-                 label='dftb', atoms=None, kpts=None,
-                 **kwargs):
+                 label='dftb', atoms=None, kpts=None, **kwargs):
         """  Construct a DFTB+ calculator.  """
         
         from ase.dft.kpoints import monkhorst_pack
@@ -79,10 +84,13 @@ class Dftb(FileIOCalculator):
             slako_dir = './'
         
         self.default_parameters = dict(
+            Options_='',
+            Options_WriteResultsTag='Yes',
+            Options_WriteEigenvectors='No',
+#            Options_CalculateForces='Yes',
+            Options_MinimiseMemoryUsage='No',
             Hamiltonian_='DFTB',
-            Driver_='ConjugateGradient',
-            Driver_MaxForceComponent='1E-4',
-            Driver_MaxSteps=0,
+#            Hamiltonian_SCCTolerance = 1.0E-005,
             Hamiltonian_SlaterKosterFiles_='Type2FileNames',
             Hamiltonian_SlaterKosterFiles_Prefix=slako_dir,
             Hamiltonian_SlaterKosterFiles_Separator='"-"',
@@ -95,6 +103,33 @@ class Dftb(FileIOCalculator):
             self.default_parameters['Hamiltonian_MaxAngularMomentum_'+species] = DefaultMaxAngMom[species]
         
         self.pbc = np.any(atoms.pbc)
+        ## control whether DFTB+ should calculate forces or enable singe-point calculations (large systems!)
+        calc_forces = kwargs.get('Options_CalculateForces', 'Yes')
+        self.calculate_forces = ( (calc_forces=='Yes') or (calc_forces=='YES') )
+        if self.calculate_forces:
+            self.default_parameters['Driver_']='ConjugateGradient'
+            self.default_parameters['Driver_MaxForceComponent']='1E-4'
+            self.default_parameters['Driver_MaxSteps']=0
+        else:
+            print("You chose not to calculate forces (Options_CalculateForces = 'No').\
+Be aware that this might limit capabilities.")
+            self.default_parameters['Driver']='{}'
+        
+        do_3rd_order = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
+        if ( (do_3rd_order=='Yes') or (do_3rd_order=='YES') ):
+            self.default_parameters['Hamiltonian_DampXH'] = 'Yes',
+            self.default_parameters['Hamiltonian_DampXHExponent'] = 4.05,
+            self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
+            for species in list(set(atoms.get_chemical_symbols())):
+                input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
+                if (not (input_dU=='inputdoesntlooklikethis')):
+                    self.default_parameters['Hamiltonian_HubbardDerivs_'+species] = input_dU
+                else:
+                    try:
+                        self.default_parameters['Hamiltonian_HubbardDerivs_'+species] = DefaultdU[species]
+                    except KeyError:
+                        raise NotImplementedError("Hubbard Derivative for '"+species+"' not found. Please specify on input or implement.")
+        
         ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
         ## not needed for general use (CPA native in newest DFTB+ versions)
         self.hvr_approach = 'none' #'CPA'
@@ -113,6 +148,7 @@ class Dftb(FileIOCalculator):
                 key = initkey + '_empty' + str(i)
                 self.parameters[key] = str(mp[i]).strip('[]') + ' 1.0'
         
+        self.atoms = atoms
         #the input file written only once
         if restart == None:
             self.write_dftb_in()
@@ -144,6 +180,8 @@ class Dftb(FileIOCalculator):
         #--------MAIN KEYWORDS-------
         previous_key = 'dummy_'
         myspace = ' '
+        if (self.hvr_approach == 'CPA') or (self.hvr_approach == 'HA'):
+            self.parameters['Options_WriteEigenvectors'] = 'Yes'
         
         for key, value in sorted(self.parameters.items()):
             current_depth = key.rstrip('_').count('_')
@@ -164,11 +202,13 @@ class Dftb(FileIOCalculator):
         for my_backsclash in reversed(range(current_depth)):
             outfile.write(3 * my_backsclash * myspace + '} \n')
         #output to 'results.tag' file (which has proper formatting)
-        outfile.write('Options { \n')
-        outfile.write('   WriteResultsTag = Yes  \n')
-        if (self.hvr_approach == 'CPA') or (self.hvr_approach == 'HA'):
-            outfile.write('   WriteEigenvectors = Yes  \n')
-        outfile.write('} \n')
+#        outfile.write('Options = { \n')
+#        outfile.write('   WriteResultsTag = Yes  \n')
+#        if (self.hvr_approach == 'CPA') or (self.hvr_approach == 'HA'):
+#            outfile.write('   WriteEigenvectors = Yes  \n')
+#        if not self.calc_forces:
+#            outfile.write('   CalculateForces=No\n')
+#        outfile.write('} \n')
         outfile.close()
         
     def set(self, **kwargs):
@@ -251,7 +291,9 @@ class Dftb(FileIOCalculator):
             #self.results['forces'] = np.zeros([len(self.atoms), 3])
         #else:
             #self.read_forces()
-        self.read_forces()
+        if self.calculate_forces:
+            self.read_forces()
+        
         os.remove('results.tag')
         
     
@@ -262,7 +304,12 @@ class Dftb(FileIOCalculator):
         """
         orbitalslist = {0:['s'], 1:['py','pz','px'], 2:['dxy','dyz','dz2','dxz','dx2-y2'], \
                        3:['f3yx2-y3','fxyz','fyz2','fz3','fxz2','fzx2-zy2','fx3-3xy2']}
-        self.atoms = read('geo_end.xyz')
+        try:
+            atoms_end = read('geo_end.xyz')
+        except IOError:
+            atoms_end = self.atoms
+        
+        self.atoms = atoms_end
         self.nAtoms = len(self.atoms)
         self.atomic_charges = np.zeros(self.nAtoms)
         self.Orb2Atom = np.zeros(self.nOrbs)
