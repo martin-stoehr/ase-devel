@@ -1,3 +1,10 @@
+###################################################
+#
+#  This module was taken from the Hotbit package 
+#          (distributed under GNU GPL)
+#
+###################################################
+
 import numpy as np
 import hb_box_mix
 from scipy.linalg import norm

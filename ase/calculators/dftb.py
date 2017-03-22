@@ -87,6 +87,7 @@ class Dftb(FileIOCalculator):
             Options_='',
             Options_WriteResultsTag='Yes',
             Options_WriteEigenvectors='No',
+            Options_WriteCPA='No',
 #            Options_CalculateForces='Yes',
             Options_MinimiseMemoryUsage='No',
             Hamiltonian_='DFTB',
@@ -131,8 +132,8 @@ Be aware that this might limit capabilities.")
                         raise NotImplementedError("Hubbard Derivative for '"+species+"' not found. Please specify on input or implement.")
         
         ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
-        ## not needed for general use (CPA native in newest DFTB+ versions)
-        self.hvr_approach = 'none' #'CPA'
+        ## 'CPA' native in newest DFTB+ versions
+        self.hvr_approach = 'CPA'
         
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
@@ -180,7 +181,7 @@ Be aware that this might limit capabilities.")
         #--------MAIN KEYWORDS-------
         previous_key = 'dummy_'
         myspace = ' '
-        if (self.hvr_approach == 'CPA') or (self.hvr_approach == 'HA'):
+        if (self.hvr_approach == 'HA'):
             self.parameters['Options_WriteEigenvectors'] = 'Yes'
         
         for key, value in sorted(self.parameters.items()):
@@ -201,14 +202,7 @@ Be aware that this might limit capabilities.")
         current_depth = key.rstrip('_').count('_')
         for my_backsclash in reversed(range(current_depth)):
             outfile.write(3 * my_backsclash * myspace + '} \n')
-        #output to 'results.tag' file (which has proper formatting)
-#        outfile.write('Options = { \n')
-#        outfile.write('   WriteResultsTag = Yes  \n')
-#        if (self.hvr_approach == 'CPA') or (self.hvr_approach == 'HA'):
-#            outfile.write('   WriteEigenvectors = Yes  \n')
-#        if not self.calc_forces:
-#            outfile.write('   CalculateForces=No\n')
-#        outfile.write('} \n')
+        
         outfile.close()
         
     def set(self, **kwargs):
@@ -350,6 +344,16 @@ Be aware that this might limit capabilities.")
             ## reshape array into shape = (n_kpoints, n_Orbitals)
             self.f = textoccs.reshape((self.nOrbs, self.nk)).T
         
+        ## dispersion energy (MBD/TS)
+        try:
+            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
+        except KeyError:
+            vdWmode = 'none'
+        
+        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
+            textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
+            self.dispersion_energy = float(textdisp.split()[-2])
+        
         ## k-point weighting
         myfile = open('dftb_in.hsd','r')
         linesin = myfile.readlines()
@@ -388,6 +392,23 @@ Be aware that this might limit capabilities.")
             self.wf[0] = np.array(c).reshape((self.nk, self.nOrbs, self.nOrbs))
         
     
+    def read_CPA(self):
+        """
+        Read CPA ratios as returned by DFTB+, length = nAtoms
+        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
+        """
+        try:
+            fCPA = open('CPA_ratios.out','r')
+            lines = fCPA.readlines()[1:]
+            fCPA.close()
+            self.hvr_CPA = np.zeros(self.nAtoms)
+            for iAtom in xrange(self.nAtoms):
+                self.hvr_CPA[iAtom] = float(lines[iAtom].split()[-1])
+            
+        except IOError:
+            raise RuntimeError("No file 'CPA_ratios.out'. Something went terribly wrong.")
+        
+    
     def read_energy(self):
         """Read Energy from dftb output file (results.tag)."""
         from ase.units import Hartree
@@ -417,7 +438,7 @@ Be aware that this might limit capabilities.")
     
     #-------------------------------------------#
     #  Approach(es) to atomic polarizabilities  #
-    #  by Martin Stoehr, martin.stoehr@tum.de   #
+    #  by Martin Stoehr, martin.stoehr@uni.lu   #
     #-------------------------------------------#
     
     def set_hvr_approach(self, approach):
@@ -434,15 +455,7 @@ Be aware that this might limit capabilities.")
     
     def get_hirsh_volrat(self):
         """
-        Return Hirshfeld volume ratios using method <approach>
-        
-        parameters:
-        ===========
-            approach:  . 'HA'     actual Hirshfeld analysis using confined basis confinement
-                                  (see ext_HA_DFTB.py)
-                       . 'CPA'    ratios as obtained by charge population approach
-                                  (see ext_CPA_DFTB.py)
-                       . 'const'  return constant ratios of 1.
+        Return Hirshfeld volume ratios using method <self.approach>
         """
         if self.hvr_approach == 'const':
             self.rescaling = self.get_hvr_const()
@@ -451,7 +464,7 @@ Be aware that this might limit capabilities.")
         elif self.hvr_approach == 'CPA':
             self.rescaling = self.get_hvr_CPA()
         else:
-            raise NotImplementedError("Sorry dude, I don't know about a scheme called '"+approach+"'.")
+            raise NotImplementedError("Sorry dude, I don't know about a scheme called '"+self.hvr_approach+"'.")
         return self.rescaling
         
     
@@ -490,19 +503,32 @@ Be aware that this might limit capabilities.")
     
     def get_hvr_CPA(self):
         """  Return rescaling ratios as obtained by charge population approach.  """
-        if self.eigenvectors_missing:
-            raise ValueError('No eigenvectors available. Please set WriteEigenvectors = True for DFTB calculation.')
-        
-        syms = self.atoms.get_chemical_symbols()
-        n_el_atom, ZAtoms = np.zeros(self.nAtoms), np.zeros(self.nAtoms)
-        for iAtom in xrange(self.nAtoms):
-            n_el_atom[iAtom] = data[syms[iAtom]]['valence_number']
-            ZAtoms[iAtom] = data[syms[iAtom]]['Z']
-        
-        CPA = ChargePopulationAnalysis(self.wf, self.f, self.wk, n_el_atom, ZAtoms, self.Orb2Atom)
-        self.hvr_CPA = CPA.get_a_div_a0()
+        doCPA = np.array([False, False, False, False])
+        doCPA[0] = (self.parameters['Options_WriteCPA'] == 'Yes')
+        doCPA[1] = (self.parameters['Options_WriteCPA'] == 'YES')
+        doCPA[2] = (self.parameters['Options_WriteCPA'] == 'True')
+        doCPA[3] = (self.parameters['Options_WriteCPA'] == 'TRUE')
+        if np.any(doCPA):
+            self.read_CPA()
+        else:
+            raise ValueError("Sorry, you need to set Options_WriteCPA = 'Yes' for this feature.")
         
         return self.hvr_CPA
+        
+    
+    def get_dispersion_energy(self):
+        """"
+        Return van der Waals dispersion energy as obtained by MBD/TS scheme.
+        """
+        try:
+            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
+        except KeyError:
+            vdWmode = 'none'
+        
+        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
+            return self.dispersion_energy
+        else:
+            raise ValueError('You did not specify a dispersion model.')
         
     
 

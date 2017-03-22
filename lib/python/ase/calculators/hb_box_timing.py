@@ -1,3 +1,10 @@
+###################################################
+#
+#  This module was taken from the Hotbit package 
+#          (distributed under GNU GPL)
+#
+###################################################
+
 # Copyright (C) 2008 NSC Jyvaskyla
 # Please see the accompanying LICENSE file for further information.
 
