@@ -17,6 +17,10 @@ if 'cpa.pyf' in curr_files:
 if 'CPA_recode.so' in curr_files:
     remove(src_loc+'CPA_recode.so')
 
+if (system('dpkg --list | grep ifort') == 256):
+    f2pycomp = 'gfortran'
+else:
+    f2pycomp = 'intelem'
 
 system('f2py '+src_loc+'CPA_recode.f90 -m CPA_recode -h '+src_loc+'cpa.pyf')
 
@@ -44,7 +48,6 @@ for line in tnew:
     f.write(line)
 f.close()
 
-#system('f2py -c --fcompiler=intelem --f90flags="-O3" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
-system('f2py -c --fcompiler=gfortran --f90flags="-O3" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
+system('f2py -c --fcompiler='+f2pycomp+' --f90flags="-O3" '+src_loc+'cpa.pyf '+src_loc+'CPA_recode.f90')
 
 #--EOF--#
