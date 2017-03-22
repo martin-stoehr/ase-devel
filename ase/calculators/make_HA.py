@@ -33,12 +33,12 @@ if 'HA_recode.so' in curr_files:
     remove(src_loc+'HA_recode.so')
 
 
-system('ifort -c -fPIC -O3 -debug all -traceback '+src_loc+'spherical_harmonics.f90')
-#system('gfortran -c -fPIC -O3 '+src_loc+'spherical_harmonics.f90')
+#system('ifort -c -fPIC -O3 '+src_loc+'spherical_harmonics.f90')
+system('gfortran -c -fPIC -O3 '+src_loc+'spherical_harmonics.f90')
 #system('ifort -c -fPIC -O3 '+src_loc+'splines.f90')
 #system('gfortran -c -fPIC -O3 '+src_loc+'splines.f90')
-system('ifort -c -fPIC -O3 -debug all -traceback '+src_loc+'splines_alt.f90')
-#system('gfortran -c -fPIC -O3 '+src_loc+'splines_alt.f90')
+#system('ifort -c -fPIC -O3 '+src_loc+'splines_alt.f90')
+system('gfortran -c -fPIC -O3 '+src_loc+'splines_alt.f90')
 system('f2py '+src_loc+'HA_recode.f90 -m HA_recode -h '+src_loc+'ha.pyf')
 
 f = open(src_loc+'ha.pyf', 'r')
@@ -64,7 +64,7 @@ for line in tnew:
 f.close()
 
 #system('f2py -c --fcompiler=intelem -I'+src_loc+' splines.o spherical_harmonics.o --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
-system('f2py -c --fcompiler=intelem -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3 -debug all -traceback" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
-#system('f2py -c --fcompiler=gfortran -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
+#system('f2py -c --fcompiler=intelem -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
+system('f2py -c --fcompiler=gfortran -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
 
 #--EOF--#
