@@ -1,5 +1,0 @@
-#!/usr/bin/python
-
-from ase.db.cli import run
-
-run()

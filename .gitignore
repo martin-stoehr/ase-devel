@@ -1,0 +1,8 @@
+*.pyc
+*.o
+*.a
+*.so
+*.pyf
+build
+lib
+install.log

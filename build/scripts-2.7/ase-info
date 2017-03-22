@@ -1,5 +1,0 @@
-#!/usr/bin/python
-
-from ase.cli.info import main
-
-main()
