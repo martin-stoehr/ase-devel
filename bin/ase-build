@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/opt/apps/resif/devel/v1.1-20150414/core/software/lang/Python/2.7.10-ictce-7.3.5/bin/python
 
 from ase.cli.build import main
 

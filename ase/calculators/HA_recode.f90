@@ -39,7 +39,7 @@ contains
         
         !! increments, number of radial grid points, and loop indices for integration
         double precision                                    :: Vincr,dTheta,dPhi,rc,Theta,Phi,sin_t
-        double precision,parameter                          :: ln_rmax=log(100.)
+        double precision,parameter                          :: ln_rmax=dlog(100.d0)
         integer                                             :: ir,iT,iP,i
         double precision,dimension(nThetas,nr)              :: wV
         double precision,dimension(3,nThetas,nPhis,nr)      :: sph2cart

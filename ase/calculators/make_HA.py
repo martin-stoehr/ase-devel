@@ -33,7 +33,7 @@ if 'HA_recode.so' in curr_files:
     remove(src_loc+'HA_recode.so')
 
 
-if (system('dpkg --list | grep ifort') == 256):
+if (system('which ifort') == 256):
     fcomp, f2pycomp = 'gfortran', 'gfortran'
 else:
     fcomp, f2pycomp = 'ifort', 'intelem'

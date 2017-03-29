@@ -27,6 +27,7 @@ default_parameters = {'xc':'PBE',
                       'rsSCS':True,
                       'do_TSSCS':False,
                       'use_scalapack':True,
+                      'eigensolver':'qr',
                       'get_MBD_eigenvalues':False,
                       'get_MBD_eigenvectors':False,
                       }
@@ -71,6 +72,7 @@ class kSpace_MBD_calculator(Calculator):
                   'rsSCS', \
                   'do_TSSCS', \
                   'use_scalapack', \
+                  'eigensolver', \
                   'get_MBD_eigenvalues', \
                   'get_MBD_eigenvectors']
     
@@ -206,6 +208,13 @@ class kSpace_MBD_calculator(Calculator):
         """
         Initialize MBD calculation and evaluate properties.
         """
+        solver_bak = self.eigensolver
+        self.eigensolver = self.eigensolver.strip()[:5].ljust(5)
+        if self.eigensolver not in ['qr   ', 'mrrr ', 'dandc']:
+            print("The specified eigensolver '"+solver_bak.strip()+"' is not known (yet).")
+            print("Using default solver 'qr' instead...")
+            self.eigensolver = 'qr   '
+        
         mbd.init_grid(self.n_omega_SCS)
         mbd.param_ts_energy_accuracy = self.TS_accuracy
         mbd.param_ts_cutoff_radius = self.TS_cutoff
@@ -214,6 +223,7 @@ class kSpace_MBD_calculator(Calculator):
         mbd.param_k_grid_shift = self.k_grid_shift
         mbd.param_mbd_nbody_max = self.max_nbody_MBD
         mbd.param_vacuum_axis = self.vacuum_axis
+        mbd.eigensolver = self.eigensolver
         mbd.my_task, mbd.n_tasks = self.myid, self.ntasks
         
         assert hasattr(self, 'a_div_a0'), \
