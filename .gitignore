@@ -3,6 +3,13 @@
 **/*.a
 **/*.so
 **/*.pyf
+**/*.mod
+ase/**/*.pyc
+ase/**/*.o
+ase/**/*.a
+ase/**/*.so
+ase/**/*.pyf
+ase/**/*.mod
 build
 lib
 install.log
