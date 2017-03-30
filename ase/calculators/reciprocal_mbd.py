@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from mbd_scalapack import mbd_scalapack as mbd
-from pymbd import get_free_atom_data
+from pymbd import get_free_atom_data, get_damping
 from ase import atoms
 from ase.units import Bohr, Hartree
 from ase.calculators.calculator import Calculator
@@ -129,20 +129,9 @@ class kSpace_MBD_calculator(Calculator):
         get damping parameters for vdW(TS) with current settings.
         """
         
-        self.ts_d = 20.
-        ts_s_r_dict = {'PBE':0.94, 'pbe':0.94, \
-                       'PBE0':0.96, 'pbe0':0.96, \
-                       'HSE':0.96, 'hse':0.96, \
-                       'BLYP':0.62, 'blyp':0.62, \
-                       'B3LYP':0.84, 'b3lyp':0.84, \
-                       'revPBE':0.60, 'revpbe':0.60, \
-                       'AM05':0.84, 'am05':0.84}
-        
-        if self.xc in ts_s_r_dict.iterkeys():
-            self.ts_s_r = ts_s_r_dict[self.xc]
-        else:
-            print("No default parameters for '"+self.xc+"'. Using standard values of arguably applicability...")
-            self.ts_s_r = 1.
+        damp_dict = get_damping(self.xc)
+        self.ts_d = damp_dict['ts_d']
+        self.ts_s_r = damp_dict['ts_s_r']
         
     
     def _get_SCS_and_MBD_damping_params(self):
@@ -150,55 +139,24 @@ class kSpace_MBD_calculator(Calculator):
         get damping parameters for MBD and SCS (they're the same) with current settings.
         """
         
-        mbd_scs_d_dict = {'PBE':2.56, 'pbe':2.56, \
-                          'PBE0':2.53, 'pbe0':2.53, \
-                          'HSE':2.53, 'hse':2.53}
-        
-        mbd_rsscs_beta_dict = {'PBE':0.83, 'pbe':0.83, \
-                               'PBE0':0.85, 'pbe0':0.85, \
-                               'HSE':0.85, 'hse':0.85}
-        
-        mbd_ts_erf_beta_dict = {'PBE':2.56, 'pbe':2.56, \
-                                'PBE0':2.53, 'pbe0':2.53, \
-                                'HSE':2.53, 'hse':2.53}
-        
-        mbd_ts_fermi_beta_dict = {'PBE':2.56, 'pbe':2.56, \
-                                  'PBE0':2.53, 'pbe0':2.53, \
-                                  'HSE':2.53, 'hse':2.53}
-        
-        if (self.do_SCS and (not self.rsSCS)):
-            if self.xc in mbd_scs_d_dict.iterkeys():
-                self.damp_par_d = mbd_scs_d_dict[self.xc]
+        damp_dict = get_damping(self.xc)
+        if self.do_SCS:
+            if self.rsSCS:
+                self.damp_par_a = damp_dict['mbd_rsscs_a']
             else:
-                print("No default parameters for '"+self.xc+"'. Using standard values of arguably applicability...")
-                self.damp_par_d = 2.
+                self.damp_par_a = damp_dict['mbd_scs_a']
         else:
-            self.damp_par_d = 6.
+            self.damp_par_a = damp_dict['mbd_ts_a']
         
         if self.do_SCS:
             if self.rsSCS:
-                if self.xc in mbd_rsscs_beta_dict.iterkeys():
-                    self.damp_par_beta = mbd_rsscs_beta_dict[self.xc]
-                else:
-                    print("No default parameters for '"+self.xc+"'. Using standard values of arguably applicability...")
-                    self.damp_par_beta = 1.
+                self.damp_par_beta = damp_dict['mbd_rsscs_beta']
             else:
-                print("Default parameters for MBD@SCS (without range separation) not defined.")
-                print("Using standard parameters, implement this otherwise (also needs different damping).")
-                self.damp_par_beta = 1.
-        
+                self.damp_par_beta = damp_dict['mbd_scs_beta']
         elif ('erf' in self.Coulomb_CFDM):
-            if self.xc in mbd_ts_erf_beta_dict.iterkeys():
-                self.damp_par_beta = mbd_ts_erf_beta_dict[self.xc]
-            else:
-                print("No default parameters for '"+self.xc+"'. Using standard values of arguably applicability...")
-                self.damp_par_beta = 1.
+                self.damp_par_beta = damp_dict['mbd_ts_erf_beta']
         elif ('fermi' in self.Coulomb_CFDM):
-            if self.xc in mbd_ts_fermi_beta_dict.iterkeys():
-                self.damp_par_beta = mbd_ts_fermi_beta_dict[self.xc]
-            else:
-                print("No default parameters for '"+self.xc+"'. Using standard values of arguably applicability...")
-                self.damp_par_beta = 1.
+                self.damp_par_beta = damp_dict['mbd_ts_fermi_beta']
         else:
             print("No default parameters for current settings. Using standard values of arguably applicability...")
             self.damp_par_beta = 1.
@@ -290,7 +248,7 @@ class kSpace_MBD_calculator(Calculator):
                                                self.alpha_dyn_TS, \
                                                r_vdw=self.RvdW_TS, \
                                                beta=self.damp_par_beta, \
-                                               a=self.damp_par_d, \
+                                               a=self.damp_par_a, \
                                                unit_cell=self.UC)
         else:
             self.alpha_dyn_SCS = mbd.run_scs(modus_scs, \
@@ -299,7 +257,7 @@ class kSpace_MBD_calculator(Calculator):
                                              self.alpha_dyn_TS, \
                                              r_vdw=self.RvdW_TS, \
                                              beta=self.damp_par_beta, \
-                                             a=self.damp_par_d, \
+                                             a=self.damp_par_a, \
                                              unit_cell=self.UC)
         
         self.alpha_0_SCS = self.alpha_dyn_SCS[0]
@@ -326,7 +284,7 @@ class kSpace_MBD_calculator(Calculator):
                                               unit_cell=self.UC, \
                                               r_vdw=rvdwAB, \
                                               beta=self.damp_par_beta, \
-                                              a=self.damp_par_d)
+                                              a=self.damp_par_a)
         else:
             self.E_MBD = mbd.get_mbd_energy(self.modus, \
                                             self.Coulomb_CFDM, \
@@ -336,7 +294,7 @@ class kSpace_MBD_calculator(Calculator):
                                             unit_cell=self.UC, \
                                             r_vdw=rvdwAB, \
                                             beta=self.damp_par_beta, \
-                                            a=self.damp_par_d)
+                                            a=self.damp_par_a)
         
         self.E_MBD *= Hartree
         

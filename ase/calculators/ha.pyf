@@ -3,11 +3,11 @@
 
 python module HA_recode ! in 
     interface  ! in :HA_recode
-        module ha_recode ! in :HA_recode:/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase-testing/ase/calculators/HA_recode.f90
+        module ha_recode ! in :HA_recode:/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase_haswell/ase/calculators/HA_recode.f90
             use splines_alt
             use spherical_harmonics
             double precision, parameter,optional :: pi=3.14159265
-            subroutine hirshfeld_main(natoms,nkpts,norbs,nthetas,nphis,positions,coeff,wk,f,lrnl_max,dr,nr,len_r,rmins,rnl_id,occ_free,otypes,orb2at,at2orbs,hirsh_volrat) ! in :HA_recode:/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase-testing/ase/calculators/HA_recode.f90:ha_recode
+            subroutine hirshfeld_main(natoms,nkpts,norbs,nthetas,nphis,positions,coeff,wk,f,lrnl_max,dr,nr,len_r,rmins,rnl_id,occ_free,otypes,orb2at,at2orbs,hirsh_volrat) ! in :HA_recode:/mnt/gaiagpfs/users/homedirs/mstoehr/bin/ase-devel/ase_haswell/ase/calculators/HA_recode.f90:ha_recode
                 integer intent(in) :: natoms
                 integer intent(in) :: nkpts
                 integer intent(in) :: norbs
