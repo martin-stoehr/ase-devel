@@ -288,7 +288,7 @@ Be aware that this might limit capabilities.")
         if self.calculate_forces:
             self.read_forces()
         
-#        os.remove('results.tag')
+        os.remove('results.tag')
         
     
     def read_additional_info(self):
