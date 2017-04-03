@@ -262,10 +262,10 @@ Be aware that this might limit capabilities.")
             ## where is this information for non-SCC calculations
             hSCC = 'Hamiltonian_SCC'
             if self.parameters.has_key(hSCC):
-                if (self.parameters[hSCC] == 'YES'):
+                if (self.parameters[hSCC] in ['YES', 'Yes', 'yes']):
                     self.read_additional_info()
-            else:
-                print('You started a non-SCC calculation. No additional Information available.')
+                else:
+                    print('You started a non-SCC calculation. No additional Information available.')
             
             try:
                 myfile = open('eigenvec.out','r')
@@ -288,7 +288,7 @@ Be aware that this might limit capabilities.")
         if self.calculate_forces:
             self.read_forces()
         
-        os.remove('results.tag')
+#        os.remove('results.tag')
         
     
     def read_additional_info(self):
@@ -353,6 +353,8 @@ Be aware that this might limit capabilities.")
         if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
             textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
             self.dispersion_energy = float(textdisp.split()[-2])
+        else:
+            print('No dispersion model defined.')
         
         ## k-point weighting
         myfile = open('dftb_in.hsd','r')
