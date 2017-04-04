@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from mbd_scalapack import mbd_scalapack as mbd
+#from mbd import mbd
 from pymbd import get_free_atom_data, get_damping
 from ase import atoms
 from ase.units import Bohr, Hartree
@@ -30,6 +31,7 @@ default_parameters = {'xc':'PBE',
                       'eigensolver':'qr',
                       'get_MBD_eigenvalues':False,
                       'get_MBD_eigenvectors':False,
+                      'set_negative_eigenvalues_zero':True,
                       }
 
 
@@ -74,7 +76,8 @@ class kSpace_MBD_calculator(Calculator):
                   'use_scalapack', \
                   'eigensolver', \
                   'get_MBD_eigenvalues', \
-                  'get_MBD_eigenvectors']
+                  'get_MBD_eigenvectors', \
+                  'set_negative_eigenvalues_zero']
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
                  label=os.curdir, atoms=None, **kwargs):
@@ -181,6 +184,7 @@ class kSpace_MBD_calculator(Calculator):
         mbd.param_k_grid_shift = self.k_grid_shift
         mbd.param_mbd_nbody_max = self.max_nbody_MBD
         mbd.param_vacuum_axis = self.vacuum_axis
+        mbd.param_zero_negative_eigs = self.set_negative_eigenvalues_zero
         mbd.eigensolver = self.eigensolver
         mbd.my_task, mbd.n_tasks = self.myid, self.ntasks
         
@@ -198,7 +202,7 @@ class kSpace_MBD_calculator(Calculator):
                 raise ValueError("You chose periodic boundary condition via vacuum_axis, but did not specify how to handle it (do_reciprocal or do_supercell)!")
         
         if self.do_reciprocal:
-            self.modus += 'R'
+            self.modus.replace('C', 'R')
         if (self.ntasks > 1):
             self.modus += 'P'
         if self.get_MBD_eigenvalues:
@@ -236,11 +240,11 @@ class kSpace_MBD_calculator(Calculator):
         
     
     def _run_electrostatic_screening(self):
+        modus_scs = self.modus.replace('R','')
         self.alpha_dyn_TS = mbd.alpha_dynamic_ts_all('C', \
                                                      mbd.n_grid_omega, \
                                                      self.alpha_0_TS, \
                                                      c6=self.C6_TS)
-        modus_scs = self.modus.replace('R','')
         if self.use_scalapack: # use ScaLAPACK?
             self.alpha_dyn_SCS = mbd.run_scs_s(modus_scs, \
                                                self.Coulomb_SCS, \
