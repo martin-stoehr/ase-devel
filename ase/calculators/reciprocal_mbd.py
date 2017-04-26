@@ -220,7 +220,7 @@ class kSpace_MBD_calculator(Calculator):
         if self.do_SCS:
             self._run_electrostatic_screening()
         
-        if self.do_reciprocal: self.modus += 'R' #.replace('C','R')
+        if self.do_reciprocal: self.modus = self.modus.replace('C','CR')
         if self.get_MBD_eigenvalues: self.modus += 'E'
         if self.get_MBD_eigenvectors: self.modus += 'V'
         
