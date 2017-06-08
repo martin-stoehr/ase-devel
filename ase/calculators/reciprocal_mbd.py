@@ -1,14 +1,13 @@
 import numpy as np
 import os
-from mbd_scalapack import mbd_scalapack as mbd_s
-#from mbd import mbd
+from mbd_scalapack import mbd_scalapack as mbd_mod
 from pymbd import get_free_atom_data, get_damping
 from ase import atoms
 from ase.units import Bohr, Hartree
 from ase.calculators.calculator import Calculator
 
 
-default_parameters = {'xc':'PBE',
+default_parameters = {'xc':'pbe',
                       'n_omega_SCS':20,
                       'Coulomb_SCS':'fermi,dip,gg',
                       'Coulomb_CFDM':'fermi,dip',
@@ -32,6 +31,11 @@ default_parameters = {'xc':'PBE',
                       'get_MBD_eigenvalues':False,
                       'get_MBD_eigenvectors':False,
                       'set_negative_eigenvalues_zero':True,
+                      'use_MBDrsSCS_damping':False, 
+                      'interaction_modes':{'calculate':False, \
+                                           'indices_subsystem1':[], \
+                                           'indices_subsystem2':[], \
+                                           'prefix_mbd_modes':"mbd_eigenmodes"}
                       }
 
 
@@ -77,7 +81,12 @@ class kSpace_MBD_calculator(Calculator):
                   'eigensolver', \
                   'get_MBD_eigenvalues', \
                   'get_MBD_eigenvectors', \
-                  'set_negative_eigenvalues_zero']
+                  'set_negative_eigenvalues_zero', \
+                  'use_MBDrsSCS_damping', \
+                  'interaction_modes']
+    
+    dict_kwargs = ['interaction_modes']
+    
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
                  label=os.curdir, atoms=None, **kwargs):
@@ -89,7 +98,11 @@ class kSpace_MBD_calculator(Calculator):
         ## set or overwrite any additional keyword arguments provided
         for arg, val in kwargs.items():
             if arg in self.valid_args:
-                setattr(self, arg, val)
+                if (arg in self.dict_kwargs):
+                    for arg2, val2 in kwargs[arg].iteritems():
+                        self.__dict__[arg][arg2] = val2
+                else:
+                    setattr(self, arg, val)
             else:
                 raise RuntimeError('unknown keyword arg "%s" : not in %s'
                                    % (arg, self.valid_args))
@@ -117,14 +130,14 @@ class kSpace_MBD_calculator(Calculator):
         return NotImplementedError
         
     
-    def update_properties(self, atoms):
+    def update_properties(self, atoms, do_MBD=True):
         if not hasattr(self, 'atoms') or self.atoms != atoms:
-            self.calculate(atoms)
+            self.calculate(atoms, do_MBD=do_MBD)
         
     
-    def calculate(self, atoms):
+    def calculate(self, atoms, do_MBD=True):
         self.atoms = atoms.copy()
-        self.init_MBD(atoms=self.atoms)
+        self.init_MBD(atoms=self.atoms, do_MBD=do_MBD)
         
     
     def _get_TS_damping_params(self):
@@ -143,7 +156,9 @@ class kSpace_MBD_calculator(Calculator):
         """
         
         damp_dict = get_damping(self.xc)
-        if self.do_SCS:
+        if self.use_MBDrsSCS_damping:
+            self.damp_par_a = damp_dict['mbd_rsscs_a']
+        elif self.do_SCS:
             if self.rsSCS:
                 self.damp_par_a = damp_dict['mbd_rsscs_a']
             else:
@@ -151,7 +166,9 @@ class kSpace_MBD_calculator(Calculator):
         else:
             self.damp_par_a = damp_dict['mbd_ts_a']
         
-        if self.do_SCS:
+        if self.use_MBDrsSCS_damping:
+            self.damp_par_beta = damp_dict['mbd_rsscs_beta']
+        elif self.do_SCS:
             if self.rsSCS:
                 self.damp_par_beta = damp_dict['mbd_rsscs_beta']
             else:
@@ -165,15 +182,10 @@ class kSpace_MBD_calculator(Calculator):
             self.damp_par_beta = 1.
         
     
-    def init_MBD(self, atoms=None):
+    def init_MBD(self, atoms=None, do_MBD=True):
         """
         Initialize MBD calculation and evaluate properties.
         """
-#        if (self.use_scalapack):
-        mbd_mod = mbd_s
-#        else:
-#            mbd_mod = mbd
-        
         mbd_mod.init_grid(self.n_omega_SCS)
         mbd_mod.param_ts_energy_accuracy = self.TS_accuracy
         mbd_mod.param_ts_cutoff_radius = self.TS_cutoff
@@ -184,15 +196,15 @@ class kSpace_MBD_calculator(Calculator):
         mbd_mod.param_vacuum_axis = self.vacuum_axis
         mbd_mod.param_zero_negative_eigs = self.set_negative_eigenvalues_zero
         mbd_mod.my_task, mbd_mod.n_tasks = self.myid, self.ntasks
-        if self.use_scalapack:
-            solver_bak = self.eigensolver
-            self.eigensolver = self.eigensolver.strip()[:5].ljust(5)
-            if self.eigensolver not in ['qr   ', 'mrrr ', 'dandc']:
+        solver_bak = self.eigensolver
+        self.eigensolver = self.eigensolver.strip()[:5].ljust(5)
+        if self.eigensolver not in ['qr   ', 'mrrr ', 'dandc']:
+            self.eigensolver = 'qr   '
+            if (self.myid == 0):
                 print("The specified eigensolver '"+solver_bak.strip()+"' is not known (yet).")
                 print("Using default solver 'qr' instead...")
-                self.eigensolver = 'qr   '
-
-            mbd_mod.eigensolver = self.eigensolver
+        
+        mbd_mod.eigensolver = self.eigensolver
         
         assert hasattr(self, 'a_div_a0'), \
         "Please provide rescaling to obtain initial dispersion parameters from accurate free atom reference data via 'set_rescaling(rescaling)'!"
@@ -200,7 +212,10 @@ class kSpace_MBD_calculator(Calculator):
         self.modus = ''
         if (self.ntasks > 1): self.modus += 'P'
         if np.any(self.vacuum_axis == atoms.pbc):
-            print('Your specification for vacuum_axis is not in line with the boundary conditions of the atoms object!')
+            if (self.myid == 0):
+                msg = '\n WARNING: Your specification for vacuum_axis is not in line with '
+                msg += 'the boundary conditions of the atoms object!\n'
+                print(msg)
         
         if (not np.all(self.vacuum_axis)):
             self.modus += 'C'
@@ -224,7 +239,7 @@ class kSpace_MBD_calculator(Calculator):
         if self.get_MBD_eigenvalues: self.modus += 'E'
         if self.get_MBD_eigenvectors: self.modus += 'V'
         
-        self._get_mbd_energy()
+        if do_MBD: self._get_mbd_energy()
         if self.do_TS: self._get_TS_energy1()
         if self.do_TSSCS:
             if not self.do_SCS:
@@ -233,18 +248,22 @@ class kSpace_MBD_calculator(Calculator):
             else:
                 self._get_TSSCS_energy1()
         
+        if self.interaction_modes['calculate']:
+            idx1 = np.array(self.interaction_modes['indices_subsystem1'])
+            idx2 = np.array(self.interaction_modes['indices_subsystem2'])
+            check_ia1 = np.any([idx in idx2 for idx in idx1])
+            check_ia2 = np.any(np.concatenate((idx1,idx1)) > len(atoms))
+            check_ia3 = ( (len(idx1)==0) or (len(idx2)==0) )
+            if ( (check_ia1 or check_ia2 or check_ia3) and (self.myid == 0) ):
+                print('Invalid specification of subsystems! Skipping interaction modes...')
+                print('Please specify non-overlapping indices in Python/C ordering.')
+            else:
+                self._get_interaction_modes()
+        
         mbd_mod.destroy_grid()
-#       if self.use_scalapack:
-#            # finalize should be handled by mpi4py, I think...
-#            mbd_mod.exit_blacs_and_finalize(1)
         
     
     def _run_electrostatic_screening(self):
-#        if (self.use_scalapack):
-        mbd_mod = mbd_s
-#        else:
-#            mbd_mod = mbd
-        
         self.alpha_dyn_TS = mbd_mod.alpha_dynamic_ts_all('C', \
                                                  mbd_mod.n_grid_omega, \
                                                  self.alpha_0_TS, \
@@ -275,11 +294,6 @@ class kSpace_MBD_calculator(Calculator):
         
     
     def _get_mbd_energy(self):
-#        if (self.use_scalapack):
-        mbd_mod = mbd_s
-#        else:
-#            mbd_mod = mbd
-        
         kgrid = mbd_mod.make_k_grid(mbd_mod.make_g_grid(*self.Ggrid), self.UC)
         
         if self.do_SCS:     # do MBD@(rs)SCS?
@@ -311,12 +325,30 @@ class kSpace_MBD_calculator(Calculator):
         self.E_MBD *= Hartree
         
     
+    def _get_interaction_modes(self):
+        kgrid = mbd_mod.make_k_grid(mbd_mod.make_g_grid(*self.Ggrid), self.UC)
+        
+        if self.do_SCS:     # do MBD@(rs)SCS?
+            alph, om, rvdwAB, c6 = self.alpha_0_SCS, self.omega_SCS, self.RvdW_SCS, self.C6_SCS
+        else:               # do MBD@TS
+            alph, om, rvdwAB, c6 = self.alpha_0_TS, self.omega_TS, self.RvdW_TS, self.C6_TS
+        
+        idx_sub1 = self.interaction_modes['indices_subsystem1']+1
+        idx_sub2 = self.interaction_modes['indices_subsystem2']+1
+        pref_in = self.interaction_modes['prefix_mbd_modes']
+        mbd_mod.get_interaction_modes(self.modus, \
+                                      self.Coulomb_CFDM, \
+                                      self.pos, alph, om, \
+                                      rvdwAB, self.damp_par_beta, \
+                                      self.damp_par_a, c6, \
+                                      idx_sub1, idx_sub2, \
+                                      unit_cell=self.UC, \
+                                      k_grid=kgrid, \
+                                      prefix_mbd_modes=pref_in)
+        
+    
     def _get_TS_energy1(self):
         self._get_TS_damping_params()
-#        if (self.use_scalapack):
-        mbd_mod = mbd_s
-#        else:
-#            mbd_mod = mbd
         
         if self.use_scalapack:
             self.E_TS = mbd_mod.get_ts_energy_lowmem(self.modus, \
@@ -341,10 +373,6 @@ class kSpace_MBD_calculator(Calculator):
     
     def _get_TSSCS_energy1(self):
         self._get_TS_damping_params()
-#        if (self.use_scalapack):
-        mbd_mod = mbd_s
-#        else:
-#            mbd_mod = mbd
         
         if self.use_scalapack:
             self.E_TS_SCS = mbd_mod.get_ts_energy_lowmem(self.modus, \
@@ -378,6 +406,9 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_static_alpha_SCS(self):
         if self.do_SCS:
+            if not hasattr(self, 'alpha_0_SCS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.alpha_0_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get alpha0 after SCS")
@@ -385,6 +416,9 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_frequency_dependent_alpha_SCS(self):
         if self.do_SCS:
+            if not hasattr(self, 'alpha_dyn_SCS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.alpha_dyn_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get dynamic alpha after SCS")
@@ -396,6 +430,9 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_C6_SCS(self):
         if self.do_SCS:
+            if not hasattr(self, 'C6_SCS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.C6_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get C6_SCS")
@@ -407,6 +444,9 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_RvdW_SCS(self):
         if self.do_SCS:
+            if not hasattr(self, 'RvdW_SCS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.RvdW_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get RvdW_SCS")
@@ -418,6 +458,9 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_omega_SCS(self):
         if self.do_SCS:
+            if not hasattr(self, 'omega_SCS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.omega_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get omega_SCS")
@@ -425,6 +468,9 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_TS_energy(self):
         if self.do_TS:
+            if not hasattr(self, 'E_TS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.E_TS
         else:
             raise ValueError("Please specify 'do_TS = True' in order to get TS energy")
@@ -432,9 +478,91 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_TSSCS_energy(self):
         if self.do_TSSCS:
+            if not hasattr(self, 'E_TS_SCS'):
+                self.update_properties(self.atoms, do_MBD=False)
+            
             return self.E_TS_SCS
         else:
             raise ValueError("Please specify 'do_TSSCS = True' in order to get TS+SCS energy")
+        
+    
+    def get_mbd_density(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out"):
+        if self.do_SCS:
+            has_alph = hasattr(self, 'alpha_0_SCS')
+            has_om = hasattr(self, 'omega_SCS')
+            if not (has_alph and has_om):
+                self.update_properties(self.atoms, do_MBD=False)
+            
+            m_eff = charges/(self.alpha_0_SCS*self.omega_SCS*self.omega_SCS)
+        else:
+            has_alph = hasattr(self, 'alpha_0_TS')
+            has_om = hasattr(self, 'omega_TS')
+            if not (has_alph and has_om):
+                self.update_properties(self.atoms, do_MBD=False)
+            
+            m_eff = charges/(self.alpha_0_TS*self.omega_TS*self.omega_TS)
+        
+        rho = mbd_mod.eval_mbd_int_density_io(grid/Bohr, self.pos, charges, \
+                                              m_eff, evals, fname_modes)
+        
+        return rho
+        
+    
+    def get_mbd_density_box(self, gridspec, charges, evals, \
+                            fname_modes="mbd_eigenmodes.out", \
+                            write_cube=True, cube_name="mbd_density.cube"):
+        """
+        calculates MBD density of current system based on a regular
+        box-shaped grid and optionally writes .CUBE file.
+        
+        parameters:
+        ===========
+            gridspec:    (ndarray) [[xmin, xmax, Nx], [ymin, ymax, Ny], [zmin, zmax, Nz]] in \AA
+            charges:     (ndarray) charges of pseudoelectrons [a.u.]
+            evals:       (ndarray) eigenenergies of modes [a.u.]
+            fname_modes: (str)     filename containing (binary) eigenmodes
+            write_cube:  (bool)    writes .cube file if True, returns density otherwise
+            cube_name:   (str)     density will be written to cube file named <cube_name>
+        
+        """
+        
+        (x,dx), (y,dy), (z,dz) = np.linspace(*gridspec[0], retstep=True), \
+                                 np.linspace(*gridspec[1], retstep=True), \
+                                 np.linspace(*gridspec[2], retstep=True)
+        
+        grid = np.vstack((np.meshgrid(x,y,z))).reshape(3,-1)[[1,0,2]].T
+        rho = self.get_mbd_density(grid, charges, evals, fname_modes)
+        
+        if not write_cube:
+            return rho
+        elif (self.myid == 0):
+            pos_voxel0 = grid[0]
+            nx, ny, nz = int(gridspec[0][2]), int(gridspec[1][2]), int(gridspec[2][2])
+            print " Writing CUBE file..."
+            f = open(cube_name, 'w')
+            f.write('CUBE file containing MBD density\n')
+            f.write('OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n')
+            nAtoms = len(self.atoms)
+            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(nAtoms, *pos_voxel0))
+            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(nx, dx, 0., 0.))
+            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(ny, 0., dy, 0.))
+            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(nz, 0., 0., dz))
+            for iAtom in xrange(nAtoms):
+                mysym = self.atoms.get_atomic_numbers()[iAtom]
+                mypos = self.atoms.positions[iAtom]
+                f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}    {4:12.6f}\n'.format(\
+                         mysym,        0.,      mypos[0],    mypos[1],     mypos[2] ))
+            i = 0
+            for ix in xrange(nx):
+                for iy in xrange(ny):
+                    for iz in xrange(nz):
+                        f.write('{0:13.5E}'.format(rho[i]))
+                        if ( np.mod(i,6) == 5 ):
+                            f.write('\n')
+                        else:
+                            f.write('  ')
+                        i += 1
+            f.close()
         
     
 
