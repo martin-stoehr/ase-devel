@@ -400,76 +400,118 @@ class kSpace_MBD_calculator(Calculator):
         self.a_div_a0 = np.array(rescaling)
         
     
-    def get_frequency_dependent_alpha_TS(self):
+    def get_frequency_dependent_alpha_TS(self, atoms=None):
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if not hasattr(self, 'alpha_dyn_TS'):
+            self.update_properties(atoms, do_MBD=False)
+        
         return self.alpha_dyn_TS
         
     
-    def get_static_alpha_SCS(self):
+    def get_static_alpha_SCS(self, atoms=None):
         if self.do_SCS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'alpha_0_SCS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.alpha_0_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get alpha0 after SCS")
         
     
-    def get_frequency_dependent_alpha_SCS(self):
+    def get_frequency_dependent_alpha_SCS(self, atoms=None):
         if self.do_SCS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'alpha_dyn_SCS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.alpha_dyn_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get dynamic alpha after SCS")
         
     
-    def get_C6_TS(self):
+    def get_C6_TS(self, atoms=None):
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if not hasattr(self, 'C6_TS'):
+            self.update_properties(atoms, do_MBD=False)
+        
         return self.C6_TS
         
     
-    def get_C6_SCS(self):
+    def get_C6_SCS(self, atoms=None):
         if self.do_SCS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'C6_SCS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.C6_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get C6_SCS")
         
     
-    def get_RvdW_TS(self):
+    def get_RvdW_TS(self, atoms=None):
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if not hasattr(self, 'RvdW_TS'):
+            self.update_properties(atoms, do_MBD=False)
+        
         return self.RvdW_TS
         
     
-    def get_RvdW_SCS(self):
+    def get_RvdW_SCS(self, atoms=None):
         if self.do_SCS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'RvdW_SCS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.RvdW_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get RvdW_SCS")
         
     
-    def get_omega_TS(self):
+    def get_omega_TS(self, atoms=None):
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if not hasattr(self, 'omega_TS'):
+            self.update_properties(atoms, do_MBD=False)
+        
         return self.omega_TS
         
     
-    def get_omega_SCS(self):
+    def get_omega_SCS(self, atoms=None):
         if self.do_SCS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'omega_SCS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.omega_SCS
         else:
             raise ValueError("Please specify 'do_SCS = True' in order to get omega_SCS")
         
     
-    def get_TS_energy(self):
+    def get_TS_energy(self, atoms=None):
         if self.do_TS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'E_TS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.E_TS
         else:
@@ -478,27 +520,46 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_TSSCS_energy(self):
         if self.do_TSSCS:
+            if (not hasattr(self, 'atoms')) and (atoms is None):
+                raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+            
             if not hasattr(self, 'E_TS_SCS'):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             return self.E_TS_SCS
         else:
             raise ValueError("Please specify 'do_TSSCS = True' in order to get TS+SCS energy")
         
     
-    def get_mbd_density(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out"):
+    def get_mbd_density(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out", atoms=None):
+        """
+        calculates MBD density of current system based on custom grid.
+        
+        parameters:
+        ===========
+            grid:        (ndarray)   [:,3] array of grid points to evaluate density in \AA
+            charges:     (ndarray)   charges of pseudoelectrons [a.u.]
+            evals:       (ndarray)   eigenenergies of modes [a.u.]
+            fname_modes: (str)       filename containing (binary) eigenmodes
+            atoms:       (atoms obj) specify only in case MBD energy is not needed
+                                     otherwise run get_potential_energy() first.
+        
+        """
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
         if self.do_SCS:
             has_alph = hasattr(self, 'alpha_0_SCS')
             has_om = hasattr(self, 'omega_SCS')
             if not (has_alph and has_om):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             m_eff = charges/(self.alpha_0_SCS*self.omega_SCS*self.omega_SCS)
         else:
             has_alph = hasattr(self, 'alpha_0_TS')
             has_om = hasattr(self, 'omega_TS')
             if not (has_alph and has_om):
-                self.update_properties(self.atoms, do_MBD=False)
+                self.update_properties(atoms, do_MBD=False)
             
             m_eff = charges/(self.alpha_0_TS*self.omega_TS*self.omega_TS)
         
@@ -508,8 +569,8 @@ class kSpace_MBD_calculator(Calculator):
         return rho
         
     
-    def get_mbd_density_box(self, gridspec, charges, evals, \
-                            fname_modes="mbd_eigenmodes.out", \
+    def get_mbd_density_box(self, gridspec, charges, evals, return_density=False, \
+                            fname_modes="mbd_eigenmodes.out", atoms=None, \
                             write_cube=True, cube_name="mbd_density.cube"):
         """
         calculates MBD density of current system based on a regular
@@ -526,23 +587,25 @@ class kSpace_MBD_calculator(Calculator):
         
         """
         
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
         (x,dx), (y,dy), (z,dz) = np.linspace(*gridspec[0], retstep=True), \
                                  np.linspace(*gridspec[1], retstep=True), \
                                  np.linspace(*gridspec[2], retstep=True)
         
         grid = np.vstack((np.meshgrid(x,y,z))).reshape(3,-1)[[1,0,2]].T
-        rho = self.get_mbd_density(grid, charges, evals, fname_modes)
+        rho = self.get_mbd_density(grid, charges, evals, fname_modes=fname_modes, atoms=atoms)
         
-        if not write_cube:
-            return rho
-        elif (self.myid == 0):
+        if ( write_cube and (self.myid == 0) ):
             from ase.utils.write_data import write_cubefile
             write_cubefile(gridspec[0][0],gridspec[0][1],gridspec[0][2],dx, \
                            gridspec[1][0],gridspec[1][1],gridspec[1][2],dy, \
                            gridspec[2][0],gridspec[2][1],gridspec[2][2],dz, \
                            self.atoms.positions, self.atoms.get_atomic_numbers(), \
                            rho, file_name=cube_name)
-            
+        
+        if (return_density): return rho
         
     
 
