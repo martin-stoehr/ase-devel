@@ -536,33 +536,13 @@ class kSpace_MBD_calculator(Calculator):
         if not write_cube:
             return rho
         elif (self.myid == 0):
-            pos_voxel0 = grid[0]
-            nx, ny, nz = int(gridspec[0][2]), int(gridspec[1][2]), int(gridspec[2][2])
-            print " Writing CUBE file..."
-            f = open(cube_name, 'w')
-            f.write('CUBE file containing MBD density\n')
-            f.write('OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n')
-            nAtoms = len(self.atoms)
-            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(nAtoms, *pos_voxel0))
-            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(nx, dx, 0., 0.))
-            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(ny, 0., dy, 0.))
-            f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}\n'.format(nz, 0., 0., dz))
-            for iAtom in xrange(nAtoms):
-                mysym = self.atoms.get_atomic_numbers()[iAtom]
-                mypos = self.atoms.positions[iAtom]
-                f.write('{0:5d}    {1:12.6f}    {2:12.6f}    {3:12.6f}    {4:12.6f}\n'.format(\
-                         mysym,        0.,      mypos[0],    mypos[1],     mypos[2] ))
-            i = 0
-            for ix in xrange(nx):
-                for iy in xrange(ny):
-                    for iz in xrange(nz):
-                        f.write('{0:13.5E}'.format(rho[i]))
-                        if ( np.mod(i,6) == 5 ):
-                            f.write('\n')
-                        else:
-                            f.write('  ')
-                        i += 1
-            f.close()
+            from ase.utils.write_data import write_cubefile
+            write_cubefile(gridspec[0][0],gridspec[0][1],gridspec[0][2],dx, \
+                           gridspec[1][0],gridspec[1][1],gridspec[1][2],dy, \
+                           gridspec[2][0],gridspec[2][1],gridspec[2][2],dz, \
+                           self.atoms.positions, self.atoms.get_atomic_numbers(), \
+                           rho, file_name=cube_name)
+            
         
     
 
