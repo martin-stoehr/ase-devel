@@ -5,6 +5,7 @@ from pymbd import get_free_atom_data, get_damping
 from ase import atoms
 from ase.units import Bohr, Hartree
 from ase.calculators.calculator import Calculator
+from sys import stderr
 
 
 default_parameters = {'xc':'pbe',
@@ -44,7 +45,7 @@ try:
     default_parameters['ntasks'] = MPI.COMM_WORLD.Get_size()
     default_parameters['myid'] = MPI.COMM_WORLD.Get_rank()
 except ImportError:
-    sys.stderr.write('warning: Install mpi4py for MPI support\n')
+    stderr.write('warning: Install mpi4py for MPI support\n')
     default_parameters['ntasks'] = 1
     default_parameters['myid'] = 0
 
