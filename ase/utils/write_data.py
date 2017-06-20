@@ -21,14 +21,10 @@ def write_cubefile(xmin, xmax, Nx, dx, ymin, ymax, Ny, dy, zmin, zmax, Nz, dz, \
     """
     
     data = data.flatten()
-    metric_vars = ["xmin","xmax","dx", \
-                   "ymin","ymax","dy", \
-                   "zmin","zmax","dz", \
-                   "positions"]
-    
-    for var_name in metric_vars:
-        vars()[var_name] /= Bohr
-    
+    xmin, xmax, dx = xmin/Bohr, xmax/Bohr, dx/Bohr
+    ymin, ymax, dy = ymin/Bohr, ymax/Bohr, dy/Bohr
+    zmin, zmax, dz = zmin/Bohr, zmax/Bohr, dz/Bohr
+    positions /= Bohr
     f = open(file_name, 'w')
     f.write('CUBE file.\n')
     f.write('OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n')
