@@ -1,4 +1,5 @@
 import numpy as np
+from ase.units import Bohr
 
 
 def write_cubefile(xmin, xmax, Nx, dx, ymin, ymax, Ny, dy, zmin, zmax, Nz, dz, \
@@ -9,7 +10,7 @@ def write_cubefile(xmin, xmax, Nx, dx, ymin, ymax, Ny, dy, zmin, zmax, Nz, dz, \
     parameters:
     ===========
         *min, *max, N*, d*: specification of minimum, maximum, number of grid point,
-                            and stepsize in cartesian direction *
+                            and stepsize in cartesian direction * [\AA]
         positions:          atomic positions [\AA]
         atomic_numbers:     well, atomic numbers
         data:               volumetric data ordered such that data.flatten() corresponds
@@ -20,6 +21,14 @@ def write_cubefile(xmin, xmax, Nx, dx, ymin, ymax, Ny, dy, zmin, zmax, Nz, dz, \
     """
     
     data = data.flatten()
+    metric_vars = ["xmin","xmax","dx", \
+                   "ymin","ymax","dy", \
+                   "zmin","zmax","dz", \
+                   "positions"]
+    
+    for var_name in metric_vars:
+        vars()[varname] /= Bohr
+    
     f = open(file_name, 'w')
     f.write('CUBE file.\n')
     f.write('OUTER LOOP: X, MIDDLE LOOP: Y, INNER LOOP: Z\n')
