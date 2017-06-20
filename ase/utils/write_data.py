@@ -27,7 +27,7 @@ def write_cubefile(xmin, xmax, Nx, dx, ymin, ymax, Ny, dy, zmin, zmax, Nz, dz, \
                    "positions"]
     
     for var_name in metric_vars:
-        vars()[varname] /= Bohr
+        vars()[var_name] /= Bohr
     
     f = open(file_name, 'w')
     f.write('CUBE file.\n')
