@@ -35,14 +35,16 @@ if 'HA_recode.so' in curr_files:
 
 if (system('which ifort') == 256):
     fcomp, f2pycomp = 'gfortran', 'gfortran'
+    lib_lapack = '-L/usr/lib/ -llapack'
 else:
     fcomp, f2pycomp = 'ifort', 'intelem'
+    lib_lapack = '-L${MKLROOT}/lib-intel64/ -lmkl_rt'
 
 
 system(fcomp+' -c -fPIC -O3 '+src_loc+'spherical_harmonics.f90')
 #system(fcomp+' -c -fPIC -O3 '+src_loc+'splines.f90')
 system(fcomp+' -c -fPIC -O3 '+src_loc+'splines_alt.f90')
-system('f2py '+src_loc+'HA_recode.f90 -m HA_recode -h '+src_loc+'ha.pyf')
+system('f2py --fcompiler='f2pycomp+' '+src_loc+'HA_recode.f90 -m HA_recode -h '+src_loc+'ha.pyf')
 
 f = open(src_loc+'ha.pyf', 'r')
 text = f.readlines()
@@ -66,6 +68,6 @@ for line in tnew:
     f.write(line)
 f.close()
 
-system('f2py -c --fcompiler='+f2pycomp+' -I'+src_loc+' splines_alt.o spherical_harmonics.o -L/usr/lib/ -llapack --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
+system('f2py -c --fcompiler='+f2pycomp+' -I'+src_loc+' splines_alt.o spherical_harmonics.o '+lib_lapack+' --f90flags="-O3" '+src_loc+'ha.pyf '+src_loc+'HA_recode.f90')
 
 #--EOF--#
