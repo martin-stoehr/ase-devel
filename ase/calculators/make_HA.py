@@ -38,13 +38,13 @@ if (system('which ifort') == 256):
     lib_lapack = '-L/usr/lib/ -llapack'
 else:
     fcomp, f2pycomp = 'ifort', 'intelem'
-    lib_lapack = '-L${MKLROOT}/lib-intel64/ -lmkl_rt'
+    lib_lapack = '-L${MKLROOT}/lib/intel64/ -lmkl_rt'
 
 
 system(fcomp+' -c -fPIC -O3 '+src_loc+'spherical_harmonics.f90')
 #system(fcomp+' -c -fPIC -O3 '+src_loc+'splines.f90')
 system(fcomp+' -c -fPIC -O3 '+src_loc+'splines_alt.f90')
-system('f2py --fcompiler='f2pycomp+' '+src_loc+'HA_recode.f90 -m HA_recode -h '+src_loc+'ha.pyf')
+system('f2py '+src_loc+'HA_recode.f90 -m HA_recode -h '+src_loc+'ha.pyf')
 
 f = open(src_loc+'ha.pyf', 'r')
 text = f.readlines()
