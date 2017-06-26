@@ -570,43 +570,241 @@ class kSpace_MBD_calculator(Calculator):
         return rho
         
     
-    def get_mbd_density_box(self, gridspec, charges, evals, return_density=False, \
-                            fname_modes="mbd_eigenmodes.out", atoms=None, \
-                            write_cube=True, cube_name="mbd_density.cube"):
+    def get_mbd_density_cell(self, cell, origin, n_gridpoints, charges, evals, \
+                             return_density=False, fname_modes="mbd_eigenmodes.out", \
+                             atoms=None, write_cube=True, cube_name="mbd_density.cube"):
         """
         calculates MBD density of current system based on a regular
-        box-shaped grid and optionally writes .CUBE file.
+        cell-shaped grid and optionally writes .CUBE file.
         
         parameters:
         ===========
-            gridspec:    (ndarray) [[xmin, xmax, Nx], [ymin, ymax, Ny], [zmin, zmax, Nz]] in \AA
-            charges:     (ndarray) charges of pseudoelectrons [a.u.]
-            evals:       (ndarray) eigenenergies of modes [a.u.]
-            fname_modes: (str)     filename containing (binary) eigenmodes
-            write_cube:  (bool)    writes .cube file if True, returns density otherwise
-            cube_name:   (str)     density will be written to cube file named <cube_name>
+            cell:           (ndarray) [a,b,c] cell vectors in \AA
+            origin:         (ndarray) origin of volumetric data in \AA
+            n_gridpoints:   (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
+            charges:        (ndarray) charges of pseudoelectrons [a.u.]
+            evals:          (ndarray) eigenenergies of modes [a.u.]
+            return_density: (boolean) function call returns density as ndarray (default: False)
+            fname_modes:    (string)  filename containing (FORTRAN binary) eigenmodes
+            atoms:          (ASE obj) atoms object (required if no calculation is done before)
+            write_cube:     (boolean) writes .cube file if True [default: True]
+            cube_name:      (string)  density will be written to cube file named <cube_name>
         
         """
         
         if (not hasattr(self, 'atoms')) and (atoms is None):
             raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
         
-        (x,dx), (y,dy), (z,dz) = np.linspace(*gridspec[0], retstep=True), \
-                                 np.linspace(*gridspec[1], retstep=True), \
-                                 np.linspace(*gridspec[2], retstep=True)
+        if not any([return_density, write_cube]):
+            if self.myid == 0:
+                print " "
+                print " You did not specify any way to output the density (on return or .CUBE output file)."
+                print " I will write the data to a .CUBE file named "+cube_name+"for you..."
+                print " "
+                write_cube = True
         
-        grid = np.vstack((np.meshgrid(x,y,z))).reshape(3,-1)[[1,0,2]].T
-        rho = self.get_mbd_density(grid, charges, evals, fname_modes=fname_modes, atoms=atoms)
+        if ( not hasattr(self, 'grid') ):
+            construct_grid = True
+        elif ( (np.size(self.grid) != np.prod(n_gridpoints)) or \
+               any(self.grid[0] != origin) ):
+            construct_grid = True
+        else:
+            construct_grid = False
+        
+        if construct_grid: self._build_regular_grid(cell, origin, n_gridpoints)
+        rho = self.get_mbd_density(self.grid, charges, evals, fname_modes=fname_modes, atoms=atoms)
         
         if ( write_cube and (self.myid == 0) ):
             from ase.utils.write_data import write_cubefile
-            write_cubefile(gridspec[0][0],gridspec[0][1],gridspec[0][2],dx, \
-                           gridspec[1][0],gridspec[1][1],gridspec[1][2],dy, \
-                           gridspec[2][0],gridspec[2][1],gridspec[2][2],dz, \
-                           self.atoms.positions, self.atoms.get_atomic_numbers(), \
-                           rho, file_name=cube_name)
+            write_cubefile(origin, cell, n_gridpoints, self.atoms.positions, \
+                           self.atoms.get_atomic_numbers(), rho, \
+                           file_name=cube_name)
         
         if (return_density): return rho
+        
+    
+    def get_noninteracting_density(self, grid, charges, atoms=None):
+        """
+        calculates MBD density of current system based on custom grid.
+        
+        parameters:
+        ===========
+            grid:        (ndarray)   [:,3] array of grid points to evaluate density in \AA
+            charges:     (ndarray)   charges of pseudoelectrons [a.u.]
+            atoms:       (atoms obj) specify only in case MBD energy is not needed
+                                     otherwise run get_potential_energy() first.
+        
+        """
+        
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if self.do_SCS:
+            has_alph = hasattr(self, 'alpha_0_SCS')
+            has_om = hasattr(self, 'omega_SCS')
+            if not (has_alph and has_om):
+                self.update_properties(atoms, do_MBD=False)
+            
+            omegas, alphas_0 = self.omega_SCS, self.alpha_0_SCS
+        else:
+            has_alph = hasattr(self, 'alpha_0_TS')
+            has_om = hasattr(self, 'omega_TS')
+            if not (has_alph and has_om):
+                self.update_properties(atoms, do_MBD=False)
+            
+            omegas, alphas_0 = self.omega_TS, self.alpha_0_TS
+        
+        m_eff = charges/(alphas_0*omegas*omegas)
+        rho = mbd_mod.eval_mbd_nonint_density(grid/Bohr, self.pos, charges, \
+                                              m_eff, omegas)
+        
+        return rho
+        
+    
+    def get_noninteracting_density_cell(self, cell, origin, n_gridpoints, charges, \
+                                return_density=False, atoms=None, write_cube=True, \
+                                cube_name="mbd_nonint_density.cube"):
+        """
+        calculates MBD density of current system based on a regular
+        cell-shaped grid and optionally writes .CUBE file.
+        
+        parameters:
+        ===========
+            cell:           (ndarray) [a,b,c] cell vectors in \AA
+            origin:         (ndarray) origin of volumetric data in \AA
+            n_gridpoints:   (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
+            charges:        (ndarray) charges of pseudoelectrons [a.u.]
+            return_density: (boolean) function call returns density as ndarray (default: False)
+            atoms:          (ASE obj) atoms object (required if no calculation is done before)
+            write_cube:     (boolean) writes .cube file if True [default: True]
+            cube_name:      (string)  density will be written to cube file named <cube_name>
+        
+        """
+        
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if not any([return_density, write_cube]):
+            if self.myid == 0:
+                print " "
+                print " You did not specify any way to output the density (on return or .CUBE output file)."
+                print " I will write the data to a .CUBE file named "+cube_name+"for you..."
+                print " "
+                write_cube = True
+            
+        if ( not hasattr(self, 'grid') ):
+            construct_grid = True
+        elif ( (np.size(self.grid) != np.prod(n_gridpoints)) or \
+               any(self.grid[0] != origin) ):
+            construct_grid = True
+        else:
+            construct_grid = False
+        
+        if construct_grid: self._build_regular_grid(cell, origin, n_gridpoints)
+        rho = self.get_noninteracting_density(self.grid, charges, atoms=atoms)
+        
+        if ( write_cube and (self.myid == 0) ):
+            from ase.utils.write_data import write_cubefile
+            write_cubefile(origin, cell, n_gridpoints, self.atoms.positions, \
+                           self.atoms.get_atomic_numbers(), rho, \
+                           file_name=cube_name)
+        
+        if (return_density): return rho
+        
+    
+    def get_density_difference(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out", \
+                               atoms=None):
+        """ returns difference in MBD density between fully and non-interacting system. """
+        
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+
+        if self.do_SCS:
+            has_alph = hasattr(self, 'alpha_0_SCS')
+            has_om = hasattr(self, 'omega_SCS')
+            if not (has_alph and has_om):
+                self.update_properties(atoms, do_MBD=False)
+            
+            omegas, alphas_0 = self.omega_SCS, self.alpha_0_SCS
+        else:
+            has_alph = hasattr(self, 'alpha_0_TS')
+            has_om = hasattr(self, 'omega_TS')
+            if not (has_alph and has_om):
+                self.update_properties(atoms, do_MBD=False)
+            
+            omegas, alphas_0 = self.omega_TS, self.alpha_0_TS
+        
+        m_eff = charges/(alphas_0*omegas*omegas)
+        
+        drho = mbd_mod.eval_mbd_density_difference_io(grid/Bohr, self.pos, charges, m_eff, \
+                                                      evals, omegas, fname_modes)
+        return drho
+        
+    
+    def get_density_difference_cell(self, cell, origin, n_gridpoints, charges, evals, \
+                                 return_drho=False, fname_modes="mbd_eigenmodes.out", \
+                                 atoms=None, write_cube=True, \
+                                 cube_name="mbd_density_difference.cube"):
+        """
+        calculates MBD density difference between fully and non-interacting system
+        on a regular cell-shaped grid and optionally writes cube files of the densities.
+        
+        parameters:
+        ===========
+            cell:         (ndarray) [a,b,c] cell vectors in \AA
+            origin:       (ndarray) origin of volumetric data in \AA
+            n_gridpoints: (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
+            charges:      (ndarray) charges of pseudoelectrons [a.u.]
+            evals:        (ndarray) eigenenergies of modes [a.u.]
+            return_drho:  (boolean) function call returns density as ndarray (default: False)
+            fname_modes:  (string)  filename containing (FORTRAN binary) eigenmodes
+            atoms:        (ASE obj) atoms object (required if no calculation is done before)
+            write_cube:   (boolean) write .cube file of density difference (default: True)
+            cube_name:    (string)  filename for density difference .cube file
+        
+        """
+        
+        if not any([return_drho, write_cube]):
+            if self.myid == 0:
+                print " "
+                print " No specification of how to output density difference (return or .CUBE file)."
+                print " I will write the data to a .CUBE file named "+cube_name_drho+"for you..."
+                print " "
+                write_cube_drho = True
+        
+        if ( not hasattr(self, 'grid') ):
+            construct_grid = True
+        elif ( (np.size(self.grid) != np.prod(n_gridpoints)) or \
+               any(self.grid[0] != origin) ):
+            construct_grid = True
+        else:
+            construct_grid = False
+        
+        if construct_grid: self._build_regular_grid(cell, origin, n_gridpoints)
+        drho = self.get_density_difference(self.grid, charges, evals, \
+                                           fname_modes=fname_modes, \
+                                           atoms=atoms)
+        
+        if ( write_cube and (self.myid == 0) ):
+            from ase.utils.write_data import write_cubefile
+            write_cubefile(origin, cell, n_gridpoints, self.atoms.positions, \
+                           self.atoms.get_atomic_numbers(), drho, file_name=cube_name)
+        
+        if (return_drho): return drho
+        
+    
+    def _build_regular_grid(self, cell, origin, n_gridpts):
+        """ build regular grid for given cell, origin, and number of grid points. """
+        n_gridpts = np.asarray(n_gridpts, dtype=int)
+        duc = ( np.asarray(cell).T/(n_gridpts-1) ).T
+        self.grid = []
+        for fx_i in xrange(n_gridpts[0]):
+            for fy_i in xrange(n_gridpts[1]):
+                for fz_i in xrange(n_gridpts[2]):
+                    lattpt = np.asarray([fx_i,fy_i,fz_i]).dot(duc)
+                    self.grid.append(np.asarray(origin) + lattpt)
+        
+        self.grid = np.asarray(self.grid)
         
     
 
