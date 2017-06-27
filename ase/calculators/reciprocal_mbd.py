@@ -743,24 +743,27 @@ class kSpace_MBD_calculator(Calculator):
     
     def get_density_difference_cell(self, cell, origin, n_gridpoints, charges, evals, \
                                  return_drho=False, fname_modes="mbd_eigenmodes.out", \
-                                 atoms=None, write_cube=True, \
-                                 cube_name="mbd_density_difference.cube"):
+                                 atoms=None, write_cube=True, write_cube_int=False, \
+                                 cube_name="mbd_density_difference.cube", \
+                                 cube_name_int="mbd_density.cube"):
         """
         calculates MBD density difference between fully and non-interacting system
         on a regular cell-shaped grid and optionally writes cube files of the densities.
         
         parameters:
         ===========
-            cell:         (ndarray) [a,b,c] cell vectors in \AA
-            origin:       (ndarray) origin of volumetric data in \AA
-            n_gridpoints: (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
-            charges:      (ndarray) charges of pseudoelectrons [a.u.]
-            evals:        (ndarray) eigenenergies of modes [a.u.]
-            return_drho:  (boolean) function call returns density as ndarray (default: False)
-            fname_modes:  (string)  filename containing (FORTRAN binary) eigenmodes
-            atoms:        (ASE obj) atoms object (required if no calculation is done before)
-            write_cube:   (boolean) write .cube file of density difference (default: True)
-            cube_name:    (string)  filename for density difference .cube file
+            cell:           (ndarray) [a,b,c] cell vectors in \AA
+            origin:         (ndarray) origin of volumetric data in \AA
+            n_gridpoints:   (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
+            charges:        (ndarray) charges of pseudoelectrons [a.u.]
+            evals:          (ndarray) eigenenergies of modes [a.u.]
+            return_drho:    (boolean) function call returns density as ndarray (default: False)
+            fname_modes:    (string)  filename containing (FORTRAN binary) eigenmodes
+            atoms:          (ASE obj) atoms object (required if no calculation is done before)
+            write_cube:     (boolean) write .cube file of density difference (default: True)
+            write_cube_int: (boolean) write .cube file of interacting density (default: False)
+            cube_name:      (string)  filename for density difference .cube file
+            cube_name_int:  (string)  filename for interacting density .cube file
         
         """
         
@@ -781,6 +784,17 @@ class kSpace_MBD_calculator(Calculator):
             construct_grid = False
         
         if construct_grid: self._build_regular_grid(cell, origin, n_gridpoints)
+        if (write_cube_int):
+            rho_int = self.get_mbd_density(self.grid, charges, evals, \
+                                           fname_modes=fname_modes, \
+                                           atoms=atoms)
+            if (self.myid == 0):
+                from ase.utils.write_data import write_cubefile
+                write_cubefile(origin, cell, n_gridpoints, self.atoms.positions, \
+                               self.atoms.get_atomic_numbers(), rho_int, \
+                               file_name=cube_name_int)
+            del(rho_int)
+        
         drho = self.get_density_difference(self.grid, charges, evals, \
                                            fname_modes=fname_modes, \
                                            atoms=atoms)
