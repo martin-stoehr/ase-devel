@@ -550,6 +550,17 @@ class kSpace_MBD_calculator(Calculator):
         if (not hasattr(self, 'atoms')) and (atoms is None):
             raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
         
+        try:
+            nAtoms = len(self.atoms)
+        except (AttributeError, TypeError):
+            nAtoms = len(atoms)
+        
+        if (np.size(evals) != nAtoms):
+            errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
+            errstr += " Please provide appropriate eigenvalues.\n"
+            if (self.myid == 0): print errstr
+            exit()
+        
         if self.do_SCS:
             has_alph = hasattr(self, 'alpha_0_SCS')
             has_om = hasattr(self, 'omega_SCS')
@@ -597,6 +608,17 @@ class kSpace_MBD_calculator(Calculator):
         
         if (not hasattr(self, 'atoms')) and (atoms is None):
             raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        try:
+            nAtoms = len(self.atoms)
+        except (AttributeError, TypeError):
+            nAtoms = len(atoms)
+        
+        if (np.size(evals) != nAtoms):
+            errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
+            errstr += " Please provide appropriate eigenvalues.\n"
+            if (self.myid == 0): print errstr
+            exit()
         
         if not any([return_density, write_cube]):
             if self.myid == 0:
@@ -734,6 +756,17 @@ class kSpace_MBD_calculator(Calculator):
         if (not hasattr(self, 'atoms')) and (atoms is None):
             raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
         
+        try:
+            nAtoms = len(self.atoms)
+        except (AttributeError, TypeError):
+            nAtoms = len(atoms)
+        
+        if (np.size(evals) != nAtoms):
+            errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
+            errstr += " Please provide appropriate eigenvalues.\n"
+            if (self.myid == 0): print errstr
+            exit()
+        
         if self.do_SCS:
             has_alph = hasattr(self, 'alpha_0_SCS')
             has_om = hasattr(self, 'omega_SCS')
@@ -782,6 +815,20 @@ class kSpace_MBD_calculator(Calculator):
             cube_name_int:  (string)  filename for interacting density .cube file
         
         """
+        
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        try:
+            nAtoms = len(self.atoms)
+        except (AttributeError, TypeError):
+            nAtoms = len(atoms)
+        
+        if (np.size(evals) != nAtoms):
+            errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
+            errstr += " Please provide appropriate eigenvalues.\n"
+            if (self.myid == 0): print errstr
+            exit()
         
         if not any([return_drho, write_cube]):
             if self.myid == 0:
