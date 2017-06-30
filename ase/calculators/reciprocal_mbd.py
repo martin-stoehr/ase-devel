@@ -532,7 +532,8 @@ class kSpace_MBD_calculator(Calculator):
             raise ValueError("Please specify 'do_TSSCS = True' in order to get TS+SCS energy")
         
     
-    def get_mbd_density(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out", atoms=None):
+    def get_mbd_density(self, grid, charges, evals, \
+                        fname_modes="mbd_eigenmodes.out", atoms=None):
         """
         calculates MBD density of current system based on custom grid.
         
@@ -540,7 +541,7 @@ class kSpace_MBD_calculator(Calculator):
         ===========
             grid:        (ndarray)   [:,3] array of grid points to evaluate density in \AA
             charges:     (ndarray)   charges of pseudoelectrons [a.u.]
-            evals:       (ndarray)   eigenenergies of modes [a.u.]
+            evals:       (ndarray)   eigenenergies of MBD Hamiltonian [a.u.]
             fname_modes: (str)       filename containing (binary) eigenmodes
             atoms:       (atoms obj) specify only in case MBD energy is not needed
                                      otherwise run get_potential_energy() first.
@@ -555,24 +556,26 @@ class kSpace_MBD_calculator(Calculator):
             if not (has_alph and has_om):
                 self.update_properties(atoms, do_MBD=False)
             
-            m_eff = charges/(self.alpha_0_SCS*self.omega_SCS*self.omega_SCS)
+            alphas, omega_0 = self.alpha_0_SCS, self.omega_SCS
         else:
             has_alph = hasattr(self, 'alpha_0_TS')
             has_om = hasattr(self, 'omega_TS')
             if not (has_alph and has_om):
                 self.update_properties(atoms, do_MBD=False)
             
-            m_eff = charges/(self.alpha_0_TS*self.omega_TS*self.omega_TS)
-        
+            alphas, omega_0 = self.alpha_0_TS, self.omega_TS
+            
+        m_eff = charges/(alphas*omega_0*omega_0)
+        omega_int = np.asarray(evals)*np.asarray(evals)
         rho = mbd_mod.eval_mbd_int_density_io(grid/Bohr, self.pos, charges, \
-                                              m_eff, evals, fname_modes)
+                                              m_eff, omega_int, fname_modes)
         
         return rho
         
     
     def get_mbd_density_cell(self, cell, origin, n_gridpoints, charges, evals, \
-                             return_density=False, fname_modes="mbd_eigenmodes.out", \
-                             atoms=None, write_cube=True, cube_name="mbd_density.cube"):
+                       return_density=False, fname_modes="mbd_eigenmodes.out", \
+                       atoms=None, write_cube=True, cube_name="mbd_density.cube"):
         """
         calculates MBD density of current system based on a regular
         cell-shaped grid and optionally writes .CUBE file.
@@ -583,7 +586,7 @@ class kSpace_MBD_calculator(Calculator):
             origin:         (ndarray) origin of volumetric data in \AA
             n_gridpoints:   (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
             charges:        (ndarray) charges of pseudoelectrons [a.u.]
-            evals:          (ndarray) eigenenergies of modes [a.u.]
+            evals:          (ndarray) eigenenergies of MBD Hamiltonian [a.u.]
             return_density: (boolean) function call returns density as ndarray (default: False)
             fname_modes:    (string)  filename containing (FORTRAN binary) eigenmodes
             atoms:          (ASE obj) atoms object (required if no calculation is done before)
@@ -612,7 +615,8 @@ class kSpace_MBD_calculator(Calculator):
             construct_grid = False
         
         if construct_grid: self._build_regular_grid(cell, origin, n_gridpoints)
-        rho = self.get_mbd_density(self.grid, charges, evals, fname_modes=fname_modes, atoms=atoms)
+        rho = self.get_mbd_density(self.grid, charges, evals, \
+                                   fname_modes=fname_modes, atoms=atoms)
         
         if ( write_cube and (self.myid == 0) ):
             from ase.utils.write_data import write_cubefile
@@ -645,18 +649,18 @@ class kSpace_MBD_calculator(Calculator):
             if not (has_alph and has_om):
                 self.update_properties(atoms, do_MBD=False)
             
-            omegas, alphas_0 = self.omega_SCS, self.alpha_0_SCS
+            omega_0, alphas_0 = self.omega_SCS, self.alpha_0_SCS
         else:
             has_alph = hasattr(self, 'alpha_0_TS')
             has_om = hasattr(self, 'omega_TS')
             if not (has_alph and has_om):
                 self.update_properties(atoms, do_MBD=False)
             
-            omegas, alphas_0 = self.omega_TS, self.alpha_0_TS
+            omega_0, alphas_0 = self.omega_TS, self.alpha_0_TS
         
-        m_eff = charges/(alphas_0*omegas*omegas)
-        rho = mbd_mod.eval_mbd_nonint_density(grid/Bohr, self.pos, charges, \
-                                              m_eff, omegas)
+        m_eff = charges/(alphas_0*omega_0*omega_0)
+        rho = mbd_mod.eval_mbd_nonint_density_io(grid/Bohr, self.pos, charges, \
+                                                 m_eff, omega_0)
         
         return rho
         
@@ -712,36 +716,48 @@ class kSpace_MBD_calculator(Calculator):
         if (return_density): return rho
         
     
-    def get_density_difference(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out", \
-                               atoms=None):
-        """ returns difference in MBD density between fully and non-interacting system. """
+    def get_drho_int_nonint(self, grid, charges, evals, fname_modes="mbd_eigenmodes.out", \
+                            atoms=None):
+        """
+        returns difference in MBD density between fully and non-interacting system.
+        
+        parameters:
+        ===========
+            grid:           (ndarray) (Npoints, 3)-shaped coordinates of grid points in \AA
+            charges:        (ndarray) charges of pseudoelectrons [a.u.]
+            evals:          (ndarray) eigenenergies of MBD Hamiltonian [a.u.]
+            fname_modes:    (string)  filename containing (FORTRAN binary) eigenmodes
+            atoms:          (ASE obj) atoms object (required if no calculation is done before)
+        
+        """
         
         if (not hasattr(self, 'atoms')) and (atoms is None):
             raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
-
+        
         if self.do_SCS:
             has_alph = hasattr(self, 'alpha_0_SCS')
             has_om = hasattr(self, 'omega_SCS')
             if not (has_alph and has_om):
                 self.update_properties(atoms, do_MBD=False)
             
-            omegas, alphas_0 = self.omega_SCS, self.alpha_0_SCS
+            omega_0, alphas_0 = self.omega_SCS, self.alpha_0_SCS
         else:
             has_alph = hasattr(self, 'alpha_0_TS')
             has_om = hasattr(self, 'omega_TS')
             if not (has_alph and has_om):
                 self.update_properties(atoms, do_MBD=False)
             
-            omegas, alphas_0 = self.omega_TS, self.alpha_0_TS
+            omega_0, alphas_0 = self.omega_TS, self.alpha_0_TS
         
-        m_eff = charges/(alphas_0*omegas*omegas)
-        
-        drho = mbd_mod.eval_mbd_density_difference_io(grid/Bohr, self.pos, charges, m_eff, \
-                                                      evals, omegas, fname_modes)
+        m_eff = charges/(alphas_0*omega_0*omega_0)
+        omega_int = np.asarray(evals)*np.asarray(evals)
+        drho = mbd_mod.eval_mbd_drho_int_nonint_io(grid/Bohr, self.pos, charges, \
+                                                   m_eff, omega_int, omega_0, \
+                                                   fname_modes)
         return drho
         
     
-    def get_density_difference_cell(self, cell, origin, n_gridpoints, charges, evals, \
+    def get_drho_int_nonint_cell(self, cell, origin, n_gridpoints, charges, evals, \
                                  return_drho=False, fname_modes="mbd_eigenmodes.out", \
                                  atoms=None, write_cube=True, write_cube_int=False, \
                                  cube_name="mbd_density_difference.cube", \
@@ -756,7 +772,7 @@ class kSpace_MBD_calculator(Calculator):
             origin:         (ndarray) origin of volumetric data in \AA
             n_gridpoints:   (ndarray) [Na,Nb,Nc] number of gridpoints along cell vectors
             charges:        (ndarray) charges of pseudoelectrons [a.u.]
-            evals:          (ndarray) eigenenergies of modes [a.u.]
+            evals:          (ndarray) eigenenergies of MBD Hamiltonian [a.u.]
             return_drho:    (boolean) function call returns density as ndarray (default: False)
             fname_modes:    (string)  filename containing (FORTRAN binary) eigenmodes
             atoms:          (ASE obj) atoms object (required if no calculation is done before)
@@ -795,9 +811,9 @@ class kSpace_MBD_calculator(Calculator):
                                file_name=cube_name_int)
             del(rho_int)
         
-        drho = self.get_density_difference(self.grid, charges, evals, \
-                                           fname_modes=fname_modes, \
-                                           atoms=atoms)
+        drho = self.get_drho_int_nonint(self.grid, charges, evals, \
+                                        fname_modes=fname_modes, \
+                                        atoms=atoms)
         
         if ( write_cube and (self.myid == 0) ):
             from ase.utils.write_data import write_cubefile
@@ -811,14 +827,14 @@ class kSpace_MBD_calculator(Calculator):
         """ build regular grid for given cell, origin, and number of grid points. """
         n_gridpts = np.asarray(n_gridpts, dtype=int)
         duc = ( np.asarray(cell).T/(n_gridpts-1) ).T
-        self.grid = []
+        self.grid, i = np.zeros((np.prod(n_gridpts),3)), 0
         for fx_i in xrange(n_gridpts[0]):
             for fy_i in xrange(n_gridpts[1]):
                 for fz_i in xrange(n_gridpts[2]):
                     lattpt = np.asarray([fx_i,fy_i,fz_i]).dot(duc)
-                    self.grid.append(np.asarray(origin) + lattpt)
+                    self.grid[i] = np.asarray(origin) + lattpt
+                    i += 1
         
-        self.grid = np.asarray(self.grid)
         
     
 
