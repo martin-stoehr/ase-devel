@@ -530,6 +530,40 @@ class kSpace_MBD_calculator(Calculator):
             return self.E_TS_SCS
         else:
             raise ValueError("Please specify 'do_TSSCS = True' in order to get TS+SCS energy")
+    
+    def get_effective_masses(self, charges=None, atoms=None):
+        """
+        return effective mass of oscillators according to
+        m[iAtom] = charges[iAtom]/(alpha_0[iAtom] * omega_0[iAtom]**2)
+        
+        parameters:
+        ===========
+            . charges  (ndarray) charges of pseudo-particles [default 1]
+            . atoms    (ASE obj) Atoms-object [define if no calculation is performed before]
+        
+        """
+        
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if self.do_SCS:
+            has_alph = hasattr(self, 'alpha_0_SCS')
+            has_om = hasattr(self, 'omega_SCS')
+            if not (has_alph and has_om):
+                self.update_properties(atoms, do_MBD=False)
+            
+            alphas, omega_0 = self.alpha_0_SCS, self.omega_SCS
+        else:
+            has_alph = hasattr(self, 'alpha_0_TS')
+            has_om = hasattr(self, 'omega_TS')
+            if not (has_alph and has_om):
+                self.update_properties(atoms, do_MBD=False)
+            
+            alphas, omega_0 = self.alpha_0_TS, self.omega_TS
+        
+        if charges is None: charges = np.ones(len(self.atoms))
+        m_eff = charges/(alphas*omega_0*omega_0)
+        return m_eff
         
     
     def get_mbd_density(self, grid, charges, evals, \

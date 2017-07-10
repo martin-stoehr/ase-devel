@@ -116,6 +116,21 @@ class Dftb(FileIOCalculator):
 Be aware that this might limit capabilities.")
             self.default_parameters['Driver']='{}'
         
+        minmem = kwargs.get('Options_MinimiseMemoryUsage', 'No')
+        if minmem in ['YES','Yes','yes']:
+            defaultsolver = 'Standard{}'
+        else:
+            defaultsolver = 'DivideAndConquer{}'
+        
+        dftbsolver = kwargs.get('Hamiltonian_Eigensolver', defaultsolver)
+        if not dftbsolver.endswith('{}'): dftbsolver += '{}'
+        if (dftbsolver in ['QR{}','qr{}']): dftbsolver = 'Standard{}'
+        if not dftbsolver in ['Standard{}', 'DivideAndConquer{}']:
+            print("Eigensolver '"+dftbsolver+"' not known. Defaulting to '"+defaultsolver+"'.")
+            dftbsolver = defaultsolver
+        
+        kwargs['Hamiltonian_Eigensolver'] = dftbsolver
+        
         do_3rd_order = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
         if ( (do_3rd_order=='Yes') or (do_3rd_order=='YES') ):
             self.default_parameters['Hamiltonian_DampXH'] = 'Yes',
