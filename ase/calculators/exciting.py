@@ -1,18 +1,21 @@
+from __future__ import print_function
 import os
 
 import numpy as np
-from lxml import etree as ET
 
 from ase.io.exciting import atoms2etree
 from ase.units import Bohr, Hartree
+from ase.calculators.calculator import PropertyNotImplementedError
+from ase.utils import basestring
 
 
 class Exciting:
     def __init__(self, dir='calc', paramdict=None,
                  speciespath=None,
-                 bin='excitingser', kpts=(1, 1, 1), **kwargs):
+                 bin='excitingser', kpts=(1, 1, 1),
+                 autormt=False, **kwargs):
         """Exciting calculator object constructor
-        
+
         dir: string
             directory in which to execute exciting
         paramdict: dict
@@ -20,34 +23,33 @@ class Exciting:
             translated to attributes, nested dictionaries are translated
             to sub elements. A list of dictionaries is translated to a
             list of sub elements named after the key of which the list
-            is the value.
-            
-            default: None
+            is the value.  Default: None
         speciespath: string
             Directory or URL to look up species files
         bin: string
-            Path or executable name of exciting
-            
-            default: ``excitingser``
+            Path or executable name of exciting.  Default: ``excitingser``
         kpts: integer list length 3
             Number of k-points
+        autormt: bool
+            Bla bla?
         kwargs: dictionary like
             list of key value pairs to be converted into groundstate attributes
-        
+
         """
         self.dir = dir
         self.energy = None
-        
+
         self.paramdict = paramdict
         if speciespath is None:
             speciespath = os.environ['EXCITINGROOT'] + '/species'
         self.speciespath = speciespath
         self.converged = False
         self.excitingbinary = bin
+        self.autormt = autormt
         self.groundstate_attributes = kwargs
-        if  (not 'ngridk' in kwargs.keys() and (not (self.paramdict))):
+        if ('ngridk' not in kwargs.keys() and (not (self.paramdict))):
             self.groundstate_attributes['ngridk'] = ' '.join(map(str, kpts))
- 
+
     def update(self, atoms):
         if (not self.converged or
             len(self.numbers) != len(atoms) or
@@ -76,7 +78,7 @@ class Exciting:
         return self.forces.copy()
 
     def get_stress(self, atoms):
-        raise NotImplementedError
+        raise PropertyNotImplementedError
 
     def calculate(self, atoms):
         self.positions = atoms.get_positions().copy()
@@ -91,12 +93,13 @@ class Exciting:
         self.read()
 
     def write(self, atoms):
+        from lxml import etree as ET
         if not os.path.isdir(self.dir):
             os.mkdir(self.dir)
         root = atoms2etree(atoms)
         root.find('structure').attrib['speciespath'] = self.speciespath
-        root.find('structure').attrib['autormt'] = 'false'
-       
+        root.find('structure').attrib['autormt'] = str(self.autormt).lower()
+
         if(self.paramdict):
             self.dicttoxml(self.paramdict, root)
             fd = open('%s/input.xml' % self.dir, 'w')
@@ -114,30 +117,33 @@ class Exciting:
             fd.write(ET.tostring(root, method='xml', pretty_print=True,
                                  xml_declaration=True, encoding='UTF-8'))
             fd.close()
-            
+
     def dicttoxml(self, pdict, element):
+        from lxml import etree as ET
         for key, value in pdict.items():
-            if (type(value) is str and key == 'text()'):
+            if (isinstance(value, basestring) and key == 'text()'):
                 element.text = value
-            elif (type(value) is str):
+            elif (isinstance(value, basestring)):
                 element.attrib[key] = value
-            elif (type(value) is list):
+            elif (isinstance(value, list)):
                 for item in value:
                     self.dicttoxml(item, ET.SubElement(element, key))
-            elif (type(value) is dict):
+            elif (isinstance(value, dict)):
                 if(element.findall(key) == []):
                     self.dicttoxml(value, ET.SubElement(element, key))
                 else:
                     self.dicttoxml(value, element.findall(key)[0])
             else:
                 print('cannot deal with', key, '=', value)
-               
+
     def read(self):
         """
         reads Total energy and forces from info.xml
         """
+        from lxml import etree as ET
+
         INFO_file = '%s/info.xml' % self.dir
-   
+
         try:
             fd = open(INFO_file)
         except IOError:
@@ -150,7 +156,7 @@ class Exciting:
         for force in forcesnodes:
             forces.append(np.array(float(force)))
         self.forces = np.reshape(forces, (-1, 3)) * Hartree / Bohr
-        
+
         if str(info.xpath('//groundstate/@status')[0]) == 'finished':
             self.converged = True
         else:

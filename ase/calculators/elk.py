@@ -4,26 +4,25 @@ import numpy as np
 
 from ase.units import Bohr, Hartree
 from ase.io.elk import read_elk
-from ase.calculators.calculator import FileIOCalculator, Parameters, kpts2mp, \
-    ReadError
+from ase.calculators.calculator import (FileIOCalculator, Parameters, kpts2mp,
+                                        ReadError, PropertyNotImplementedError,
+                                        EigenvalOccupationMixin)
 
-elk_parameters = {
-    'swidth': Hartree,
-    }
+elk_parameters = {'swidth': Hartree}
 
-class ELK(FileIOCalculator):
+class ELK(FileIOCalculator, EigenvalOccupationMixin):
     command = 'elk > elk.out'
     implemented_properties = ['energy', 'forces']
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label=os.curdir, atoms=None, **kwargs):
         """Construct ELK calculator.
-        
+
         The keyword arguments (kwargs) can be one of the ASE standard
         keywords: 'xc', 'kpts' and 'smearing' or any of ELK'
         native keywords.
         """
-        
+
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
 
@@ -41,7 +40,7 @@ class ELK(FileIOCalculator):
         return system_changes
 
     def set(self, **kwargs):
-        changed_parameters = FileIOCalculator.set(self, **kwargs)        
+        changed_parameters = FileIOCalculator.set(self, **kwargs)
         if changed_parameters:
             self.reset()
 
@@ -73,6 +72,17 @@ class ELK(FileIOCalculator):
 
         fd = open(os.path.join(self.directory, 'elk.in'), 'w')
 
+        # handle custom specifications of rmt
+        # (absolute or relative to default) in Bohr
+        # rmt = {'H': 0.7, 'O': -0.2, ...}
+
+        if self.parameters.get('rmt', None) is not None:
+            self.rmt = self.parameters['rmt'].copy()
+            assert len(self.rmt.keys()) == len(list(set(self.rmt.keys()))), 'redundant rmt definitions'
+            self.parameters.pop('rmt') # this is not an elk keyword!
+        else:
+            self.rmt = None
+
         inp = {}
         inp.update(self.parameters)
 
@@ -82,7 +92,8 @@ class ELK(FileIOCalculator):
                       'REVPBE': 21,
                       'PBESOL': 22,
                       'WC06': 26,
-                      'AM05': 30}[self.parameters.xc]
+                      'AM05': 30,
+                      'mBJLDA': (100, 208, 12)}[self.parameters.xc]
             inp['xctype'] = xctype
             del inp['xc']
 
@@ -159,8 +170,52 @@ class ELK(FileIOCalculator):
             raise RuntimeError(
                 'Missing species directory!  Use species_dir ' +
                 'parameter or set $ELK_SPECIES_PATH environment variable.')
-        # if sppath is present in elk.in it overwrites species blocks!
-        fd.write("sppath\n'%s'\n\n" % species_path)
+        # custom species definitions
+        if self.rmt is not None:
+            fd.write("\n")
+            sfile = os.path.join(os.environ['ELK_SPECIES_PATH'], 'elk.in')
+            assert os.path.exists(sfile)
+            slines = open(sfile, 'r').readlines()
+            # remove unused species
+            for s in self.rmt.keys():
+                if s not in species.keys():
+                    self.rmt.pop(s)
+            # add undefined species with defaults
+            for s in species.keys():
+                if s not in self.rmt.keys():
+                    # use default rmt for undefined species
+                    self.rmt.update({s: 0.0})
+            # write custom species into elk.in
+            skeys = list(set(self.rmt.keys())) # unique
+            skeys.sort()
+            for s in skeys:
+                found = False
+                for n, line in enumerate(slines):
+                    if line.find("'" + s + "'") > -1:
+                        begline = n - 1
+                for n, line in enumerate(slines[begline:]):
+                    if not line.strip(): # first empty line
+                        endline = n
+                        found = True
+                        break
+                assert found
+                fd.write("species\n")
+                # set rmt on third line
+                rmt = self.rmt[s]
+                assert isinstance(rmt, (float,int))
+                if rmt <= 0.0: # relative
+                    # split needed because H is defined with comments
+                    newrmt = float(slines[begline + 3].split()[0].strip()) + rmt
+                else:
+                    newrmt = rmt
+                slines[begline + 3] = '%6s\n' % str(newrmt)
+                for l in slines[begline: begline + endline]:
+                    fd.write('%s' % l)
+                fd.write("\n")
+        else:
+            # use default species
+            # if sppath is present in elk.in it overwrites species blocks!
+            fd.write("sppath\n'%s'\n\n" % os.environ['ELK_SPECIES_PATH'])
 
     def read(self, label):
         FileIOCalculator.read(self, label)
@@ -170,7 +225,7 @@ class ELK(FileIOCalculator):
 
         for filename in [totenergy, eigval, kpoints, self.out]:
             if not os.path.isfile(filename):
-                raise ReadError
+                raise ReadError('ELK output file '+filename+' is missing.')
 
         # read state from elk.in because *.OUT do not provide enough digits!
         self.atoms = read_elk(os.path.join(self.directory, 'elk.in'))
@@ -186,6 +241,7 @@ class ELK(FileIOCalculator):
         self.read_energy()
         if self.parameters.get('tforce'):
             self.read_forces()
+        self.width = self.read_electronic_temperature()
         self.nbands = self.read_number_of_bands()
         self.nelect = self.read_number_of_electrons()
         self.niter = self.read_number_of_iterations()
@@ -199,7 +255,7 @@ class ELK(FileIOCalculator):
 
     def get_forces(self, atoms):
         if not self.parameters.get('tforce'):
-            raise NotImplementedError
+            raise PropertyNotImplementedError
         return FileIOCalculator.get_forces(self, atoms)
 
     def read_energy(self):
@@ -210,13 +266,10 @@ class ELK(FileIOCalculator):
 
     def read_forces(self):
         lines = open(self.out, 'r').readlines()
-        forces = np.zeros([len(self.atoms), 3])
         forces = []
-        atomnum = 0
         for line in lines:
             if line.rfind('total force') > -1:
                 forces.append(np.array([float(f) for f in line.split(':')[1].split()]))
-                atomnum =+ 1
         self.results['forces'] = np.array(forces) * Hartree / Bohr
 
     def read_convergence(self):
@@ -228,6 +281,9 @@ class ELK(FileIOCalculator):
         return converged
 
     # more methods
+    def get_electronic_temperature(self):
+        return self.width*Hartree
+
     def get_number_of_bands(self):
         return self.nbands
 
@@ -240,7 +296,7 @@ class ELK(FileIOCalculator):
     def get_number_of_spins(self):
         return 1 + int(self.spinpol)
 
-    def get_magnetic_moment(self, atoms):
+    def get_magnetic_moment(self, atoms=None):
         return self.magnetic_moment
 
     def get_magnetic_moments(self, atoms):
@@ -262,6 +318,9 @@ class ELK(FileIOCalculator):
     def get_ibz_k_points(self):
         return self.read_kpts(mode='ibz_k_points')
 
+    def get_k_point_weights(self):
+        return self.read_kpts(mode='k_point_weights')
+
     def get_fermi_level(self):
         return self.read_fermi()
 
@@ -281,9 +340,9 @@ class ELK(FileIOCalculator):
         values = []
         for line in text:
             if mode == 'ibz_k_points':
-                b = [float(c.strip()) for c in line.split()[1:-3]]
+                b = [float(c.strip()) for c in line.split()[1:4]]
             else:
-                b = [float(c.strip()) for c in line.split()[-2]]
+                b = float(line.split()[-2])
             values.append(b)
         if len(values) == 0:
             values = None
@@ -298,7 +357,7 @@ class ELK(FileIOCalculator):
                 nbands = int(line.split(':')[0].strip())
                 break
         if self.get_spin_polarized():
-            nbands = nbands / 2
+            nbands = nbands // 2
         return nbands
 
     def read_number_of_electrons(self):
@@ -328,13 +387,13 @@ class ELK(FileIOCalculator):
         return magmom
 
     def read_electronic_temperature(self):
-        swidth = None
+        width = None
         text = open(self.out).read().lower()
         for line in iter(text.split('\n')):
             if line.rfind('smearing width :') > -1:
-                swidth = float(line.split(':')[1].strip())
+                width = float(line.split(':')[1].strip())
                 break
-        return Hartree*swidth
+        return width
 
     def read_eigenvalues(self, kpt=0, spin=0, mode='eigenvalues'):
         """ Returns list of last eigenvalues, occupations
@@ -355,7 +414,7 @@ class ELK(FileIOCalculator):
                 kpts = int(line.split(':')[0].strip())
                 break
         assert not kpts is None
-        text = lines[3:] # remove first 3 lines
+        text = lines[3:]  # remove first 3 lines
         # find the requested k-point
         beg = 2 + (nstsv + 4) * kpt
         end = beg + nstsv
@@ -363,16 +422,16 @@ class ELK(FileIOCalculator):
             # elk prints spin-up and spin-down together
             if spin == 0:
                 beg = beg
-                end = beg + nstsv / 2
+                end = beg + nstsv // 2
             else:
-                beg = beg - nstsv / 2 - 3
+                beg = beg + nstsv // 2
                 end = end
         values = []
         for line in text[beg:end]:
             b = [float(c.strip()) for c in line.split()[1:]]
             values.append(b)
         if mode == 'eigenvalues':
-            values = [Hartree*v[0] for v in values]
+            values = [Hartree * v[0] for v in values]
         else:
             values = [v[1] for v in values]
         if len(values) == 0:
@@ -382,10 +441,10 @@ class ELK(FileIOCalculator):
     def read_fermi(self):
         """Method that reads Fermi energy in Hartree from the output file
         and returns it in eV"""
-        E_f=None
+        E_f = None
         text = open(self.out).read().lower()
         for line in iter(text.split('\n')):
             if line.rfind('fermi                       :') > -1:
                 E_f = float(line.split(':')[1].strip())
-        E_f = E_f*Hartree
+        E_f = E_f * Hartree
         return E_f

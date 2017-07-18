@@ -589,7 +589,7 @@ class kSpace_MBD_calculator(Calculator):
         except (AttributeError, TypeError):
             nAtoms = len(atoms)
         
-        if (np.size(evals) != nAtoms):
+        if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
             if (self.myid == 0): print errstr
@@ -648,7 +648,7 @@ class kSpace_MBD_calculator(Calculator):
         except (AttributeError, TypeError):
             nAtoms = len(atoms)
         
-        if (np.size(evals) != nAtoms):
+        if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
             if (self.myid == 0): print errstr
@@ -795,7 +795,7 @@ class kSpace_MBD_calculator(Calculator):
         except (AttributeError, TypeError):
             nAtoms = len(atoms)
         
-        if (np.size(evals) != nAtoms):
+        if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
             if (self.myid == 0): print errstr
@@ -858,7 +858,7 @@ class kSpace_MBD_calculator(Calculator):
         except (AttributeError, TypeError):
             nAtoms = len(atoms)
         
-        if (np.size(evals) != nAtoms):
+        if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
             if (self.myid == 0): print errstr

@@ -10,9 +10,11 @@
 import os
 import numpy as np
 from ase.test import NotAvailable
-from ase.calculators.neighborlist import NeighborList
-from ase.calculators.calculator import Calculator
+from ase.neighborlist import NeighborList
+from ase.calculators.calculator import Calculator, all_changes
 from scipy.interpolate import InterpolatedUnivariateSpline as spline
+from ase.units import Bohr, Hartree
+from ase.utils import basestring
 
 
 class EAM(Calculator):
@@ -51,7 +53,7 @@ The total energy `E_{\rm tot}` of an arbitrary arrangement of atoms is
 given by the EAM potential as
 
 .. math::
-   E_{\rm tot} = \sum_i F(\bar\rho_i) + \frac{1}{2}\sum_{i\ne j} \phi(r_{ij})
+   E_\text{tot} = \sum_i F(\bar\rho_i) + \frac{1}{2}\sum_{i\ne j} \phi(r_{ij})
 
 and
 
@@ -69,10 +71,10 @@ atom and its neighbour for that bond.
 The ADP potential is defined as
 
 .. math::
-   E_{\rm tot} = \sum_i F(\bar\rho_i) + \frac{1}{2}\sum_{i\ne j} \phi(r_{ij})
-   + {1\over 2} \sum_{i,\alpha} (\mu_i^\alpha)^2
-   + {1\over 2} \sum_{i,\alpha,\beta} (\lambda_i^{\alpha\beta})^2
-   - {1 \over 6} \sum_i \nu_i^2
+   E_\text{tot} = \sum_i F(\bar\rho_i) + \frac{1}{2}\sum_{i\ne j} \phi(r_{ij})
+   + \frac{1}{2} \sum_{i,\alpha} (\mu_i^\alpha)^2
+   + \frac{1}{2} \sum_{i,\alpha,\beta} (\lambda_i^{\alpha\beta})^2
+   - \frac{1}{6} \sum_i \nu_i^2
 
 where `\mu_i^\alpha` is the dipole vector, `\lambda_i^{\alpha\beta}`
 is the quadrupole tensor and `\nu_i` is the trace of
@@ -220,10 +222,12 @@ End EAM Interface Documentation
     default_parameters = dict(
         skin=1.0,
         potential=None,
-        header="""EAM/ADP potential file\nGenerated from eam.py\nblank\n""")
+        header=[b'EAM/ADP potential file\n',
+                b'Generated from eam.py\n',
+                b'blank\n'])
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
-                  label=os.curdir, atoms=None, **kwargs):
+                 label=os.curdir, atoms=None, **kwargs):
 
         if 'potential' in kwargs:
             self.read_potential(kwargs['potential'])
@@ -240,7 +244,7 @@ End EAM Interface Documentation
                       'skin', 'form', 'Z', 'nr', 'nrho', 'mass')
 
         # set any additional keyword arguments
-        for arg, val in self.parameters.iteritems():
+        for arg, val in self.parameters.items():
             if arg in valid_args:
                 setattr(self, arg, val)
             else:
@@ -253,7 +257,6 @@ End EAM Interface Documentation
 
         if extension == '.eam':
             self.form = 'eam'
-            raise NotImplementedError
         elif extension == '.alloy':
             self.form = 'alloy'
         elif extension == '.adp':
@@ -266,60 +269,101 @@ End EAM Interface Documentation
         and creates the interpolation functions from the data
         """
 
-        if isinstance(fileobj, str):
+        if isinstance(fileobj, basestring):
             f = open(fileobj)
             self.set_form(fileobj)
         else:
             f = fileobj
+            
+        def lines_to_list(lines):
+            """Make the data one long line so as not to care how its formatted
+            """
+            data = []
+            for line in lines:
+                data.extend(line.split())
+            return data
 
         lines = f.readlines()
-        self.header = lines[:3]
-        i = 3
+        if self.form == 'eam':        # single element eam file (aka funcfl)
+                self.header = lines[:1]
+                
+                data = lines_to_list(lines[1:])
+                
+                # eam form is just like an alloy form for one element
+                
+                self.Nelements = 1
+                self.Z = np.array([data[0]], dtype=int)
+                self.mass = np.array([data[1]])
+                self.a = np.array([data[2]])
+                self.lattice = [data[3]]
+                 
+                self.nrho = int(data[4])
+                self.drho = float(data[5])
+                self.nr = int(data[6])
+                self.dr = float(data[7])
+                self.cutoff = float(data[8])
+                
+                n = 9 + self.nrho
+                self.embedded_data = np.array([np.float_(data[9:n])])
+                
+                self.rphi_data = np.zeros([self.Nelements, self.Nelements,
+                                           self.nr])
+                                
+                effective_charge = np.float_(data[n:n + self.nr])
+                # convert effective charges to rphi according to
+                # http://lammps.sandia.gov/doc/pair_eam.html
+                self.rphi_data[0, 0] = Bohr * Hartree * (effective_charge**2)
+                
+                self.density_data = np.array(
+                    [np.float_(data[n + self.nr:n + 2 * self.nr])])
+                
+        else:
+                self.header = lines[:3]
+                i = 3
 
-        # make the data one long line so as not to care how its formatted
-        data = []
-        for line in lines[i:]:
-            data.extend(line.split())
+                data = lines_to_list(lines[i:])
 
-        self.Nelements = int(data[0])
-        d = 1
-        self.elements = data[d:(d + self.Nelements)]
-        d += self.Nelements
+                self.Nelements = int(data[0])
+                d = 1
+                self.elements = data[d:d + self.Nelements]
+                d += self.Nelements
 
-        self.nrho = int(data[d])
-        self.drho = float(data[d + 1])
-        self.nr = int(data[d + 2])
-        self.dr = float(data[d + 3])
-        self.cutoff = float(data[d + 4])
+                self.nrho = int(data[d])
+                self.drho = float(data[d + 1])
+                self.nr = int(data[d + 2])
+                self.dr = float(data[d + 3])
+                self.cutoff = float(data[d + 4])
 
-        self.embedded_data = np.zeros([self.Nelements, self.nrho])
-        self.density_data = np.zeros([self.Nelements, self.nr])
-        self.Z = np.zeros([self.Nelements], dtype=int)
-        self.mass = np.zeros([self.Nelements])
-        self.a = np.zeros([self.Nelements])
-        self.lattice = []
-        d += 5
+                self.embedded_data = np.zeros([self.Nelements, self.nrho])
+                self.density_data = np.zeros([self.Nelements, self.nr])
+                self.Z = np.zeros([self.Nelements], dtype=int)
+                self.mass = np.zeros([self.Nelements])
+                self.a = np.zeros([self.Nelements])
+                self.lattice = []
+                d += 5
 
-        # reads in the part of the eam file for each element
-        for elem in range(self.Nelements):
-            self.Z[elem] = int(data[d])
-            self.mass[elem] = float(data[d + 1])
-            self.a[elem] = float(data[d + 2])
-            self.lattice.append(data[d + 3])
-            d += 4
+                # reads in the part of the eam file for each element
+                for elem in range(self.Nelements):
+                    self.Z[elem] = int(data[d])
+                    self.mass[elem] = float(data[d + 1])
+                    self.a[elem] = float(data[d + 2])
+                    self.lattice.append(data[d + 3])
+                    d += 4
 
-            self.embedded_data[elem] = np.float_(data[d:(d + self.nrho)])
-            d += self.nrho
-            self.density_data[elem] = np.float_(data[d:(d + self.nr)])
-            d += self.nr
+                    self.embedded_data[elem] = np.float_(
+                        data[d:(d + self.nrho)])
+                    d += self.nrho
+                    self.density_data[elem] = np.float_(data[d:(d + self.nr)])
+                    d += self.nr
 
-        # reads in the r*phi data for each interaction between elements
-        self.rphi_data = np.zeros([self.Nelements, self.Nelements, self.nr])
+                # reads in the r*phi data for each interaction between elements
+                self.rphi_data = np.zeros([self.Nelements, self.Nelements,
+                                           self.nr])
 
-        for i in range(self.Nelements):
-            for j in range(i, self.Nelements):
-                self.rphi_data[i, j] = np.float_(data[d:(d + self.nr)])
-                d += self.nr
+                for i in range(self.Nelements):
+                    for j in range(i + 1):
+                        self.rphi_data[j, i] = np.float_(data[d:(d + self.nr)])
+                        d += self.nr
 
         self.r = np.arange(0, self.nr) * self.dr
         self.rho = np.arange(0, self.nrho) * self.drho
@@ -353,16 +397,9 @@ End EAM Interface Documentation
         # to go through zero due to the r*phi format in alloy and adp
         for i in range(self.Nelements):
             for j in range(i, self.Nelements):
-                if self.form == 'eam':  # not stored as rphi
-                    # should we ignore the first point for eam ?
-                    raise RuntimeError('.eam format not yet supported')
-
-                    self.phi[i, j] = spline(
-                        self.r[1:], self.rphi_data[i, j][1:], k=3)
-                else:
-                    self.phi[i, j] = spline(
-                        self.r[1:],
-                        self.rphi_data[i, j][1:] / self.r[1:], k=3)
+                self.phi[i, j] = spline(
+                    self.r[1:],
+                    self.rphi_data[i, j][1:] / self.r[1:], k=3)
 
                 self.d_phi[i, j] = self.deriv(self.phi[i, j])
 
@@ -394,17 +431,17 @@ End EAM Interface Documentation
         """read in the extra adp data from the potential file"""
 
         self.d_data = np.zeros([self.Nelements, self.Nelements, self.nr])
-        # should be non symetrical combinations of 2
+        # should be non symmetrical combinations of 2
         for i in range(self.Nelements):
-            for j in range(i, self.Nelements):
-                self.d_data[i, j] = data[d:d + self.nr]
+            for j in range(i + 1):
+                self.d_data[j, i] = data[d:d + self.nr]
                 d += self.nr
 
         self.q_data = np.zeros([self.Nelements, self.Nelements, self.nr])
-        # should be non symetrical combinations of 2
+        # should be non symmetrical combinations of 2
         for i in range(self.Nelements):
-            for j in range(i, self.Nelements):
-                self.q_data[i, j] = data[d:d + self.nr]
+            for j in range(i + 1):
+                self.q_data[j, i] = data[d:d + self.nr]
                 d += self.nr
 
     def write_potential(self, filename, nc=1, numformat='%.8e'):
@@ -413,7 +450,7 @@ End EAM Interface Documentation
         wide.  Note: array lengths need to be an exact multiple of nc
         """
 
-        f = open(filename, 'w')
+        f = open(filename, 'wb')
 
         assert self.nr % nc == 0
         assert self.nrho % nc == 0
@@ -421,13 +458,12 @@ End EAM Interface Documentation
         for line in self.header:
             f.write(line)
 
-        f.write('%d ' % self.Nelements)
-        for i in range(self.Nelements):
-            f.write('%s ' % str(self.elements[i]))
-        f.write('\n')
+        f.write('{0} '.format(self.Nelements).encode())
+        f.write(' '.join(self.elements).encode() + b'\n')
 
-        f.write('%d %f %d %f %f \n' %
-                (self.nrho, self.drho, self.nr, self.dr, self.cutoff))
+        f.write(('%d %f %d %f %f \n' %
+                 (self.nrho, self.drho, self.nr,
+                  self.dr, self.cutoff)).encode())
 
         # start of each section for each element
 #        rs = np.linspace(0, self.nr * self.dr, self.nr)
@@ -437,14 +473,15 @@ End EAM Interface Documentation
         rhos = np.arange(0, self.nrho) * self.drho
 
         for i in range(self.Nelements):
-            f.write('%d %f %f %s\n' % (self.Z[i], self.mass[i],
-                                       self.a[i], str(self.lattice[i])))
+            f.write(('%d %f %f %s\n' %
+                     (self.Z[i], self.mass[i],
+                      self.a[i], str(self.lattice[i]))).encode())
             np.savetxt(f,
-                       self.embedded_energy[i](rhos).reshape(self.nrho / nc,
+                       self.embedded_energy[i](rhos).reshape(self.nrho // nc,
                                                              nc),
                        fmt=nc * [numformat])
             np.savetxt(f,
-                       self.electron_density[i](rs).reshape(self.nr / nc,
+                       self.electron_density[i](rs).reshape(self.nr // nc,
                                                             nc),
                        fmt=nc * [numformat])
 
@@ -453,7 +490,7 @@ End EAM Interface Documentation
         for i in range(self.Nelements):
             for j in range(i, self.Nelements):
                 np.savetxt(f,
-                           (rs * self.phi[i, j](rs)).reshape(self.nr / nc,
+                           (rs * self.phi[i, j](rs)).reshape(self.nr // nc,
                                                              nc),
                            fmt=nc * [numformat])
 
@@ -500,8 +537,7 @@ End EAM Interface Documentation
         self.neighbors.update(atoms)
 
     def calculate(self, atoms=None, properties=['energy'],
-                  system_changes=['positions', 'numbers', 'cell',
-                                  'pbc', 'charges','magmoms']):
+                  system_changes=all_changes):
         """EAM Calculator
 
         atoms: Atoms object
@@ -512,7 +548,7 @@ End EAM Interface Documentation
         system_changes: list of str
             List of what has changed since last calculation.  Can be
             any combination of these five: 'positions', 'numbers', 'cell',
-            'pbc', 'charges' and 'magmoms'.
+            'pbc', 'initial_charges' and 'initial_magmoms'.
             """
 
         Calculator.calculate(self, atoms, properties, system_changes)
@@ -563,7 +599,7 @@ End EAM Interface Documentation
             rvec = (atoms.positions[neighbors] + offset -
                     atoms.positions[i])
 
-            ## calculate the distance to the nearest neighbors
+            # calculate the distance to the nearest neighbors
             r = np.sqrt(np.sum(np.square(rvec), axis=1))  # fast
 #            r = np.apply_along_axis(np.linalg.norm, 1, rvec)  # sloow
 
@@ -573,7 +609,7 @@ End EAM Interface Documentation
                 if not use.any():
                     continue
                 pair_energy += np.sum(self.phi[self.index[i], j_index](
-                        r[nearest][use])) / 2.
+                    r[nearest][use])) / 2.
 
                 density = np.sum(
                     self.electron_density[j_index](r[nearest][use]))
@@ -676,13 +712,13 @@ End EAM Interface Documentation
         for gamma in range(3):
             term1 = (mu_i[gamma] - mu[:, gamma]) * self.d[form1][form2](r)
 
-            term2 = np.sum((mu_i - mu)
-                           * self.d_d[form1][form2](r)[:, np.newaxis]
-                           * (rvec * rvec[:, gamma][:, np.newaxis]
-                           / r[:, np.newaxis]), axis=1)
+            term2 = np.sum((mu_i - mu) *
+                           self.d_d[form1][form2](r)[:, np.newaxis] *
+                           (rvec * rvec[:, gamma][:, np.newaxis] /
+                            r[:, np.newaxis]), axis=1)
 
-            term3 = 2 * np.sum((lam_i[:, gamma] + lam[:, :, gamma])
-                               * rvec * self.q[form1][form2](r)[:, np.newaxis],
+            term3 = 2 * np.sum((lam_i[:, gamma] + lam[:, :, gamma]) *
+                               rvec * self.q[form1][form2](r)[:, np.newaxis],
                                axis=1)
             term4 = 0.0
             for alpha in range(3):
@@ -692,8 +728,8 @@ End EAM Interface Documentation
                               self.d_q[form1][form2](r) * rs) / r
 
             term5 = ((lam_i.trace() + lam.trace(axis1=1, axis2=2)) *
-                     (self.d_q[form1][form2](r) * r
-                      + 2 * self.q[form1][form2](r)) * rvec[:, gamma]) / 3.
+                     (self.d_q[form1][form2](r) * r +
+                      2 * self.q[form1][form2](r)) * rvec[:, gamma]) / 3.
 
             # the minus for term5 is a correction on the adp
             # formulation given in the 2005 Mishin Paper and is posted
@@ -794,5 +830,3 @@ End EAM Interface Documentation
                 label = name + ' ' + self.elements[i] + '-' + self.elements[j]
                 plt.plot(curvex, curvey[i, j](curvex), label=label)
         plt.legend()
-
-#print 'done eam'

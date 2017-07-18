@@ -1,274 +1,266 @@
-"""
-Version 2012/08/20, Torsten Kerber
+"""This module defines an ASE interface to MOPAC.
 
-Contributors:
-  Torsten Kerber, Ecole normale superieure de Lyon:
-  Paul Fleurat-Lessard, Ecole normale superieure de Lyon
-  based on a script by Rosa Bulo, Ecole normale superieure de Lyon
+Set $ASE_MOPAC_COMMAND to something like::
 
-This work is supported by Award No. UK-C0017, made by King Abdullah
-University of Science and Technology (KAUST), Saudi Arabia
+    LD_LIBRARY_PATH=/path/to/lib/ \
+    MOPAC_LICENSE=/path/to/license \
+    /path/to/MOPAC2012.exe PREFIX.mop 2> /dev/null
 
-See accompanying license files for details.
 """
 import os
+
 import numpy as np
 
-from ase.units import kcal, mol
-from ase.calculators.general import Calculator
-
-str_keys = ['functional', 'job_type', 'command']
-int_keys = ['restart', 'spin']
-bool_keys = ['OPT']
-float_keys = ['RELSCF']
+from ase import Atoms
+from ase.calculators.calculator import FileIOCalculator, ReadError, Parameters
+from ase.units import kcal, mol, Debye
 
 
-class Mopac(Calculator):
-    name = 'MOPAC'
-    def __init__(self, label='ase', **kwargs):
-        # define parameter fields
-        self.str_params = {}
-        self.int_params = {}
-        self.bool_params = {}
-        self.float_params = {}
-        
-        # initials parameter fields
-        for key in str_keys:
-            self.str_params[key] = None
-        for key in int_keys:
-            self.int_params[key] = None
-        for key in bool_keys:
-            self.bool_params[key] = None
-        for key in float_keys:
-            self.float_params[key] = None
-                        
-        # set initial values
-        self.set(restart=0,
-                 spin=0,
-                 OPT=False,
-                 functional='PM6',
-                 job_type='NOANCI 1SCF GRADIENTS AUX(0,PRECISION=9)',
-                 RELSCF=0.0001)
-        # set user values
-        self.set(**kwargs)
+class MOPAC(FileIOCalculator):
+    implemented_properties = ['energy', 'forces', 'dipole', 'magmom']
+    command = 'mopac PREFIX.mop 2> /dev/null'
 
-        # save label
-        self.label = label
-        
-        #set atoms
-        self.atoms = None
-        # initialize the results
-        self.version = None
-        self.energy_zero = None
-        self.energy_free = None
-        self.forces = None
-        self.stress = None
-        
-        # initialize the results
-        self.occupations = None
-        
+    default_parameters = dict(
+        method='PM7',
+        task='1SCF GRADIENTS',
+        relscf=0.0001)
+
+    methods = ['AM1', 'MNDO', 'MNDOD', 'PM3', 'PM6', 'PM6-D3', 'PM6-DH+',
+               'PM6-DH2', 'PM6-DH2X', 'PM6-D3H4', 'PM6-D3H4X', 'PMEP', 'PM7',
+               'PM7-TS', 'RM1']
+
+    def __init__(self, restart=None, ignore_bad_restart_file=False,
+                 label='mopac', atoms=None, **kwargs):
+        """Construct MOPAC-calculator object.
+
+        Parameters
+        ==========
+        label: str
+            Prefix for filenames (label.mop, label.out, ...)
+
+        Examples
+        ========
+        Use default values to do a single SCF calculation and print
+        the forces (task='1SCF GRADIENTS')
+
+        >>> from ase.build import molecule
+        >>> from ase.calculators.mopac import MOPAC
+        >>> atoms = molecule('O2')
+        >>> atoms.calc = MOPAC(label='O2')
+        >>> atoms.get_potential_energy()
+        >>> eigs = atoms.calc.get_eigenvalues()
+        >>> somos = atoms.calc.get_somo_levels()
+        >>> homo, lumo = atoms.calc.get_homo_lumo_levels()
+
+        Use the internal geometry optimization of Mopac
+        >>> atoms = molecule('H2')
+        >>> atoms.calc = MOPAC(label='H2', task='GRADIENTS')
+        >>> atoms.get_potential_energy()
+
+        Read in and start from output file
+        >>> atoms = MOPAC.read_atoms('H2')
+        >>> atoms.calc.get_homo_lumo_levels()
+
+        """
+        FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
+                                  label, atoms, **kwargs)
+
     def set(self, **kwargs):
-        """
-        Sets the parameters on the according keywords
-        Raises RuntimeError when wrong keyword is provided
-        """
-        for key in kwargs:
-            if key in self.bool_params:
-                self.bool_params[key] = kwargs[key]
-            elif key in self.int_params:
-                self.int_params[key] = kwargs[key]
-            elif key in self.str_params:
-                self.str_params[key] = kwargs[key]
-            elif key in self.float_params:
-                self.float_params[key] = kwargs[key]
-            else:
-                raise RuntimeError('MOPAC calculator: unknown keyword: ' + key)
+        changed_parameters = FileIOCalculator.set(self, **kwargs)
+        if changed_parameters:
+            self.reset()
 
-    def get_version(self):
-        return self.version
+    def write_input(self, atoms, properties=None, system_changes=None):
+        FileIOCalculator.write_input(self, atoms, properties, system_changes)
+        p = self.parameters
 
-    def initialize(self, atoms):
-        pass
+        # Build string to hold .mop input file:
+        s = p.method + ' ' + p.task + ' '
 
-    def write_input(self, fname, atoms):
-        """
-        Writes the files that have to be written each timestep
-        """
-        
-        # start the input
-        mopac_input = ''
+        if p.relscf:
+            s += 'RELSCF={0} '.format(p.relscf)
 
-        #write functional and job_type
-        for key in 'functional', 'job_type':
-            if self.str_params[key] != None:
-                mopac_input += self.str_params[key] + ' '
-                
-        if self.float_params['RELSCF'] != None:
-            mopac_input += 'RELSCF=' + str(self.float_params['RELSCF']) + ' '
-            
-        #write charge
-        charge = sum(atoms.get_initial_charges())
+        # Write charge:
+        charge = atoms.get_initial_charges().sum()
         if charge != 0:
-            mopac_input += 'CHARGE=%i ' % (charge)
-        
-        #write spin
-        spin = self.int_params['spin']
-        if spin == 1.:
-            mopac_input += 'DOUBLET '
-        elif spin == 2.:
-            mopac_input += 'TRIPLET '
+            s += 'CHARGE={0} '.format(int(round(charge)))
 
-        #input down
-        mopac_input += '\n'
-        mopac_input += 'Title: ASE job\n\n'
+        magmom = int(round(abs(atoms.get_initial_magnetic_moments().sum())))
+        if magmom:
+            s += (['DOUBLET', 'TRIPLET', 'QUARTET', 'QUINTET'][magmom - 1] +
+                  ' UHF ')
 
-        f = 1
-        # write coordinates
-        for iat in xrange(len(atoms)):
-            atom = atoms[iat]
-            xyz = atom.position
-            mopac_input += ' %2s' % atom.symbol
-            # write x, y, z
-            for idir in xrange(3):
-                mopac_input += '    %16.5f %i' % (xyz[idir], f)
-            mopac_input += '\n'
+        s += '\nTitle: ASE calculation\n\n'
 
-        if atoms.pbc.any():
-            for v in atoms.get_cell():
-                mopac_input += 'Tv %8.3f %8.3f %8.3f\n' % (v[0], v[1], v[2])
-        
-        # write input
-        myfile = open(fname, 'w')
-        myfile.write(mopac_input)
-        myfile.close()
+        # Write coordinates:
+        for xyz, symbol in zip(atoms.positions, atoms.get_chemical_symbols()):
+            s += ' {0:2} {1} 1 {2} 1 {3} 1\n'.format(symbol, *xyz)
 
-    def get_command(self):
-        """Return command string if program installed, otherwise None.  """
-        command = None
-        if self.str_params['command'] is not None:
-            command = self.str_params['command']
-        elif ('MOPAC_COMMAND' in os.environ):
-            command = os.environ['MOPAC_COMMAND']
-        return command
+        for v, p in zip(atoms.cell, atoms.pbc):
+            if p:
+                s += 'Tv {0} {1} {2}\n'.format(*v)
 
-    def run(self):
-        """
-        Writes input in label.mop
-        Runs MOPAC
-        Reads Version, Energy and Forces
-        """
-        # set the input file name
-        finput = self.label + '.mop'
-        foutput = self.label + '.out'
-        
-        self.write_input(finput, self.atoms)
+        with open(self.label + '.mop', 'w') as f:
+            f.write(s)
 
-        command = self.get_command()
-        if command is None:
-            raise RuntimeError('MOPAC command not specified')
-        
-        exitcode = os.system('%s %s' % (command, finput))
-        
-        if exitcode != 0:
-            raise RuntimeError('MOPAC exited with error code')
+    def get_spin_polarized(self):
+        return self.nspins == 2
 
-        self.version = self.read_version(foutput)
-
-        energy = self.read_energy(foutput)
-        self.energy_zero = energy
-        self.energy_free = energy
-        
-        self.forces = self.read_forces(foutput)
-
-    def read_version(self, fname):
-        """
-        Reads the MOPAC version string from the second line
-        """
-        version = 'unknown'
-        lines = open(fname).readlines()
-        for line in lines:
-            if "  Version" in line:
-                version = line.split()[-2]
-                break
-        return version
-
-    def read_energy(self, fname):
-        """
-        Reads the ENERGY from the output file (HEAT of FORMATION in kcal / mol)
-        Raises RuntimeError if no energy was found
-        """
-        outfile = open(fname)
-        lines = outfile.readlines()
-        outfile.close()
-
-        energy = None
-        for line in lines:
-            if line.find('HEAT OF FORMATION') != -1:
-                words = line.split()
-                energy = float(words[5])
-            if line.find('H.o.F. per unit cell') != -1:
-                words = line.split()
-                energy = float(words[5])
-            if line.find('UNABLE TO ACHIEVE SELF-CONSISTENCE') != -1:
-                energy = None
-        if energy is None:
-            raise RuntimeError('MOPAC: could not find total energy')
-        
-        energy *= (kcal / mol)
-        return energy
-
-    def read_forces(self, fname):
-        """
-        Reads the FORCES from the output file
-        search string: (HEAT of FORMATION in kcal / mol / AA)
-        """
-        outfile = open(fname)
-        lines = outfile.readlines()
-        outfile.close()
-
-        nats = len(self.atoms)
-        forces = np.zeros((nats, 3), float)
-        
+    def get_index(self, lines, pattern):
         for i, line in enumerate(lines):
-            if line.find('GRADIENT\n') != -1:
-                for j in range(nats * 3):
-                    gline = lines[i + j + 1]
-                    forces[j / 3, j % 3] = float(gline[49:62])
+            if line.find(pattern) != -1:
+                return i
+
+    def read(self, label):
+        FileIOCalculator.read(self, label)
+        if not os.path.isfile(self.label + '.out'):
+            raise ReadError
+
+        with open(self.label + '.out') as f:
+            lines = f.readlines()
+
+        self.parameters = Parameters(task='', method='')
+        p = self.parameters
+        parm_line = self.read_parameters_from_file(lines)
+        for keyword in parm_line.split():
+            if 'RELSCF' in keyword:
+                p.relscf = float(keyword.split('=')[-1])
+            elif keyword in self.methods:
+                p.method = keyword
+            else:
+                p.task += keyword + ' '
+
+        p.task.rstrip()
+        self.atoms = self.read_atoms_from_file(lines)
+        self.read_results()
+
+    def read_atoms_from_file(self, lines):
+        """Read the Atoms from the output file stored as list of str in lines.
+        Parameters:
+
+            lines: list of str
+        """
+        # first try to read from final point (last image)
+        i = self.get_index(lines, 'FINAL  POINT  AND  DERIVATIVES')
+        if i is None:  # XXX should we read it from the input file?
+            assert 0, 'Not implemented'
+
+        lines1 = lines[i:]
+        i = self.get_index(lines1, 'CARTESIAN COORDINATES')
+        j = i + 2
+        symbols = []
+        positions = []
+        while not lines1[j].isspace():  # continue until we hit a blank line
+            l = lines1[j].split()
+            symbols.append(l[1])
+            positions.append([float(c) for c in l[2: 2 + 3]])
+            j += 1
+
+        return Atoms(symbols=symbols, positions=positions)
+
+    def read_parameters_from_file(self, lines):
+        """Find and return the line that defines a Mopac calculation
+
+        Parameters:
+
+            lines: list of str
+        """
+        for i, line in enumerate(lines):
+            if line.find('CALCULATION DONE:') != -1:
                 break
-        
-        forces *= - (kcal / mol)
-        return forces
-        
-    def atoms_are_equal(self, atoms_new):
-        ''' (adopted from jacapo.py)
-        comparison of atoms to self.atoms using tolerances to account
-        for float/double differences and float math.
-        '''
-    
-        TOL = 1.0e-6  # angstroms
 
-        # check for change in cell parameters
-        test = len(atoms_new) == len(self.atoms)
-        if test is not True:
-            return False
-        
-        # check for change in cell parameters
-        test = (abs(self.atoms.get_cell() - atoms_new.get_cell()) <= TOL).all()
-        if test is not True:
-            return False
-        
-        old = self.atoms.arrays
-        new = atoms_new.arrays
-        
-        # check for change in atom position
-        test = (abs(new['positions'] - old['positions']) <= TOL).all()
-        if test is not True:
-            return False
-        
-        # passed all tests
-        return True
+        lines1 = lines[i:]
+        for i, line in enumerate(lines1):
+            if line.find('****') != -1:
+                return lines1[i + 1]
 
-    def update(self, atoms_new):
-        if not self.atoms_are_equal(atoms_new):
-            self.atoms = atoms_new.copy()
-            self.run()
+    def read_results(self):
+        """Read the results, such as energy, forces, eigenvalues, etc.
+        """
+        FileIOCalculator.read(self, self.label)
+        if not os.path.isfile(self.label + '.out'):
+            raise ReadError
+
+        with open(self.label + '.out') as f:
+            lines = f.readlines()
+
+        for i, line in enumerate(lines):
+            if line.find('TOTAL ENERGY') != -1:
+                self.results['energy'] = float(line.split()[3])
+            elif line.find('FINAL HEAT OF FORMATION') != -1:
+                self.final_hof = float(line.split()[5]) * kcal / mol
+            elif line.find('NO. OF FILLED LEVELS') != -1:
+                self.nspins = 1
+                self.no_occ_levels = int(line.split()[-1])
+            elif line.find('NO. OF ALPHA ELECTRON') != -1:
+                self.nspins = 2
+                self.no_alpha_electrons = int(line.split()[-1])
+                self.no_beta_electrons = int(lines[i+1].split()[-1])
+                self.results['magmom'] = abs(self.no_alpha_electrons -
+                                             self.no_beta_electrons)
+            elif line.find('FINAL  POINT  AND  DERIVATIVES') != -1:
+                forces = [-float(line.split()[6])
+                          for line in lines[i + 3:i + 3 + 3 * len(self.atoms)]]
+                self.results['forces'] = np.array(
+                    forces).reshape((-1, 3)) * kcal / mol
+            elif line.find('EIGENVALUES') != -1:
+                if line.find('ALPHA') != -1:
+                    j = i + 1
+                    eigs_alpha = []
+                    while not lines[j].isspace():
+                        eigs_alpha += [float(eps) for eps in lines[j].split()]
+                        j += 1
+                elif line.find('BETA') != -1:
+                    j = i + 1
+                    eigs_beta = []
+                    while not lines[j].isspace():
+                        eigs_beta += [float(eps) for eps in lines[j].split()]
+                        j += 1
+                    eigs = np.array([eigs_alpha, eigs_beta]).reshape(2, 1, -1)
+                    self.eigenvalues = eigs
+                else:
+                    eigs = []
+                    j = i + 1
+                    while not lines[j].isspace():
+                        eigs += [float(e) for e in lines[j].split()]
+                        j += 1
+                    self.eigenvalues = np.array(eigs).reshape(1, 1, -1)
+            elif line.find('DIPOLE   ') != -1:
+                self.results['dipole'] = np.array(
+                    lines[i + 3].split()[1:1 + 3], float) * Debye
+
+    def get_eigenvalues(self, kpt=0, spin=0):
+        return self.eigenvalues[spin, kpt]
+
+    def get_homo_lumo_levels(self):
+        eigs = self.eigenvalues
+        if self.nspins == 1:
+            nocc = self.no_occ_levels
+            return np.array([eigs[0, 0, nocc - 1], eigs[0, 0, nocc]])
+        else:
+            na = self.no_alpha_electrons
+            nb = self.no_beta_electrons
+            if na == 0:
+                return None, self.eigenvalues[1, 0, nb - 1]
+            elif nb == 0:
+                return self.eigenvalues[0, 0, na - 1], None
+            else:
+                eah, eal = eigs[0, 0, na - 1: na + 1]
+                ebh, ebl = eigs[1, 0, nb - 1: nb + 1]
+                return np.array([max(eah, ebh), min(eal, ebl)])
+
+    def get_somo_levels(self):
+        assert self.nspins == 2
+        na, nb = self.no_alpha_electrons, self.no_beta_electrons
+        if na == 0:
+            return None, self.eigenvalues[1, 0, nb - 1]
+        elif nb == 0:
+            return self.eigenvalues[0, 0, na - 1], None
+        else:
+            return np.array([self.eigenvalues[0, 0, na - 1],
+                             self.eigenvalues[1, 0, nb - 1]])
+
+    def get_final_heat_of_formation(self):
+        """Final heat of formation as reported in the Mopac output file
+        """
+        return self.final_hof

@@ -1,3 +1,4 @@
+from __future__ import print_function
 """This module defines an ASE interface to FLAPW code FLEUR.
 
 http://www.flapw.de
@@ -12,6 +13,7 @@ import re
 import numpy as np
 
 from ase.units import Hartree, Bohr
+from ase.calculators.calculator import PropertyNotImplementedError
 
 class FLEUR:
     """Class for doing FLEUR calculations.
@@ -110,8 +112,8 @@ class FLEUR:
         self.mixer = mixer
 
         if convergence:
-            self.convergence = convergence 
-            self.convergence['energy'] /= Hartree 
+            self.convergence = convergence
+            self.convergence['energy'] /= Hartree
         else:
             self.convergence = {'energy' : 0.0001}
 
@@ -148,7 +150,7 @@ class FLEUR:
         stat = p.wait()
         out = p.stdout.read()
         err = p.stderr.read()
-        print mode, ': stat= ', stat, ' out= ', out, ' err=', err
+        print(mode, ': stat= ', stat, ' out= ', out, ' err=', err)
         # special handling of exit status from density generation and regular fleur.x
         if mode in ['density']:
             if '!' in err:
@@ -254,11 +256,11 @@ class FLEUR:
         return np.array((0.0, 0.0, 0.0))
 
     def get_stress(self, atoms):
-        raise NotImplementedError
+        raise PropertyNotImplementedError
 
     def get_dipole_moment(self, atoms):
         """Returns total dipole moment of the system."""
-        raise NotImplementedError
+        raise PropertyNotImplementedError
 
     def calculate(self, atoms):
         """Converge a FLEUR calculation to self-consistency.
@@ -484,7 +486,7 @@ class FLEUR:
                                 r = float(rorig) + self.rmt[s] / Bohr
                             else:
                                 r = self.rmt[s] / Bohr
-                            print s, rorig, r
+                            print(s, rorig, r)
                             lines[ln] = lines[ln].replace(rorig, ("%.6f" % r))
 
         # write everything back to inp
@@ -534,7 +536,7 @@ class FLEUR:
             if m:
                 itmax = int(m.group(2))
                 self.niter += itmax
-                itmax_new = itmax / 2
+                itmax_new = itmax // 2
                 itmax = max(self.itmax_step, itmax_new)
                 line = 'itmax=%2d' % itmax + line[8:]
             fh.write(line)

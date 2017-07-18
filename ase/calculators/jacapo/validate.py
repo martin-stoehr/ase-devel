@@ -1,5 +1,9 @@
+from __future__ import print_function
 import os
 import numpy as np
+from ase.utils import basestring
+
+
 '''
 input validation module
 
@@ -20,7 +24,7 @@ def get_dacapopath():
 ### Validation functions
 ##########################################
 def valid_int(x):
-    if (isinstance(x, int) or isinstance(x,np.int32)):
+    if (isinstance(x, int) or isinstance(x, np.int32)):
         return True
 
 def valid_float(x):
@@ -34,7 +38,7 @@ def valid_boolean(x):
     return isinstance(x, bool)
 
 def valid_str(x):
-    return isinstance(x, str)
+    return isinstance(x, basestring)
 
 def valid_atoms(x):
     import ase
@@ -68,7 +72,7 @@ def valid_calculate_stress(x):
     return valid_boolean(x)
 
 def valid_kpts(x):
-    if isinstance(x, str):
+    if isinstance(x, basestring):
         return x in ['cc6_1x1',
                      'cc12_2x3',
                      'cc18_sq3xsq3',
@@ -123,7 +127,7 @@ def valid_pseudopotentials(x):
 
     dacapopath = get_dacapopath()
     if dacapopath is None:
-        raise Exception, 'No $DACAPOPATH found. please set it in .cshrc or .bashrc'
+        raise Exception('No $DACAPOPATH found. please set it in .cshrc or .bashrc')
 
     from ase.data import chemical_symbols
     for key in x:
@@ -175,23 +179,23 @@ def valid_ados(x):
                   'cutoff']
     for key in x:
         if key not in valid_keys:
-            print '%s not in %s' % (key, str(valid_keys))
+            print('%s not in %s' % (key, str(valid_keys)))
             return False
         if key == 'energywindow':
             if not len(x['energywindow']) == 2:
-                print '%s is bad' % key
+                print('%s is bad' % key)
                 return False
         if key == 'energywidth':
             if not valid_float(x['energywidth']):
-                print key, ' is bad'
+                print(key, ' is bad')
                 return False
         elif key == 'npoints':
             if not valid_int(x['npoints']):
-                print key, ' is bad'
+                print(key, ' is bad')
                 return False
         elif key == 'cutoff':
             if not valid_float(x['cutoff']):
-                print key, ' is bad'
+                print(key, ' is bad')
                 return False
     return True
 
@@ -205,14 +209,14 @@ def valid_decoupling(x):
             return False
         elif key == 'ngaussians':
             if not valid_int(x[key]):
-                print key
+                print(key)
                 return False
         elif key == 'ecutoff':
             if not valid_int_or_float(x[key]):
                 return False
         elif key == 'gausswidth':
             if not valid_float(x[key]):
-                print key, x[key]
+                print(key, x[key])
                 return False
     return True
 

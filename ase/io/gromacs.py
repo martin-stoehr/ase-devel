@@ -4,6 +4,7 @@ from __future__ import print_function
 
 from ase.atoms import Atoms
 from ase.parallel import paropen
+from ase.utils import basestring
 
 
 def read_gromacs(filename):
@@ -121,13 +122,13 @@ def write_gromacs(fileobj, images):
 
     from ase import units
 
-    if isinstance(fileobj, str):
+    if isinstance(fileobj, basestring):
         fileobj = paropen(fileobj, 'w')
 
     if not isinstance(images, (list, tuple)):
         images = [images]
 
-    natoms = images[-1].get_number_of_atoms()
+    natoms = len(images[-1])
     try:
         gromacs_residuenames = images[-1].get_array('residuenames')
     except:
@@ -148,7 +149,7 @@ def write_gromacs(fileobj, images):
         vel = pos * 0.0
 
     fileobj.write('#A Gromacs structure file written by ASE \n')
-    fileobj.write('%5d \n' % images[-1].get_number_of_atoms())
+    fileobj.write('%5d \n' % len(images[-1]))
     count = 1
     for resname, atomtype, xyz, vxyz in zip\
             (gromacs_residuenames, gromacs_atomtypes, pos, vel):

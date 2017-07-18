@@ -3,6 +3,7 @@ import numpy as np
 import ase
 from ase.data import chemical_symbols
 from ase.parallel import paropen
+from ase.utils import basestring
 
 cfg_default_fields = np.array(['positions', 'momenta', 'numbers', 'magmoms'])
 
@@ -11,7 +12,7 @@ def write_cfg(f, a):
     """Write atomic configuration to a CFG-file (native AtomEye format).
        See: http://mt.seas.upenn.edu/Archive/Graphics/A/
     """
-    if isinstance(f, str):
+    if isinstance(f, basestring):
         f = paropen(f, 'w')
     if isinstance(a, list):
         if len(a) == 1:
@@ -21,7 +22,7 @@ def write_cfg(f, a):
 
     f.write('Number of particles = %i\n' % len(a))
     f.write('A = 1.0 Angstrom\n')
-    cell = a.get_cell()
+    cell = a.get_cell(complete=True)
     for i in range(3):
         for j in range(3):
             f.write('H0(%1.1i,%1.1i) = %f A\n' % (i + 1, j + 1, cell[i, j]))
@@ -118,7 +119,7 @@ def write_clr(f, atoms):
 
     radius.shape = (-1, 1)
 
-    if isinstance(f, str):
+    if isinstance(f, basestring):
         f = paropen(f, 'w')
     for c1, c2, c3, r in np.append(color, radius, axis=1):
         f.write('%f %f %f %f\n' % (c1, c2, c3, r))
@@ -128,7 +129,7 @@ def read_cfg(f):
     """Read atomic configuration from a CFG-file (native AtomEye format).
        See: http://mt.seas.upenn.edu/Archive/Graphics/A/
     """
-    if isinstance(f, str):
+    if isinstance(f, basestring):
         f = open(f)
 
     nat = None
@@ -150,6 +151,7 @@ def read_cfg(f):
         if len(l) != 0 and not l.startswith('#'):
             if l == '.NO_VELOCITY.':
                 vels = None
+                naux += 3
             else:
                 s = l.split('=')
                 if len(s) == 2:
@@ -167,7 +169,7 @@ def read_cfg(f):
                     elif key == 'A':
                         pass  # unit = float(value[0])
                     elif key == 'entry_count':
-                        naux = int(value[0]) - 3
+                        naux += int(value[0]) - 6
                         auxstrs = [''] * naux
                         if nat is not None:
                             aux = np.zeros([nat, naux])

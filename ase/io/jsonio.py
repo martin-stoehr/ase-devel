@@ -2,6 +2,7 @@ import datetime
 import json
 
 import numpy as np
+from ase.utils import basestring
 
 
 class MyEncoder(json.JSONEncoder):
@@ -11,6 +12,8 @@ class MyEncoder(json.JSONEncoder):
                 return {'__complex_ndarray__': (obj.real.tolist(),
                                                 obj.imag.tolist())}
             return obj.tolist()
+        if isinstance(obj, np.integer):
+            return int(obj)
         if isinstance(obj, datetime.datetime):
             return {'__datetime__': obj.isoformat()}
         if hasattr(obj, 'todict'):
@@ -39,8 +42,8 @@ def intkey(key):
         return int(key)
     except ValueError:
         return key
-    
-    
+
+
 def numpyfy(obj):
     if isinstance(obj, dict):
         return dict((intkey(key), numpyfy(value))
@@ -60,9 +63,9 @@ def numpyfy(obj):
 def decode(txt):
     return numpyfy(mydecode(txt))
 
-    
+
 def read_json(name):
-    if isinstance(name, str):
+    if isinstance(name, basestring):
         fd = open(name, 'r')
     else:
         fd = name

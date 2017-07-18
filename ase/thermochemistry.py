@@ -1,3 +1,4 @@
+from __future__ import print_function
 """Modules for calculating thermochemical information from computational
 outputs."""
 
@@ -6,43 +7,6 @@ import sys
 import numpy as np
 
 from ase import units
-
-
-def rotationalinertia(atoms):
-    """Calculates the three principle moments of inertia for an ASE atoms
-    object. This uses the atomic masses from ASE, which (if not explicitly
-    specified by the user) gives an inexact approximation of an isotopically
-    averaged result. Units are in amu*angstroms**2."""
-
-    # Calculate the center of mass.
-    xcm, ycm, zcm = atoms.get_center_of_mass()
-    masses = atoms.get_masses()
-
-    # Calculate moments of inertia in the current frame of reference.
-    Ixx = 0.
-    Iyy = 0.
-    Izz = 0.
-    Ixy = 0.
-    Ixz = 0.
-    Iyz = 0.
-    for index, atom in enumerate(atoms):
-        m = masses[index]
-        x = atom.x - xcm
-        y = atom.y - ycm
-        z = atom.z - zcm
-        Ixx += m * (y**2. + z**2.)
-        Iyy += m * (x**2. + z**2.)
-        Izz += m * (x**2. + y**2.)
-        Ixy += m * x * y
-        Ixz += m * x * z
-        Iyz += m * y * z
-    # Create the inertia tensor in the current frame of reference.
-    I_ = np.matrix([[ Ixx, -Ixy, -Ixz],
-                    [-Ixy,  Iyy, -Iyz],
-                    [-Ixz, -Iyz,  Izz]])
-    # Find the eigenvalues, which are the principle moments of inertia.
-    I = np.linalg.eigvals(I_)
-    return I
 
 
 class ThermoChem:
@@ -99,13 +63,13 @@ class HarmonicThermo(ThermoChem):
         adsorbate; i.e., 3*n, where n is the number of atoms. Note that
         this class does not check that the user has supplied the correct
         number of energies. Units of energies are eV.
-    electronicenergy : float
-        the electronic energy in eV
-        (if electronicenergy is unspecified, then the methods of this
+    potentialenergy : float
+        the potential energy in eV (e.g., from atoms.get_potential_energy)
+        (if potentialenergy is unspecified, then the methods of this
         class can be interpreted as the energy corrections)
     """
 
-    def __init__(self, vib_energies, electronicenergy=None):
+    def __init__(self, vib_energies, potentialenergy=0.):
         self.vib_energies = vib_energies
         # Check for imaginary frequencies.
         if sum(np.iscomplex(self.vib_energies)):
@@ -113,10 +77,7 @@ class HarmonicThermo(ThermoChem):
         else:
             self.vib_energies = np.real(self.vib_energies)  # clear +0.j
 
-        if electronicenergy:
-            self.electronicenergy = electronicenergy
-        else:
-            self.electronicenergy = 0.
+        self.potentialenergy = potentialenergy
 
     def get_internal_energy(self, temperature, verbose=True):
         """Returns the internal energy, in eV, in the harmonic approximation
@@ -130,8 +91,8 @@ class HarmonicThermo(ThermoChem):
 
         U = 0.
 
-        write(fmt % ('E_elec', self.electronicenergy))
-        U += self.electronicenergy
+        write(fmt % ('E_pot', self.potentialenergy))
+        U += self.potentialenergy
 
         zpe = self.get_ZPE_correction()
         write(fmt % ('E_ZPE', zpe))
@@ -168,8 +129,8 @@ class HarmonicThermo(ThermoChem):
         write('=' * 49)
         return S
 
-    def get_gibbs_energy(self, temperature, verbose=True):
-        """Returns the Gibbs free energy, in eV, in the harmonic
+    def get_helmholtz_energy(self, temperature, verbose=True):
+        """Returns the Helmholtz free energy, in eV, in the harmonic
         approximation at a specified temperature (K)."""
 
         self.verbose = True
@@ -178,7 +139,7 @@ class HarmonicThermo(ThermoChem):
         U = self.get_internal_energy(temperature, verbose=verbose)
         write('')
         S = self.get_entropy(temperature, verbose=verbose)
-        G = U - temperature * S
+        F = U - temperature * S
 
         write('')
         write('Free energy components at T = %.2f K:' % temperature)
@@ -187,18 +148,245 @@ class HarmonicThermo(ThermoChem):
         write(fmt % ('U', U))
         write(fmt % ('-T*S', -temperature * S))
         write('-' * 23)
-        write(fmt % ('G', G))
+        write(fmt % ('F', F))
         write('=' * 23)
-        return G
+        return F
 
-    def get_free_energy(self, temperature, verbose=True):
-        """Deprecated: use 'get_gibbs_energy' instead."""
-        import warnings
-        warnings.warn('get_free_energy is deprecated. Please use '
-                      'get_gibbs_energy instead.',
-                      DeprecationWarning, stacklevel=2)
-        G = self.get_gibbs_energy(temperature, verbose)
-        return G
+
+class HinderedThermo(ThermoChem):
+    """Class for calculating thermodynamic properties in the hindered
+    translator and hindered rotor model where all but three degrees of
+    freedom are treated as harmonic vibrations, two are treated as
+    hindered translations, and one is treated as a hindered rotation.
+
+    Inputs:
+
+    vib_energies : list
+        a list of all the vibrational energies of the adsorbate (e.g., from
+        ase.vibrations.Vibrations.get_energies). The number of energies
+        should match the number of degrees of freedom of the adsorbate;
+        i.e., 3*n, where n is the number of atoms. Note that this class does
+        not check that the user has supplied the correct number of energies.
+        Units of energies are eV.
+    trans_barrier_energy : float
+        the translational energy barrier in eV. This is the barrier for an
+        adsorbate to diffuse on the surface.
+    rot_barrier_energy : float
+        the rotational energy barrier in eV. This is the barrier for an
+        adsorbate to rotate about an axis perpendicular to the surface.
+    sitedensity : float
+        density of surface sites in cm^-2
+    rotationalminima : integer
+        the number of equivalent minima for an adsorabte's full rotation.
+    potentialenergy : float
+        the potential energy in eV (e.g., from atoms.get_potential_energy)
+        (if potentialenergy is unspecified, then the methods of this class
+        can be interpreted as the energy corrections)
+        For example, 6 for an adsorbate on an fcc(111) top site
+    mass : float
+        the mass of the adsorbate in amu (if mass is unspecified, then it will
+        be calculated from the atoms class)
+    inertia : float
+        the reduced moment of inertia of the adsorbate in amu*Ang^-2
+        (if inertia is unspecified, then it will be calculated from the
+        atoms class)
+    atoms : an ASE atoms object
+        used to calculate rotational moments of inertia and molecular mass
+    symmetrynumber : integer
+        symmetry number of the adsorbate. This is the number of symmetric arms
+        of the adsorbate and depends upon how it is bound to the surface.
+        For example, propane bound through its end carbon has a symmetry
+        number of 1 but propane bound through its middle carbon has a symmetry
+        number of 2. (if symmetrynumber is unspecified, then the default is 1)
+    """
+
+    def __init__(self, vib_energies, trans_barrier_energy, rot_barrier_energy,
+                 sitedensity, rotationalminima, potentialenergy=0.,
+                 mass=None, inertia=None, atoms=None, symmetrynumber=1):
+        self.vib_energies = sorted(vib_energies, reverse=True)[:-3]
+        self.trans_barrier_energy = trans_barrier_energy * units._e
+        self.rot_barrier_energy = rot_barrier_energy * units._e
+        self.area = 1. / sitedensity / 100.0**2
+        self.rotationalminima = rotationalminima
+        self.potentialenergy = potentialenergy
+        self.atoms = atoms
+        self.symmetry = symmetrynumber
+
+        if (mass or atoms) and (inertia or atoms):
+            if mass:
+                self.mass = mass * units._amu
+            elif atoms:
+                self.mass = np.sum(atoms.get_masses()) * units._amu
+            if inertia:
+                self.inertia = inertia * units._amu / units.m**2
+            elif atoms:
+                self.inertia = (atoms.get_moments_of_inertia()[2] *
+                                units._amu / units.m**2)
+        else:
+            raise RuntimeError('Either mass and inertia of the '
+                               'adsorbate must be specified or '
+                               'atoms must be specified.')
+
+        # Make sure no imaginary frequencies remain.
+        if sum(np.iscomplex(self.vib_energies)):
+            raise ValueError('Imaginary frequencies are present.')
+        else:
+            self.vib_energies = np.real(self.vib_energies)  # clear +0.j
+
+        # Calculate hindered translational and rotational frequencies
+        self.freq_t = np.sqrt(self.trans_barrier_energy / (2 * self.mass *
+                                                           self.area))
+        self.freq_r = 1. / (2 * np.pi) * np.sqrt(self.rotationalminima**2 *
+                                                 self.rot_barrier_energy /
+                                                 (2 * self.inertia))
+
+    def get_internal_energy(self, temperature, verbose=True):
+        """Returns the internal energy (including the zero point energy),
+        in eV, in the hindered translator and hindered rotor model at a
+        specified temperature (K)."""
+
+        from scipy.special import iv
+
+        self.verbose = verbose
+        write = self._vprint
+        fmt = '%-15s%13.3f eV'
+        write('Internal energy components at T = %.2f K:' % temperature)
+        write('=' * 31)
+
+        U = 0.
+
+        write(fmt % ('E_pot', self.potentialenergy))
+        U += self.potentialenergy
+
+        # Translational Energy
+        T_t = units._k * temperature / (units._hplanck * self.freq_t)
+        R_t = self.trans_barrier_energy / (units._hplanck * self.freq_t)
+        dU_t = 2 * (-1. / 2 - 1. / T_t / (2 + 16 * R_t) + R_t / 2 / T_t -
+                    R_t / 2 / T_t *
+                    iv(1, R_t / 2 / T_t) / iv(0, R_t / 2 / T_t) +
+                    1. / T_t / (np.exp(1. / T_t) - 1))
+        dU_t *= units.kB * temperature
+        write(fmt % ('E_trans', dU_t))
+        U += dU_t
+
+        # Rotational Energy
+        T_r = units._k * temperature / (units._hplanck * self.freq_r)
+        R_r = self.rot_barrier_energy / (units._hplanck * self.freq_r)
+        dU_r = (-1. / 2 - 1. / T_r / (2 + 16 * R_r) + R_r / 2 / T_r -
+                R_r / 2 / T_r *
+                iv(1, R_r / 2 / T_r) / iv(0, R_r / 2 / T_r) +
+                1. / T_r / (np.exp(1. / T_r) - 1))
+        dU_r *= units.kB * temperature
+        write(fmt % ('E_rot', dU_r))
+        U += dU_r
+
+        # Vibrational Energy
+        dU_v = self._vibrational_energy_contribution(temperature)
+        write(fmt % ('E_vib', dU_v))
+        U += dU_v
+
+        # Zero Point Energy
+        dU_zpe = self.get_zero_point_energy()
+        write(fmt % ('E_ZPE', dU_zpe))
+        U += dU_zpe
+
+        write('-' * 31)
+        write(fmt % ('U', U))
+        write('=' * 31)
+        return U
+
+    def get_zero_point_energy(self, verbose=True):
+        """Returns the zero point energy, in eV, in the hindered
+        translator and hindered rotor model"""
+
+        zpe_t = 2 * (1. / 2 * self.freq_t * units._hplanck / units._e)
+        zpe_r = 1. / 2 * self.freq_r * units._hplanck / units._e
+        zpe_v = self.get_ZPE_correction()
+        zpe = zpe_t + zpe_r + zpe_v
+        return zpe
+
+    def get_entropy(self, temperature, verbose=True):
+        """Returns the entropy, in eV/K, in the hindered translator
+        and hindered rotor model at a specified temperature (K)."""
+
+        from scipy.special import iv
+
+        self.verbose = verbose
+        write = self._vprint
+        fmt = '%-15s%13.7f eV/K%13.3f eV'
+        write('Entropy components at T = %.2f K:' % temperature)
+        write('=' * 49)
+        write('%15s%13s     %13s' % ('', 'S', 'T*S'))
+
+        S = 0.
+
+        # Translational Entropy
+        T_t = units._k * temperature / (units._hplanck * self.freq_t)
+        R_t = self.trans_barrier_energy / (units._hplanck * self.freq_t)
+        S_t = 2 * (-1. / 2 + 1. / 2 * np.log(np.pi * R_t / T_t) -
+                   R_t / 2 / T_t *
+                   iv(1, R_t / 2 / T_t) / iv(0, R_t / 2 / T_t) +
+                   np.log(iv(0, R_t / 2 / T_t)) +
+                   1. / T_t / (np.exp(1. / T_t) - 1) -
+                   np.log(1 - np.exp(-1. / T_t)))
+        S_t *= units.kB
+        write(fmt % ('S_trans', S_t, S_t * temperature))
+        S += S_t
+
+        # Rotational Entropy
+        T_r = units._k * temperature / (units._hplanck * self.freq_r)
+        R_r = self.rot_barrier_energy / (units._hplanck * self.freq_r)
+        S_r = (-1. / 2 + 1. / 2 * np.log(np.pi * R_r / T_r) -
+               np.log(self.symmetry) -
+               R_r / 2 / T_r * iv(1, R_r / 2 / T_r) / iv(0, R_r / 2 / T_r) +
+               np.log(iv(0, R_r / 2 / T_r)) +
+               1. / T_r / (np.exp(1. / T_r) - 1) -
+               np.log(1 - np.exp(-1. / T_r)))
+        S_r *= units.kB
+        write(fmt % ('S_rot', S_r, S_r * temperature))
+        S += S_r
+
+        # Vibrational Entropy
+        S_v = self._vibrational_entropy_contribution(temperature)
+        write(fmt % ('S_vib', S_v, S_v * temperature))
+        S += S_v
+
+        # Concentration Related Entropy
+        N_over_A = np.exp(1. / 3) * (10.0**5 /
+                                     (units._k * temperature))**(2. / 3)
+        S_c = 1 - np.log(N_over_A) - np.log(self.area)
+        S_c *= units.kB
+        write(fmt % ('S_con', S_c, S_c * temperature))
+        S += S_c
+
+        write('-' * 49)
+        write(fmt % ('S', S, S * temperature))
+        write('=' * 49)
+        return S
+
+    def get_helmholtz_energy(self, temperature, verbose=True):
+        """Returns the Helmholtz free energy, in eV, in the hindered
+        translator and hindered rotor model at a specified temperature
+        (K)."""
+
+        self.verbose = True
+        write = self._vprint
+
+        U = self.get_internal_energy(temperature, verbose=verbose)
+        write('')
+        S = self.get_entropy(temperature, verbose=verbose)
+        F = U - temperature * S
+
+        write('')
+        write('Free energy components at T = %.2f K:' % temperature)
+        write('=' * 23)
+        fmt = '%5s%15.3f eV'
+        write(fmt % ('U', U))
+        write(fmt % ('-T*S', -temperature * S))
+        write('-' * 23)
+        write(fmt % ('F', F))
+        write('=' * 23)
+        return F
 
 
 class IdealGasThermo(ThermoChem):
@@ -217,18 +405,17 @@ class IdealGasThermo(ThermoChem):
         unspecified, then uses the entire list. Units are eV.
     geometry : 'monatomic', 'linear', or 'nonlinear'
         geometry of the molecule
-    electronicenergy : float
-        the electronic energy in eV
-        (if electronicenergy is unspecified, then the methods of this
-        class can be interpreted as the enthalpy and free energy
-        corrections)
+    potentialenergy : float
+        the potential energy in eV (e.g., from atoms.get_potential_energy)
+        (if potentialenergy is unspecified, then the methods of this
+        class can be interpreted as the energy corrections)
     natoms : integer
         the number of atoms, used along with 'geometry' to determine how
         many vibrations to use. (Not needed if an atoms object is supplied
         in 'atoms' or if the user desires the entire list of vibrations
         to be used.)
 
-    Extra inputs needed for for entropy / free energy calculations:
+    Extra inputs needed for entropy / free energy calculations:
 
     atoms : an ASE atoms object
         used to calculate rotational moments of inertia and molecular mass
@@ -242,17 +429,14 @@ class IdealGasThermo(ThermoChem):
         1.0 for a triplet with two unpaired electrons, such as O_2.)
     """
 
-    def __init__(self, vib_energies, geometry, electronicenergy=None,
+    def __init__(self, vib_energies, geometry, potentialenergy=0.,
                  atoms=None, symmetrynumber=None, spin=None, natoms=None):
-        if electronicenergy == None:
-            self.electronicenergy = 0.
-        else:
-            self.electronicenergy = electronicenergy
+        self.potentialenergy = potentialenergy
         self.geometry = geometry
         self.atoms = atoms
         self.sigma = symmetrynumber
         self.spin = spin
-        if natoms == None:
+        if natoms is None:
             if atoms:
                 natoms = len(atoms)
         # Cut the vibrations to those needed from the geometry.
@@ -284,8 +468,8 @@ class IdealGasThermo(ThermoChem):
 
         H = 0.
 
-        write(fmt % ('E_elec', self.electronicenergy))
-        H += self.electronicenergy
+        write(fmt % ('E_pot', self.potentialenergy))
+        H += self.potentialenergy
 
         zpe = self.get_ZPE_correction()
         write(fmt % ('E_ZPE', zpe))
@@ -321,7 +505,7 @@ class IdealGasThermo(ThermoChem):
         """Returns the entropy, in eV/K, in the ideal gas approximation
         at a specified temperature (K) and pressure (Pa)."""
 
-        if self.atoms == None or self.sigma == None or self.spin == None:
+        if self.atoms is None or self.sigma is None or self.spin is None:
             raise RuntimeError('atoms, symmetrynumber, and spin must be '
                                'specified for entropy and free energy '
                                'calculations.')
@@ -329,7 +513,7 @@ class IdealGasThermo(ThermoChem):
         write = self._vprint
         fmt = '%-15s%13.7f eV/K%13.3f eV'
         write('Entropy components at T = %.2f K and P = %.1f Pa:' %
-               (temperature, pressure))
+              (temperature, pressure))
         write('=' * 49)
         write('%15s%13s     %13s' % ('', 'S', 'T*S'))
 
@@ -348,14 +532,14 @@ class IdealGasThermo(ThermoChem):
         if self.geometry == 'monatomic':
             S_r = 0.0
         elif self.geometry == 'nonlinear':
-            inertias = (rotationalinertia(self.atoms) * units._amu /
+            inertias = (self.atoms.get_moments_of_inertia() * units._amu /
                         (10.0**10)**2)  # kg m^2
             S_r = np.sqrt(np.pi * np.product(inertias)) / self.sigma
             S_r *= (8.0 * np.pi**2 * units._k * temperature /
                     units._hplanck**2)**(3.0 / 2.0)
             S_r = units.kB * (np.log(S_r) + 3.0 / 2.0)
         elif self.geometry == 'linear':
-            inertias = (rotationalinertia(self.atoms) * units._amu /
+            inertias = (self.atoms.get_moments_of_inertia() * units._amu /
                         (10.0**10)**2)  # kg m^2
             inertia = max(inertias)  # should be two identical and one zero
             S_r = (8 * np.pi**2 * inertia * units._k * temperature /
@@ -398,7 +582,7 @@ class IdealGasThermo(ThermoChem):
 
         write('')
         write('Free energy components at T = %.2f K and P = %.1f Pa:' %
-               (temperature, pressure))
+              (temperature, pressure))
         write('=' * 23)
         fmt = '%5s%15.3f eV'
         write(fmt % ('H', H))
@@ -406,15 +590,6 @@ class IdealGasThermo(ThermoChem):
         write('-' * 23)
         write(fmt % ('G', G))
         write('=' * 23)
-        return G
-
-    def get_free_energy(self, temperature, pressure, verbose=True):
-        """Deprecated: use 'get_gibbs_energy' instead."""
-        import warnings
-        warnings.warn('get_free_energy is deprecated. Please use '
-                      'get_gibbs_energy instead.',
-                      DeprecationWarning, stacklevel=2)
-        G = self.get_gibbs_energy(temperature, pressure, verbose)
         return G
 
 
@@ -439,10 +614,10 @@ class CrystalThermo(ThermoChem):
         zero-valued it will be deleted along with the first element of
         phonon_DOS. Units of vibrational energies are eV.
 
-    electronicenergy : float
-        the electronic energy in eV
-        (if electronicenergy is unspecified, then the methods of this
-        class can be interpreted as the phonon energy corrections.)
+    potentialenergy : float
+        the potential energy in eV (e.g., from atoms.get_potential_energy)
+        (if potentialenergy is unspecified, then the methods of this
+        class can be interpreted as the energy corrections)
 
     formula_units : int
         the number of formula units per unit cell. If unspecified, the
@@ -451,22 +626,16 @@ class CrystalThermo(ThermoChem):
     """
 
     def __init__(self, phonon_DOS, phonon_energies,
-                 formula_units=None, electronicenergy=None):
+                 formula_units=None, potentialenergy=0.):
         self.phonon_energies = phonon_energies
         self.phonon_DOS = phonon_DOS
 
         if formula_units:
             self.formula_units = formula_units
-            if electronicenergy:
-                self.electronicenergy = electronicenergy / formula_units
-            else:
-                self. electronicenergy = electronicenergy
+            self.potentialenergy = potentialenergy / formula_units
         else:
             self.formula_units = 0
-            if electronicenergy:
-                self.electronicenergy = electronicenergy
-            else:
-                self.electronicenergy = 0
+            self.potentialenergy = potentialenergy
 
     def get_internal_energy(self, temperature, verbose=True):
         """Returns the internal energy, in eV, of crystalline solid
@@ -491,8 +660,8 @@ class CrystalThermo(ThermoChem):
             omega_e = np.delete(omega_e, 0)
             dos_e = np.delete(dos_e, 0)
 
-        write(fmt % ('E_elec', self.electronicenergy))
-        U += self.electronicenergy
+        write(fmt % ('E_pot', self.potentialenergy))
+        U += self.potentialenergy
 
         zpe_list = omega_e / 2.
         if self.formula_units == 0:
@@ -539,8 +708,8 @@ class CrystalThermo(ThermoChem):
             dos_e = np.delete(dos_e, 0)
 
         B = 1. / (units.kB * temperature)
-        S_vib = (omega_e / (temperature * (np.exp(omega_e * B) - 1.))
-                 - units.kB * np.log(1. - np.exp(-omega_e * B)))
+        S_vib = (omega_e / (temperature * (np.exp(omega_e * B) - 1.)) -
+                 units.kB * np.log(1. - np.exp(-omega_e * B)))
         if self.formula_units == 0:
             S = np.trapz(S_vib * dos_e, omega_e)
         else:

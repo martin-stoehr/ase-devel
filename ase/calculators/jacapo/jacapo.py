@@ -1,3 +1,4 @@
+from __future__ import print_function
 '''
 python module for ASE2-free and Numeric-free dacapo
 
@@ -20,9 +21,11 @@ import exceptions, glob, os, pickle, string
 from Scientific.IO.NetCDF import NetCDFFile as netCDF
 import numpy as np
 import subprocess as sp
+from ase.calculators.calculator import PropertyNotImplementedError
+from ase.utils import basestring
 
-import validate
-import changed
+from . import validate
+from . import changed
 
 try:
     from uuid import uuid1
@@ -37,6 +40,8 @@ except ImportError: #probably an old python before 2.5
 
 import logging
 log = logging.getLogger('Jacapo')
+
+import ase.dft.kpoints
 
 handler = logging.StreamHandler()
 if sys.version_info < (2,5): # no funcName in python 2.4
@@ -298,10 +303,9 @@ class Jacapo:
         if len(kwargs) > 0:
 
             if 'stress' in kwargs:
-                raise DacapoInput, '''\
-                stress keyword is deprecated.
-                you must use calculate_stress instead'''
-
+                raise DacapoInput('stress keyword is deprecated. '
+                                  'you must use calculate_stress instead')
+                
             #make sure to set calculator on atoms if it was in kwargs
             #and do this first, since some parameters need info from atoms
             if 'atoms' in kwargs:
@@ -338,30 +342,30 @@ class Jacapo:
 
         if 'DACAPO_NOSET' in os.environ:
             #it is probably a bug that this is detected so we raise an exception
-            raise Exception, 'DACAPO_NOSET detected, nothing is being set'
+            raise Exception('DACAPO_NOSET detected, nothing is being set')
 
 
         for key in kwargs:
             if key not in self.default_input:
-                raise DacapoInput, '%s is not valid input' % key
+                raise DacapoInput('%s is not valid input' % key)
 
             if kwargs[key] is None:
                 continue
 
             #now check for valid input
-            validf = 'validate.valid_%s' % key
-            valid = eval('%s(kwargs[key])' % validf)
+            validf = getattr(validate, 'valid_%s' % key)
+            valid = validf(kwargs[key])
             if not valid:
                 s = 'Warning invalid input detected for key "%s" %s'
                 log.warn(s % (key,
                               kwargs[key]))
-                raise DacapoInput, s % (key, kwargs[key])
+                raise DacapoInput(s % (key, kwargs[key]))
 
             #now see if key has changed
             if key in self.pars:
-                changef = 'changed.%s_changed' % key
+                changef = getattr(changed, '%s_changed' % key)
                 if os.path.exists(self.get_nc()):
-                    notchanged = not eval('%s(self,kwargs[key])' % changef)
+                    notchanged = not changef(self, kwargs[key])
                 else:
                     notchanged = False
                 log.debug('%s notchanged = %s' % (key, notchanged))
@@ -391,7 +395,7 @@ class Jacapo:
         log.debug(self.pars)
 
         if 'DACAPO_READONLY' in os.environ:
-            raise Exception, 'DACAPO_READONLY set and you tried to write!'
+            raise Exception('DACAPO_READONLY set and you tried to write!')
 
         if self.ready:
             log.debug('self.ready = %s' % self.ready)
@@ -403,7 +407,8 @@ class Jacapo:
         # functions.
         for key in self.pars:
             if self.pars_uptodate[key] is False:
-                setf = 'set_%s' % key
+                setf = getattr(self, 'set_%s' % key)
+                #setf = 'set_%s' % key
 
                 if self.pars[key] is None:
                     continue
@@ -413,9 +418,9 @@ class Jacapo:
                 log.debug('key = %s' % str(self.pars[key]))
 
                 if isinstance(self.pars[key], dict):
-                    eval('self.%s(**self.pars[key])' % setf)
+                    setf(**self.pars[key])
                 else:
-                    eval('self.%s(self.pars[key])' % setf)
+                    setf(self.pars[key])
 
                 self.pars_uptodate[key] = True #update the changed flag
 
@@ -433,9 +438,9 @@ class Jacapo:
         log.debug('Updating parameters')
 
         for key in self.default_input:
-            getf = 'self.get_%s()' % key
+            getf = getattr(self, 'get_%s' % key)
             log.debug('getting key: %s' % key)
-            self.pars[key] = eval(getf)
+            self.pars[key] = getf()
             self.pars_uptodate[key] = True
         return self.pars
 
@@ -674,11 +679,11 @@ class Jacapo:
         '''
 
         if xc == 'PW91' or xc is None:
-            from pw91_psp import defaultpseudopotentials
+            from .pw91_psp import defaultpseudopotentials
         else:
             log.warn('PW91 pseudopotentials are being used!')
             #todo build other xc psp databases
-            from pw91_psp import defaultpseudopotentials
+            from .pw91_psp import defaultpseudopotentials
 
         self.psp = defaultpseudopotentials
 
@@ -770,7 +775,7 @@ class Jacapo:
         The function checks to make sure it is not less than the
         planewave cutoff.
 
-        Density_WaveCutoff describes the kinetic energy neccesary to
+        Density_WaveCutoff describes the kinetic energy necessary to
         represent a wavefunction associated with the total density,
         i.e. G-vectors for which $\vert G\vert^2$ $<$
         4*Density_WaveCutoff will be used to describe the total
@@ -924,9 +929,8 @@ than density cutoff %i' % (pw, dw))
         '''
 
         #chadi-cohen
-        if isinstance(kpts, str):
-            exec('from ase.dft.kpoints import %s' % kpts)
-            listofkpts = eval(kpts)
+        if isinstance(kpts, basestring):
+            listofkpts = getattr(ase.dft.kpoints, kpts)
             gridtype = kpts #stored in ncfile
             #uc = self.get_atoms().get_cell()
             #listofkpts = np.dot(ccgrid,np.linalg.inv(uc.T))
@@ -1236,7 +1240,7 @@ than density cutoff %i' % (pw, dw))
                 os.makedirs(base)
             status = os.system("cp '%s' '%s'" % (self.nc, nc))
             if status != 0:
-                raise Exception, 'Copying ncfile failed.'
+                raise Exception('Copying ncfile failed.')
             self.nc = nc
 
         elif os.path.exists(nc):
@@ -1299,7 +1303,7 @@ than density cutoff %i' % (pw, dw))
         elif (sym is not None and z is None):
             pass
         else:
-            raise Exception, 'You can only specify Z or sym!'
+            raise Exception('You can only specify Z or sym!')
 
         if not hasattr(self, 'psp'):
             self.set_psp_database()
@@ -1354,7 +1358,7 @@ than density cutoff %i' % (pw, dw))
         elif sym == 'Maximum':
             return True
         else:
-            raise Exception, 'Type of symmetry not recognized: %s' % sym
+            raise Exception('Type of symmetry not recognized: %s' % sym)
 
     def set_symmetry(self, val=False):
         '''set how symmetry is used to reduce k-points
@@ -1432,7 +1436,7 @@ than density cutoff %i' % (pw, dw))
         nc.close()
 
     def get_extracharge(self):
-        'Return the extra charge set in teh calculator'
+        'Return the extra charge set in the calculator'
 
         nc = netCDF(self.get_nc(), 'r')
         if 'ExtraCharge' in nc.variables:
@@ -1444,7 +1448,7 @@ than density cutoff %i' % (pw, dw))
         return exchg
 
     def get_extpot(self):
-        'return the external potential set in teh calculator'
+        'return the external potential set in the calculator'
 
         nc = netCDF(self.get_nc(), 'r')
         if 'ExternalPotential' in nc.variables:
@@ -1757,7 +1761,8 @@ than density cutoff %i' % (pw, dw))
             mdos['energywidth'] = v.EnergyWidth
             mdos['numberenergypoints'] = v.NumberEnergyPoints
             mdos['cutoffradius'] = v.CutoffRadius
-            mdos['mcenters'] = eval(v.mcenters)
+            # XXXXX avoid eval()
+            #mdos['mcenters'] = eval(v.mcenters)
 
         nc.close()
 
@@ -2262,7 +2267,7 @@ than density cutoff %i' % (pw, dw))
 
         if (isinstance(pw, int)
             or isinstance(pw, float)
-            or isinstance(pw,np.int32)):
+            or isinstance(pw, np.int32)):
             return pw
         elif pw is None:
             return None
@@ -2369,7 +2374,7 @@ than density cutoff %i' % (pw, dw))
             if self.atoms is None:
                 return None
             atoms = self.atoms.copy()
-            #it is not obvious the copy of atoms should have teh same
+            #it is not obvious the copy of atoms should have the same
             #calculator
             atoms.set_calculator(self)
         else:
@@ -2413,7 +2418,7 @@ than density cutoff %i' % (pw, dw))
         elif (sym is not None and z is None):
             pass
         else:
-            raise Exception, 'You can only specify Z or sym!'
+            raise Exception('You can only specify Z or sym!')
         psp = self.psp[sym]
         return psp
 
@@ -2504,9 +2509,10 @@ than density cutoff %i' % (pw, dw))
         nc.close()
 
         if stress == None:
-            raise NotImplementedError('For stress in Jacapo, first set '
-                                      'calculate_stress=True on '
-                                      'initialization.')
+            raise PropertyNotImplementedError(
+                'For stress in Jacapo, first set '
+                'calculate_stress=True on '
+                'initialization.')
 
         return stress
 
@@ -2537,13 +2543,13 @@ than density cutoff %i' % (pw, dw))
             f.close()
 
         else:
-            raise Exception, "%s does not exist" % fullpsp
+            raise Exception("%s does not exist" % fullpsp)
 
         return nvalence
 
     def get_psp_nuclear_charge(self, psp):
         '''
-        get the nuclear charge of the atom from teh psp-file.
+        get the nuclear charge of the atom from the psp-file.
 
         This is not the same as the atomic number, nor is it
         necessarily the negative of the number of valence electrons,
@@ -2590,7 +2596,7 @@ than density cutoff %i' % (pw, dw))
             f.close()
 
         else:
-            raise Exception, "%s does not exist" % fullpsp
+            raise Exception("%s does not exist" % fullpsp)
 
         return np.array(wwnlps).sum()
 
@@ -2646,7 +2652,7 @@ than density cutoff %i' % (pw, dw))
                 f.close()
                 totval += float(nvalence)
             else:
-                print "%s does not exist" % fullpsp
+                print("%s does not exist" % fullpsp)
                 totval = None
 
         return totval
@@ -2666,7 +2672,7 @@ than density cutoff %i' % (pw, dw))
         log.debug('running calculation_required')
 
         if self.nc is None:
-            raise Exception, 'No output ncfile specified!'
+            raise Exception('No output ncfile specified!')
 
         if atoms is not None:
             if not self.atoms_are_equal(atoms):
@@ -2733,9 +2739,9 @@ than density cutoff %i' % (pw, dw))
         username = getpass.getuser()
 
         scratch_dirs = []
-        if os.environ.has_key('SCRATCH'):
+        if 'SCRATCH' in os.environ:
             scratch_dirs.append(os.environ['SCRATCH'])
-        if os.environ.has_key('SCR'):
+        if 'SCR' in os.environ:
             scratch_dirs.append(os.environ['SCR'])
         scratch_dirs.append('/scratch/'+username)
         scratch_dirs.append('/scratch/')
@@ -2743,17 +2749,17 @@ than density cutoff %i' % (pw, dw))
         for scratch_dir in scratch_dirs:
             if os.access(scratch_dir, os.W_OK):
                 return scratch_dir
-        raise IOError, "No suitable scratch directory and no write access \
-        to current dir."
+        raise IOError("No suitable scratch directory and no write access \
+        to current dir.")
 
     def set_parent(self,parent):
         if hasattr(self,'children'):
-            raise RuntimeError,"Cannot create grandparents."
+            raise RuntimeError("Cannot create grandparents.")
         self.parent = parent
 
     def attach_child(self,child):
         if hasattr(self,'parent'):
-            raise RuntimeError,"Cannot create grandchildren!"
+            raise RuntimeError("Cannot create grandchildren!")
         if not hasattr(self,'children'):
             self.children = []
         self.children.append(child)
@@ -2769,8 +2775,8 @@ than density cutoff %i' % (pw, dw))
 
         #provide a way to make no calculation get run
         if os.environ.get('DACAPO_DRYRUN', None) is not None:
-            raise DacapoDryrun, '$DACAPO_DRYRUN detected, and a calculation \
-            attempted'
+            raise DacapoDryrun('$DACAPO_DRYRUN detected, and a calculation \
+            attempted')
 
         if hasattr(self,'children'):
                 # We are a parent and call execute_parent_calculation
@@ -2916,7 +2922,7 @@ than density cutoff %i' % (pw, dw))
             log.debug(cmd)
             self._dacapo[i] = sp.Popen(cmd,stdout=sp.PIPE,stderr=sp.PIPE,shell=True,env=env)
 
-        print 'now waiting for all children to finish'
+        print('now waiting for all children to finish')
         # now wait for all processes to finish
         for i,child in enumerate(self.children):
             status = self._dacapo[i].wait()
@@ -2951,7 +2957,7 @@ than density cutoff %i' % (pw, dw))
         import tempfile
 
         if hasattr(self, "_dacapo"):
-            msg = "Starting External Dynamics while Dacapo is runnning: %s"
+            msg = "Starting External Dynamics while Dacapo is running: %s"
             msg = msg % str(self._dacapo.poll())
             log.debug(msg)
         else:
@@ -2997,8 +3003,8 @@ than density cutoff %i' % (pw, dw))
                                                          # mourning
                                                          # dacapo.
             except timeout:
-                print '''Socket connection timed out.'''
-                print '''This usually means Dacapo crashed.'''
+                print('''Socket connection timed out.''')
+                print('''This usually means Dacapo crashed.''')
 
             # close the socket s
             self.s.close()
@@ -4216,7 +4222,7 @@ s.recv(14)
             self.calculate()
 
         if not hasattr(self, 'wannier'):
-            from utils.wannier import Wannier
+            from .utils.wannier import Wannier
             self.wannier = Wannier(self)
             self.wannier.set_bands(nbands)
             self.wannier.set_spin(spin)
@@ -4238,7 +4244,7 @@ s.recv(14)
             self.calculate()
 
         if not hasattr(self, 'wannier'):
-            from utils.wannier import Wannier
+            from .utils.wannier import Wannier
             self.wannier = Wannier(self)
 
         self.wannier.set_data(initialwannier)
@@ -4387,7 +4393,7 @@ s.recv(14)
 
         exc = exc_c + exc_e
 
-        if self.get_xc == 'RPBE':
+        if self.get_xc() == 'RPBE':
             EXC = exc[-1][-1]
 
         E0 = xc[1]    # Fx = 0
@@ -4422,7 +4428,7 @@ s.recv(14)
         # GetReciprocalBlochFunctionGrid
         wfrec = np.zeros((softgrid), np.complex)
 
-        for i in xrange(len(wflist)):
+        for i in range(len(wflist)):
             wfrec[recind[0, i]-1,
                   recind[1, i]-1,
                   recind[2, i]-1] = wflist[i]
@@ -4447,10 +4453,10 @@ s.recv(14)
         origin = np.array([0., 0., 0.])
         blochphase = phasefunction(origin)
         spatialshape = wf.shape[-len(basis):]
-        gridunitvectors = np.array(map(lambda unitvector,
+        gridunitvectors = np.array(list(map(lambda unitvector,
                                        shape:unitvector/shape,
                                        basis,
-                                       spatialshape))
+                                       spatialshape)))
 
         for dim in range(len(spatialshape)):
             # Multiplying with the phase at the origin
