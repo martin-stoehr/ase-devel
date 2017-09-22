@@ -13,7 +13,7 @@
 import numpy as np
 from CPA_recode import cpa_recode as CPA
 from os import listdir
-from box.data import data
+from hb_box_data import data
 
 
 class ext_CPA_wrapper:
