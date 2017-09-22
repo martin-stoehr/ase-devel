@@ -32,8 +32,8 @@ tnew = dcopy(text)
 for i, line in enumerate(text):
     if 'integer, optional,intent(in),check(len(filenames)>=n_files),depend(filenames) :: n_files=len(filenames)' in line:
         tnew[i] = '                integer intent(in) :: n_files\n'
-    elif 'character(len=*) dimension(n_files),intent(in) :: filenames' in line:
-        tnew[i] = '                character(len=*) dimension(n_files),intent(in),depend(n_files) :: filenames\n'
+#    elif 'character(len=*) dimension(n_files),intent(in) :: filenames' in line:
+#        tnew[i] = '                character(len=*) dimension(n_files),intent(in),depend(n_files) :: filenames\n'
     elif 'integer, optional,intent(in),check(len(wk)>=n_k_tot),depend(wk) :: n_k_tot=len(wk)' in line:
         tnew[i] = '                integer intent(in) :: n_k_tot\n'
     elif 'integer, optional,intent(in),check(len(orb2atom)>=n_basis),depend(orb2atom) :: n_basis=len(orb2atom)' in line:

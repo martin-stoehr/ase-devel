@@ -98,7 +98,7 @@ class dftdisp(Calculator):
 
     def get_potential_energy(self, atoms=None):
         self.update_properties(atoms)
-        return eval(self.sdch + 'sedc_energy')
+        return float(eval(self.sdch + 'sedc_energy'))
 
     def get_forces(self, atoms=None):
         self.update_properties(atoms)

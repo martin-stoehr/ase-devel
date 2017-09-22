@@ -124,7 +124,7 @@ class kSpace_MBD_calculator(Calculator):
     def get_potential_energy(self, atoms=None):
         """ Return dispersion energy as obtained by MBD calculation. """
         self.update_properties(atoms)
-        return self.E_MBD
+        return float(self.E_MBD)
         
     
     def get_forces(self, atoms=None):

@@ -185,6 +185,8 @@ grouping = {'0': physical_model,
             '4': fodft,
             '5': ungrouped}
 
+valid_hvr_approaches = ['HA', 'CPA', 'const']
+
 
 class Aims(FileIOCalculator):
     command = 'aims.version.serial.x > aims.out'
@@ -213,15 +215,14 @@ class Aims(FileIOCalculator):
         self.cubes = cubes
         self.tier = tier
         ## approach to (approximate) Hirshfeld rescaling (M. Stoehr)
-        self.hvr_approach = 'HA'
+        self.hvr_approach = None
         
     
-    def set_hvr_approach(self, approach='HA'):
+    def set_hvr_approach(self, approach):
         """
         change approach to rescaling ratios for effective polarizabilities
         by Martin Stoehr (martin.stoehr@tum.de), Oct 2015
         """
-        valid_hvr_approaches = ['HA', 'CPA', 'const']
         if approach in valid_hvr_approaches:
             self.hvr_approach = approach
         else:
@@ -285,6 +286,11 @@ class Aims(FileIOCalculator):
 
         # Sort the keywords for the control.in according to the
         # grouping-dictionary
+        if (self.hvr_approach == 'CPA'):
+            write_restart_args = ['restart_aims', 'restart_write_only']
+            if not any([wra in self.parameters.keys() for wra in write_restart_args]):
+                self.parameters['restart_write_only'] = 'wvfn.dat'
+        
         for i_sort in range(len(grouping)):
             output.write("#\n")
             for key, value in self.parameters.items():
@@ -314,19 +320,20 @@ class Aims(FileIOCalculator):
                             output.write(' %d' % order)
                         output.write('\n')
                     elif key == 'output':
-#                        if (self.hvr_approach == 'HA') and ('Hirshfeld' not in value):
-#                            print("You forgot to set output = 'Hirshfeld', my friend.")
-#                            print("Let me fix that for you...")
-#                            value.append('Hirshfeld')
-#                        elif (self.hvr_approach == 'CPA'):
-#                            if ('h_s_matrices' not in value):
-#                                print("You forgot to set output = 'h_s_matrices', my friend.")
-#                                print("Let me fix that for you...")
-#                                value.append('h_s_matrices')
-#                            if np.any(self.atoms.pbc) and ('k_point_list' not in value):
-#                                print("You forgot to set output = 'k_point_list', my friend.")
-#                                print("Let me fix that for you...")
-#                                value.append('k_point_list')
+                        if (self.hvr_approach == 'HA') and ('Hirshfeld' not in value):
+                            print("You forgot to add 'Hirshfeld' to output, mate.")
+                            print("Let me fix that for you...")
+                            value.append('Hirshfeld')
+                        elif (self.hvr_approach == 'CPA'):
+                            if ('h_s_matrices' not in value):
+                                print("You forgot to add 'h_s_matrices' to output, mate.")
+                                print("Let me fix that for you...")
+                                value.append('h_s_matrices')
+                            
+                            if np.any(self.atoms.pbc) and ('k_point_list' not in value):
+                                print("You're using PBC and forgot to add 'k_point_list' to output.")
+                                print("Let me fix that for you...")
+                                value.append('k_point_list')
                             
                         for output_type in value:     # parses entry if only one given!!
                             output.write('%-35s%s\n' % (key, output_type))
@@ -449,16 +456,37 @@ class Aims(FileIOCalculator):
             raise NotImplementedError
         return FileIOCalculator.get_forces(self, atoms)
 
-    def get_hirsh_volrat(self):
+    def get_hirsh_volrat(self, approach_tmp=None):
         atoms = self.atoms
-        if (self.hvr_approach == 'const'):
+        if ((not approach_tmp is None) and \
+            (approach_tmp in valid_hvr_approaches)):
+            hvr_model = approach_tmp
+        else:
+            hvr_model = self.hvr_approach
+        
+        if (hvr_model == 'const'):
             return np.array([1.,]*len(atoms))
-        elif (self.hvr_approach == 'CPA'):
-            if ('output' in self.parameters and
-                'h_s_matrices' not in self.parameters['output']):
-                    raise ValueError("Set output 'h_s_matrices' in order to use external charge population analysis!")
-            return self.get_hvr_CPA()
-        elif (self.hvr_approach == 'HA'):
+        elif (hvr_model == 'CPA'):
+            write_restart_args = ['restart_aims', 'restart_write_only']
+            correct_settings, restart_set_correct = False, False
+            for keystr in write_restart_args:
+                if keystr in self.parameters.keys():
+                    if (self.parameters[keystr] == 'wvfn.dat'):
+                        restart_set_correct = True
+                        break
+            
+            if ('output' in self.parameters.keys()):
+                basis_present = ('h_s_matrices' in self.parameters['output'])
+                correct_settings = basis_present
+                if np.any(self.atoms.pbc):
+                    k_list_present = ('k_point_list' in self.parameters['output'])
+                    correct_settings = correct_settings and k_list_present
+            
+            if ( correct_settings and restart_set_correct ):
+                return self.get_hvr_CPA()
+            else:
+                raise ValueError("Set either 'restart_aims' or 'restart_write_only' to 'wvfn.dat' in order to perform external charge population analysis!")
+        elif (hvr_model == 'HA'):
             if ('output' in self.parameters and
                 'hirshfeld' not in self.parameters['output']):
                     raise ValueError("Set output 'hirshfeld' in order to use results from Hirshfeld analysis!")
@@ -475,7 +503,7 @@ class Aims(FileIOCalculator):
         from ext_CPA_AIMS import ext_CPA_wrapper
         
         atoms = self.atoms
-        ext_CPA = ext_CPA_wrapper(atoms, basisfile="basis-indices.out", eigvfile='wvfn.dat')
+        ext_CPA = ext_CPA_wrapper(atoms, basisfile="basis-indices.out")#, eigvfile='wvfn.dat')
         self.hvr_CPA = ext_CPA.get_a_div_a0()
         
         return self.hvr_CPA

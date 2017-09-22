@@ -2,7 +2,8 @@ module cpa_recode
 implicit none
 
 contains
-    subroutine get_APT(n_files, n_k_tot, n_basis, nAtoms, Orb2Atom, wk, do_pbc, type_evecs, APT)
+    function get_APT(n_files, n_k_tot, n_basis, nAtoms, Orb2Atom, wk, do_pbc, type_evecs) &
+                     result(APT)
         !! number of restart_files, k-points, basis orbitals, and atoms, and flag for pbc
         integer,intent(in)                               :: n_files,n_k_tot,n_basis,nAtoms,do_pbc
         !! assign orbital index to atom center and number of orbitals
@@ -24,7 +25,7 @@ contains
         double precision,dimension(:,:,:),allocatable    :: occ_numbers
         
         !! results array (Atom-Projected Trace of density-matrix)
-        double precision,dimension(nAtoms),intent(out)   :: APT
+        double precision,dimension(nAtoms)               :: APT
         
         
         !! get info periodic calculations
@@ -216,7 +217,7 @@ contains
             
         end subroutine deallocations
     
-    end subroutine get_APT
+    end function get_APT
     
 
 end module cpa_recode
