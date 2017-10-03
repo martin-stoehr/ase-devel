@@ -181,6 +181,7 @@ setup(name='python-ase',
 home = os.getcwd()
 os.system('python '+home+'/ase/calculators/make_HA.py '+home+'/ase/calculators ')
 os.system('python '+home+'/ase/calculators/make_CPA.py '+home+'/ase/calculators ')
+os.system('cd '+home+'/ase/calculators/ && bash build_options_sdc && cd '+home)
 for modname in ['HA_recode.', 'splines_alt.', 'spherical_harmonics.', 'CPA_recode.']:
     os.system('cp '+home+'/'+modname+'* '+home+'/lib/python/ase/calculators/')
     os.system('mv '+home+'/'+modname+'* '+home+'/ase/calculators/')
