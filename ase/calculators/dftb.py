@@ -70,7 +70,7 @@ class Dftb(FileIOCalculator):
     else:
         command = 'dftb+ > PREFIX.out'
     
-    implemented_properties = ['energy', 'forces']
+    implemented_properties = ['energy', 'forces', 'charges']
     
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label='dftb', atoms=None, kpts=None, **kwargs):
@@ -320,7 +320,7 @@ Be aware that this might limit capabilities.")
         
         self.atoms = atoms_end
         self.nAtoms = len(self.atoms)
-        self.atomic_charges = np.zeros(self.nAtoms)
+        self.charges = np.zeros(self.nAtoms)
         self.Orb2Atom = np.zeros(self.nOrbs)
         self.otypes = []
         ## read 'detailed.out' in lines
@@ -331,7 +331,7 @@ Be aware that this might limit capabilities.")
         for iline, line in enumerate(linesdet):
             if 'Net atomic charges (e)' in line:
                 for iAtom in xrange(self.nAtoms):
-                    self.atomic_charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
+                    self.charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
                 iline = iline+2+self.nAtoms
             if 'Orbital populations (up)' in line:
                 for iOrb in xrange(self.nOrbs):
@@ -340,6 +340,7 @@ Be aware that this might limit capabilities.")
                     m = int(linesdet[iline+2+iOrb].split()[3])
                     self.otypes.append(orbitalslist[l][l+m])
             
+        self.results['charges'] = self.charges
         self.Atom2Orbs = np.zeros((self.nAtoms, 2))
         for iAtom in xrange(self.nAtoms):
             startOrb = list(self.Orb2Atom).index(iAtom) + 1

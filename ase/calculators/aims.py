@@ -190,6 +190,7 @@ valid_hvr_approaches = ['HA', 'CPA', 'const']
 
 class Aims(FileIOCalculator):
     command = 'aims.version.serial.x > aims.out'
+    
     implemented_properties = ['energy', 'forces', 'stress', 'dipole',
                               'hirsh_volrat', 'hirsh_volume', 'hirsh_charges',
                               'mull_charges']

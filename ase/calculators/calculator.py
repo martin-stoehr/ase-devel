@@ -27,9 +27,10 @@ all_changes = ['positions', 'numbers', 'cell', 'pbc',
 # Recognized names of calculators sorted alphabetically:
 names = ['abinit', 'aims', 'amber', 'asap', 'castep', 'cp2k', 'demon', 'dftb',
          'dmol', 'eam', 'elk', 'emt', 'exciting', 'fleur', 'gaussian', 'gpaw',
-         'gromacs', 'gulp','hotbit', 'jacapo', 'lammps', 'lammpslib', 'lj',
+         'gromacs', 'gulp', 'hotbit', 'jacapo', 'lammps', 'lammpslib', 'lj',
          'mopac', 'morse', 'nwchem', 'octopus', 'onetep', 'siesta', 'tip3p',
-         'turbomole', 'vasp']
+         'vasp', 'turbomole', 'tip4p', 'mbd', 'octopus', 'onetep', 'mbdio', 
+         'ff', 'dft_free_atom', 'dftdisp', 'dftd3', 'dacapo', 'cpmd']
 
 
 special = {'cp2k': 'CP2K',
@@ -45,7 +46,10 @@ special = {'cp2k': 'CP2K',
            'mopac': 'MOPAC',
            'morse': 'MorsePotential',
            'nwchem': 'NWChem',
-           'tip3p': 'TIP3P'}
+           'tip3p': 'TIP3P',
+           'tip4p': 'TIP4P',
+           'dft_free_atom': 'DFT_free_atom',
+          }
 
 
 def get_calculator(name):
