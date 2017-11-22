@@ -1,41 +1,55 @@
 import errno
+import functools
 import os
+import pickle
 import sys
 import time
-import warnings
+from importlib import import_module
 from math import sin, cos, radians, atan2, degrees
 from contextlib import contextmanager
 
+try:
+    from math import gcd
+except ImportError:
+    from fractions import gcd
+
 import numpy as np
 
-from ase.data import chemical_symbols
+from ase.utils.formula import formula_hill, formula_metal
+from ase.data import covalent_radii
+
+__all__ = ['exec_', 'basestring', 'import_module', 'seterr', 'plural',
+           'devnull', 'gcd', 'convert_string_to_fd', 'Lock',
+           'opencew', 'OpenLock', 'rotate', 'irotate', 'givens',
+           'hsv2rgb', 'hsv', 'pickleload', 'FileNotFoundError',
+           'formula_hill', 'formula_metal']
 
 
 # Python 2+3 compatibility stuff:
-if sys.version_info[0] == 3:
+if sys.version_info[0] > 2:
     import builtins
     exec_ = getattr(builtins, 'exec')
     basestring = str
+    from io import StringIO
+    pickleload = functools.partial(pickle.load, encoding='bytes')
+    FileNotFoundError = getattr(builtins, 'FileNotFoundError')
 else:
+    class FileNotFoundError(OSError):
+        pass
+
+    # Legacy Python:
     def exec_(code, dct):
         exec('exec code in dct')
     basestring = basestring
-    
-if sys.version_info >= (2, 7):
-    from importlib import import_module
-else:
-    # Python 2.6:
-    def import_module(name):
-        module = __import__(name)
-        for part in name.split('.')[1:]:
-            module = getattr(module, part)
-        return module
-    
+    from StringIO import StringIO
+    pickleload = pickle.load
+StringIO  # appease pyflakes
+
 
 @contextmanager
 def seterr(**kwargs):
     """Set how floating-point errors are handled.
-    
+
     See np.seterr() for more details.
     """
     old = np.seterr(**kwargs)
@@ -44,14 +58,19 @@ def seterr(**kwargs):
 
 
 def plural(n, word):
+    """Use plural for n!=1.
+
+    >>> plural(0, 'egg'), plural(1, 'egg'), plural(2, 'egg')
+    ('0 eggs', '1 egg', '2 eggs')
+    """
     if n == 1:
         return '1 ' + word
     return '%d %ss' % (n, word)
 
-    
+
 class DevNull:
     encoding = 'UTF-8'
-    
+
     def write(self, string):
         pass
 
@@ -66,17 +85,17 @@ class DevNull:
 
     def close(self):
         pass
-    
+
     def isatty(self):
         return False
-        
+
 
 devnull = DevNull()
 
 
 def convert_string_to_fd(name, world=None):
     """Create a file-descriptor for text output.
-    
+
     Will open a file for writing with given name.  Use None for no output and
     '-' for sys.stdout.
     """
@@ -86,11 +105,11 @@ def convert_string_to_fd(name, world=None):
         return devnull
     if name == '-':
         return sys.stdout
-    if isinstance(name, str):
+    if isinstance(name, basestring):
         return open(name, 'w')
     return name  # we assume name is already a file-descriptor
 
-    
+
 # Only Windows has O_BINARY:
 CEW_FLAGS = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, 'O_BINARY', 0)
 
@@ -105,7 +124,7 @@ def opencew(filename, world=None):
 
     if world is None:
         from ase.parallel import world
-        
+
     if world.rank == 0:
         try:
             fd = os.open(filename, CEW_FLAGS)
@@ -130,7 +149,7 @@ def opencew(filename, world=None):
 class Lock:
     def __init__(self, name='lock', world=None):
         self.name = name
-        
+
         if world is None:
             from ase.parallel import world
         self.world = world
@@ -141,7 +160,7 @@ class Lock:
             if fd is not None:
                 break
             time.sleep(1.0)
-            
+
     def release(self):
         self.world.barrier()
         if self.world.rank == 0:
@@ -166,45 +185,6 @@ class OpenLock:
 
     def __exit__(self, type, value, tb):
         pass
-
-
-def hill(numbers):
-    """Convert list of atomic numbers to a chemical formula as a string.
-    
-    Elements are alphabetically ordered with C and H first."""
-    
-    if isinstance(numbers, dict):
-        count = dict(numbers)
-    else:
-        count = {}
-        for Z in numbers:
-            symb = chemical_symbols[Z]
-            count[symb] = count.get(symb, 0) + 1
-    result = [(s, count.pop(s)) for s in 'CH' if s in count]
-    result += [(s, count[s]) for s in sorted(count)]
-    return ''.join('{0}{1}'.format(symbol, n) if n > 1 else symbol
-                   for symbol, n in result)
-
-
-def prnt(*args, **kwargs):
-    """Python 3 style print function."""
-    warnings.warn('Use from __future__ import print_function')
-    fd = kwargs.pop('file', sys.stdout)
-    fd.write(
-        kwargs.pop('sep', ' ').join(str(arg) for arg in args) +
-        kwargs.pop('end', '\n'))
-    if kwargs.pop('flush', False):
-        fd.flush()
-    if kwargs:
-        raise TypeError('%r is an invalid keyword argument for this function' %
-                        kwargs.keys()[0])
-
-
-def gcd(a, b):
-    """Greatest common divisor of a and b."""
-    while a != 0:
-        a, b = b % a, a
-    return b
 
 
 def rotate(rotations, rotation=np.identity(3)):
@@ -318,6 +298,23 @@ def hsv(array, s=.9, v=.9):
         rgb[:] = hsv2rgb(h, s, v)
     return np.reshape(result, array.shape + (3,))
 
+
+def natural_cutoffs(atoms, mult=1, **kwargs):
+    """Generate a radial cutoff for every atom based on covalent radii
+
+    The covalent radii are a reasonable cutoff estimation for bonds in
+    many applications such as neighborlists, so function generates an
+    atoms length list of radii based on this idea.
+
+    atoms: An atoms object
+    mult: A multiplier for all cutoffs, useful for coarse grained adjustment
+    kwargs: Symbol of the atom and its corresponding cutoff, used to override
+            the covalent radii
+    """
+    return [kwargs.get(atom.symbol, covalent_radii[atom.number] * mult)
+            for atom in atoms]
+
+
 # This code does the same, but requires pylab
 # def cmap(array, name='hsv'):
 #     import pylab
@@ -325,15 +322,7 @@ def hsv(array, s=.9, v=.9):
 #     rgba = getattr(pylab.cm, name)(a)
 #     return rgba[:-1] # return rgb only (not alpha)
 
-ON_POSIX = 'posix' in sys.builtin_module_names
 
-try:
-    from subprocess import Popen
-except ImportError:
-    from os import popen3
-else:
-    def popen3(cmd):
-        from subprocess import PIPE
-        p = Popen(cmd, shell=True, close_fds=ON_POSIX,
-                  stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        return p.stdin, p.stdout, p.stderr
+def longsum(x):
+    """128-bit floating point sum."""
+    return float(np.asarray(x, dtype=np.longdouble).sum())
