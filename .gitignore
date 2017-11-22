@@ -4,6 +4,6 @@
 *.so
 *.pyf
 *.mod
-./build
+build
 lib
 install.log
