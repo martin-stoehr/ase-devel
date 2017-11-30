@@ -715,8 +715,8 @@ class kSpace_MBD_calculator(Calculator):
             omega_0, alphas_0 = self.omega_TS, self.alpha_0_TS
         
         m_eff = charges/(alphas_0*omega_0*omega_0)
-        rho = mbd_mod.eval_mbd_nonint_density_io(grid/Bohr, self.pos, charges, \
-                                                 m_eff, omega_0)
+        rho = mbd_mod.eval_mbd_nonint_density(grid/Bohr, self.pos, charges, \
+                                              m_eff, omega_0)
         
         return rho
         
