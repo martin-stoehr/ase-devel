@@ -102,6 +102,7 @@ bool_keys = [
     'use_local_index',
     'use_logsbt',
     'vdw_correction_hirshfeld',
+    'many_body_dispersion',
 ]
 
 list_keys = [
@@ -339,6 +340,8 @@ class Aims(FileIOCalculator):
                         for output_type in value:     # parses entry if only one given!!
                             output.write('%-35s%s\n' % (key, output_type))
                     elif key == 'vdw_correction_hirshfeld' and value:
+                        output.write('%-35s\n' % key)
+                    elif key == 'many_body_dispersion' and value:
                         output.write('%-35s\n' % key)
                     elif key in bool_keys:
                         output.write('%-35s.%s.\n' %
