@@ -97,6 +97,7 @@ class Dftb(FileIOCalculator):
                 print("WARNING: You chose ThirdOrder(Full), but I didn't find the default directory")
                 print("         '"+slako_dir+"3rd_order/' for .skf files")
                 print("         Please, make sure they are in the working directory or specified otherwise!")
+            elif do_3rd_order: slako_dir += '3rd_order/'
         else:
             slako_dir = './'
         
