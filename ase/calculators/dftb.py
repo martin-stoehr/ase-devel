@@ -85,7 +85,7 @@ class Dftb(FileIOCalculator):
         
         
         do_3rd_order = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
-        do_3rd_order_full = ( (do_3rd_order=='Yes') or (do_3rd_order=='YES') )
+        do_3rd_order_full = ( do_3rd_order.lower()=='yes' )
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
             if ( do_3rd_order_full and (not pexists(slako_dir+'3rd_order/')) ):
@@ -118,7 +118,7 @@ class Dftb(FileIOCalculator):
         self.pbc = np.any(atoms.pbc)
         ## control whether DFTB+ should calculate forces or enable singe-point calculations (large systems!)
         calc_forces = kwargs.get('Options_CalculateForces', 'Yes')
-        self.calculate_forces = ( (calc_forces=='Yes') or (calc_forces=='YES') )
+        self.calculate_forces = ( calc_forces.lower()=='yes' )
         if self.calculate_forces:
             self.default_parameters['Driver_']='ConjugateGradient'
             self.default_parameters['Driver_MaxForceComponent']='1E-4'
@@ -129,7 +129,7 @@ Be aware that this might limit capabilities.")
             self.default_parameters['Driver']='{}'
         
         minmem = kwargs.get('Options_MinimiseMemoryUsage', 'No')
-        if minmem in ['YES','Yes','yes']:
+        if minmem.lower() == 'yes':
             defaultsolver = 'Standard{}'
         else:
             defaultsolver = 'DivideAndConquer{}'
@@ -144,8 +144,8 @@ Be aware that this might limit capabilities.")
         kwargs['Hamiltonian_Eigensolver'] = dftbsolver
         
         if do_3rd_order_full:
-            self.default_parameters['Hamiltonian_DampXH'] = 'Yes',
-            self.default_parameters['Hamiltonian_DampXHExponent'] = 4.00,
+            self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
+            self.default_parameters['Hamiltonian_DampXHExponent'] = '4.00'
             self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
             for species in list(set(atoms.get_chemical_symbols())):
                 input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
@@ -209,7 +209,7 @@ Be aware that this might limit capabilities.")
         myspace = ' '
         if (self.hvr_approach == 'HA'):
             self.parameters['Options_WriteEigenvectors'] = 'Yes'
-        
+
         for key, value in sorted(self.parameters.items()):
             current_depth = key.rstrip('_').count('_')
             previous_depth = previous_key.rstrip('_').count('_')
@@ -288,7 +288,7 @@ Be aware that this might limit capabilities.")
             ## where is this information for non-SCC calculations
             hSCC = 'Hamiltonian_SCC'
             if self.parameters.has_key(hSCC):
-                if (self.parameters[hSCC] in ['YES', 'Yes', 'yes']):
+                if (self.parameters[hSCC].lower() == 'yes'):
                     self.read_additional_info()
                 else:
                     print('You started a non-SCC calculation. No additional Information available.')
