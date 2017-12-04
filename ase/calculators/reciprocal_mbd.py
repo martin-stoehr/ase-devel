@@ -187,6 +187,8 @@ class kSpace_MBD_calculator(Calculator):
         """
         Initialize MBD calculation and evaluate properties.
         """
+        from numpy.linalg import eigvals
+        
         mbd_mod.init_grid(self.n_omega_SCS)
         mbd_mod.param_ts_energy_accuracy = self.TS_accuracy
         mbd_mod.param_ts_cutoff_radius = self.TS_cutoff
@@ -224,6 +226,12 @@ class kSpace_MBD_calculator(Calculator):
                 raise ValueError("You chose periodic boundary condition via vacuum_axis, but did not specify how to handle it (do_reciprocal or do_supercell)!")
         
         self.pos = atoms.positions/Bohr
+        if np.product(eigvals(atoms.get_cell())) < 1e-2:
+            if not np.all(self.vacuum_axis):
+                raise ValueError("Volume < 0.01 \AA^3. Please, define reasonable unit cell for periodic calculations.")
+            else:
+                atoms.set_cell([[1e6,0.,0.],[0.,1e6,0.],[0.,0.,1e6]])
+        
         self.UC = atoms.get_cell()/Bohr
         symbols = atoms.get_chemical_symbols()
         self.alpha_f, self.C6_f, self.RvdW_f = get_free_atom_data(symbols)
