@@ -84,12 +84,17 @@ class Dftb(FileIOCalculator):
         from os.path import exists as pexists
         
         
-        do_3rd_order = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
-        do_3rd_order_full = ( do_3rd_order.lower()=='yes' )
+        do_3rd_o = kwargs.get('Hamiltonian_ThirdOrder', 'No')
+        if (do_3rd_o.lower() == 'yes'):
+            print("REMARK: You chose ThirdOrder = 'Yes'. This only corrects on-site terms.")
+            print("        For full 3rd order DFTB, please use ThirdOrderFull = 'Yes'.")
+        
+        do_3rd_f = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
+        do_3rd_order = any(np.asarray([do_3rd_o.lower(), do_3rd_f.lower()]) =='yes' )
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
-            if ( do_3rd_order_full and (not pexists(slako_dir+'3rd_order/')) ):
-                print("WARNING: You chose ThirdOrderFull, but I didn't find the default directory")
+            if ( do_3rd_order and (not pexists(slako_dir+'3rd_order/')) ):
+                print("WARNING: You chose ThirdOrder(Full), but I didn't find the default directory")
                 print("         '"+slako_dir+"3rd_order/' for .skf files")
                 print("         Please, make sure they are in the working directory or specified otherwise!")
         else:
@@ -143,7 +148,7 @@ Be aware that this might limit capabilities.")
         
         kwargs['Hamiltonian_Eigensolver'] = dftbsolver
         
-        if do_3rd_order_full:
+        if do_3rd_order:
             self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
             self.default_parameters['Hamiltonian_DampXHExponent'] = '4.00'
             self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
