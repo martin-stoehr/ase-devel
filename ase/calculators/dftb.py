@@ -47,19 +47,23 @@ from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
 ## default value of maximal angular momentum to be included in DFTB calculation (ease calculator init, MS)
 DefaultMaxAngMom = { 'H':'"s"',                                                                  'He':'"s"', \
                     'Li':'"p"','Be':'"p"', 'B':'"p"', 'C':'"p"', 'N':'"p"', 'O':'"p"', 'F':'"p"','Ne':'"p"', \
-                    'Na':'"p"','Mg':'"p"','Al':'"p"','Si':'"p"', 'P':'"p"', 'S':'"p"','Cl':'"p"','Ar':'"p"', \
+                    'Na':'"p"','Mg':'"p"','Al':'"p"','Si':'"p"', 'P':'"p"', 'S':'"d"','Cl':'"d"','Ar':'"p"', \
                      'K':'"p"','Ca':'"p"','Sc':'"d"','Ti':'"d"', 'V':'"d"','Cr':'"d"','Mn':'"d"','Fe':'"d"', \
                     'Co':'"d"','Ni':'"d"','Cu':'"d"','Zn':'"d"','Ga':'"p"','Ge':'"p"','As':'"p"','Se':'"p"', \
-                    'Br':'"p"','Kr':'"p"','Rb':'"p"','Sr':'"p"', 'Y':'"d"','Zr':'"d"','Nb':'"d"','Mo':'"d"', \
+                    'Br':'"d"','Kr':'"p"','Rb':'"p"','Sr':'"p"', 'Y':'"d"','Zr':'"d"','Nb':'"d"','Mo':'"d"', \
                     'Tc':'"d"','Ru':'"d"','Rh':'"d"','Pd':'"d"','Ag':'"d"','Cd':'"d"','In':'"p"','Sn':'"p"', \
-                    'Sb':'"p"','Te':'"p"', 'I':'"p"','Xe':'"p"','Cs':'"p"','Ba':'"p"','Lu':'"d"','Hf':'"d"', \
+                    'Sb':'"p"','Te':'"p"', 'I':'"d"','Xe':'"p"','Cs':'"p"','Ba':'"p"','Lu':'"d"','Hf':'"d"', \
                     'Ta':'"d"', 'W':'"d"','Re':'"d"','Os':'"d"','Ir':'"d"','Pt':'"d"','Au':'"d"','Hg':'"d"', \
                     'Tl':'"p"','Pb':'"p"','Bi':'"p"','Po':'"p"','As':'"p"','Rn':'"p"' }
 
 # calculated reference values for Hubbard Derivatives (required for DFTB3 calculations)
 DefaultdU = { \
-            # from M. Gaus, Q. Cui, M. Elstner JCTC 2011, 7 (4), 931-948:
-            'H':-0.1857, 'C':-0.1495, 'N':-0.1535, 'O':-0.1575, 'P':-0.0702, 'S':-0.0695, \
+            # from DFTB.ORG (http://www.dftb.org/parameters/download/3ob/3ob-3-1-cc/):
+            'H':-0.1857, \
+            'C':-0.1492, 'N':-0.1535, 'O':-0.1575, 'F':-0.1623, \
+            'Na':-0.0454, 'Mg':-0.02, 'P':-0.14, 'S':-0.11, 'Cl':-0.0697, \
+            'K':-0.0339, 'Ca':-0.0340, 'Zn':-0.03, 'Br':-0.0573, \
+            'I':-0.0433, \
             }
 
 
@@ -77,9 +81,17 @@ class Dftb(FileIOCalculator):
         """  Construct a DFTB+ calculator.  """
         
         from ase.dft.kpoints import monkhorst_pack
+        from os.path import exists as pexists
         
+        
+        do_3rd_order = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
+        do_3rd_order_full = ( (do_3rd_order=='Yes') or (do_3rd_order=='YES') )
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
+            if ( do_3rd_order_full and (not pexists(slako_dir+'3rd_order/')) ):
+                print("WARNING: You chose ThirdOrderFull, but I didn't find the default directory")
+                print("         '"+slako_dir+"3rd_order/' for .skf files")
+                print("         Please, make sure they are in the working directory or specified otherwise!")
         else:
             slako_dir = './'
         
@@ -131,10 +143,9 @@ Be aware that this might limit capabilities.")
         
         kwargs['Hamiltonian_Eigensolver'] = dftbsolver
         
-        do_3rd_order = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
-        if ( (do_3rd_order=='Yes') or (do_3rd_order=='YES') ):
+        if do_3rd_order_full:
             self.default_parameters['Hamiltonian_DampXH'] = 'Yes',
-            self.default_parameters['Hamiltonian_DampXHExponent'] = 4.05,
+            self.default_parameters['Hamiltonian_DampXHExponent'] = 4.00,
             self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
             for species in list(set(atoms.get_chemical_symbols())):
                 input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
