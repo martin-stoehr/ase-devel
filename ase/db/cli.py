@@ -1,294 +1,307 @@
 from __future__ import print_function
+import collections
+import json
+import os
 import sys
-from time import time
+from random import randint
 
-import numpy as np
-
+import ase.io
 from ase.db import connect
-from ase.db.core import float_to_time_string, T0, YEAR
-from ase.atoms import Atoms
-from ase.data import atomic_masses
+from ase.db.core import convert_str_to_int_float_or_str
+from ase.db.summary import Summary
+from ase.db.table import Table, all_columns
+from ase.db.web import process_metadata
+from ase.calculators.calculator import get_calculator
+from ase.utils import plural, basestring
+
+try:
+    input = raw_input  # Python 2+3 compatibility
+except NameError:
+    pass
 
 
-def plural(n, word):
-    if n == 1:
-        return '1 ' + word
-    return '%d %ss' % (n, word)
+class CLICommand:
+    short_description = 'Manipulate and query ASE database'
+
+    description = """Selection is a comma-separated list of
+    selections where each selection is of the type "ID", "key" or
+    "key=value".  Instead of "=", one can also use "<", "<=", ">=", ">"
+    and  "!=" (these must be protected from the shell by using quotes).
+    Special keys: id, user, calculator, age, natoms, energy, magmom,
+    and charge.  Chemical symbols can also be used to select number of
+    specific atomic species (H, He, Li, ...).  Selection examples:
+    'calculator=nwchem', 'age<1d', 'natoms=1', 'user=alice',
+    '2.2<bandgap<4.1', 'Cu>=10'"""
+
+    @staticmethod
+    def add_arguments(parser):
+        add = parser.add_argument
+        add('database')
+        add('query', nargs='*')
+        add('-v', '--verbose', action='store_true')
+        add('-q', '--quiet', action='store_true')
+        add('-n', '--count', action='store_true',
+            help='Count number of selected rows.')
+        add('-l', '--long', action='store_true',
+            help='Long description of selected row')
+        add('-i', '--insert-into', metavar='db-name',
+            help='Insert selected rows into another database.')
+        add('-a', '--add-from-file', metavar='filename',
+            help='Add results from file.')
+        add('-k', '--add-key-value-pairs', metavar='key1=val1,key2=val2,...',
+            help='Add key-value pairs to selected rows.  Values must '
+            'be numbers or strings and keys must follow the same rules as '
+            'keywords.')
+        add('-L', '--limit', type=int, default=20, metavar='N',
+            help='Show only first N rows (default is 20 rows).  Use --limit=0 '
+            'to show all.')
+        add('--offset', type=int, default=0, metavar='N',
+            help='Skip first N rows.  By default, no rows are skipped')
+        add('--delete', action='store_true',
+            help='Delete selected rows.')
+        add('--delete-keys', metavar='key1,key2,...',
+            help='Delete keys for selected rows.')
+        add('-y', '--yes', action='store_true',
+            help='Say yes.')
+        add('--explain', action='store_true',
+            help='Explain query plan.')
+        add('-c', '--columns', metavar='col1,col2,...',
+            help='Specify columns to show.  Precede the column specification '
+            'with a "+" in order to add columns to the default set of '
+            'columns.  Precede by a "-" to remove columns.  Use "++" for all.')
+        add('-s', '--sort', metavar='column', default='id',
+            help='Sort rows using "column".  Use "column-" for a descending '
+            'sort.  Default is to sort after id.')
+        add('--cut', type=int, default=35, help='Cut keywords and key-value '
+            'columns after CUT characters.  Use --cut=0 to disable cutting. '
+            'Default is 35 characters')
+        add('-p', '--plot', metavar='x,y1,y2,...',
+            help='Example: "-p x,y": plot y row against x row. Use '
+            '"-p a:x,y" to make a plot for each value of a.')
+        add('-P', '--plot-data', metavar='name',
+            help="Show plot from data['name'] from the selected row.")
+        add('--csv', action='store_true',
+            help='Write comma-separated-values file.')
+        add('-w', '--open-web-browser', action='store_true',
+            help='Open results in web-browser.')
+        add('--no-lock-file', action='store_true', help="Don't use lock-files")
+        add('--analyse', action='store_true',
+            help='Gathers statistics about tables and indices to help make '
+            'better query planning choices.')
+        add('-j', '--json', action='store_true',
+            help='Write json representation of selected row.')
+        add('-m', '--show-metadata', action='store_true',
+            help='Show metadata as json.')
+        add('--set-metadata', metavar='something.json',
+            help='Set metadata from a json file.')
+        add('-M', '--metadata-from-python-script', metavar='something.py',
+            help='Use metadata from a Python file.')
+        add('--unique', action='store_true',
+            help='Give rows a new unique id when using --insert-into.')
+
+    @staticmethod
+    def run(args):
+        main(args)
 
 
-def run(args=sys.argv[1:]):
-    if isinstance(args, str):
-        args = args.split(' ')
-    import argparse
-    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-    add = parser.add_argument
-    add('name', nargs=1)
-    add('selection', nargs='?')
-    add('-n', '--count', action='store_true')
-    add('-c', '--columns', help='short/long+row-row')
-    add('--explain', action='store_true')
-    add('-y', '--yes', action='store_true')
-    add('-i', '--insert-into')
-    add('-k', '--add-keywords')
-    add('-K', '--add-key-value-pairs')
-    add('--delete-keywords')
-    add('--delete-key-value-pairs')
-    add('--delete', action='store_true')
-    add('-v', '--verbose', action='store_true')
-    add('-q', '--quiet', action='store_true')
-    add('-s', '--sort')
-    add('-r', '--reverse', action='store_true')
-    add('-l', '--long', action='store_true')
-    add('--limit', type=int, default=500)
-    add('-p', '--python-expression')
-
-    args = parser.parse_args(args)
-
+def main(args):
     verbosity = 1 - args.quiet + args.verbose
+    query = ','.join(args.query)
 
-    con = connect(args.name[0])
+    if args.sort.endswith('-'):
+        args.sort = '-' + args.sort[:-1]
 
-    if verbosity == 2:
-        print(args)
-
-    rows = con.select(args.selection, explain=args.explain,
-                      verbosity=verbosity)
-
-    if args.count:
-        n = 0
-        for row in rows:
-            n += 1
-        print('%s' % plural(n, 'row'))
-        return n
-
-    if args.explain:
-        for row in rows:
-            print('%d %d %d %s' % row['explain'])
-        return
-
-    if args.add_keywords:
-        add_keywords = args.add_keywords.split(',')
-    else:
-        add_keywords = []
+    if query.isdigit():
+        query = int(query)
 
     add_key_value_pairs = {}
     if args.add_key_value_pairs:
         for pair in args.add_key_value_pairs.split(','):
             key, value = pair.split('=')
-            for type in [int, float]:
-                try:
-                    value = type(value)
-                except ValueError:
-                    pass
-                else:
-                    break
-            add_key_value_pairs[key] = value
+            add_key_value_pairs[key] = convert_str_to_int_float_or_str(value)
+
+    if args.delete_keys:
+        delete_keys = args.delete_keys.split(',')
+    else:
+        delete_keys = []
+
+    db = connect(args.database, use_lock_file=not args.no_lock_file)
+
+    def out(*args):
+        if verbosity > 0:
+            print(*args)
+
+    if args.analyse:
+        db.analyse()
+        return
+
+    if args.add_from_file:
+        filename = args.add_from_file
+        if ':' in filename:
+            calculator_name, filename = filename.split(':')
+            atoms = get_calculator(calculator_name)(filename).get_atoms()
+        else:
+            atoms = ase.io.read(filename)
+        db.write(atoms, key_value_pairs=add_key_value_pairs)
+        out('Added {0} from {1}'.format(atoms.get_chemical_formula(),
+                                        filename))
+        return
+
+    if args.count:
+        n = db.count(query)
+        print('%s' % plural(n, 'row'))
+        return
+
+    if args.explain:
+        for row in db.select(query, explain=True,
+                             verbosity=verbosity,
+                             limit=args.limit, offset=args.offset):
+            print(row['explain'])
+        return
+
+    if args.show_metadata:
+        print(json.dumps(db.metadata, sort_keys=True, indent=4))
+        return
+
+    if args.set_metadata:
+        with open(args.set_metadata) as fd:
+            db.metadata = json.load(fd)
+        return
 
     if args.insert_into:
-        con2 = connect(args.insert_into)
-        n = 0
-        ids = []
-        for dct in rows:
-            for keyword in add_keywords:
-                if keyword not in dct.keywords:
-                    dct.keywords.append(keyword)
-                    n += 1
-            rollback = True
-            if 1:  # try:
-                id = con2.write(dct, timestamp=dct.timestamp)
-                rollback = False
-            if 0:  # finally:
-                if rollback:
-                    con2.delete(ids)
-                    return
-            ids.append(id)
-        print('Added %s' % plural(n, 'keyword'))
-        print('Inserted %s' % plural(len(ids), 'row'))
-        return ids
+        nkvp = 0
+        nrows = 0
+        with connect(args.insert_into,
+                     use_lock_file=not args.no_lock_file) as db2:
+            for row in db.select(query, sort=args.sort):
+                kvp = row.get('key_value_pairs', {})
+                nkvp -= len(kvp)
+                kvp.update(add_key_value_pairs)
+                nkvp += len(kvp)
+                if args.unique:
+                    row['unique_id'] = '%x' % randint(16**31, 16**32 - 1)
+                db2.write(row, data=row.get('data'), **kvp)
+                nrows += 1
 
-    if add_keywords or add_key_value_pairs:
-        ids = [dct['id'] for dct in rows]
-        m, n = con.update(ids, add_keywords, **add_key_value_pairs)
-        print('Added %s and %s (%s updated)' %
-              (plural(m, 'keyword'),
-               plural(n, 'key-value pair'),
-               plural(len(add_key_value_pairs) * len(ids) - n, 'pair')))
-        return ids
+        out('Added %s (%s updated)' %
+            (plural(nkvp, 'key-value pair'),
+             plural(len(add_key_value_pairs) * nrows - nkvp, 'pair')))
+        out('Inserted %s' % plural(nrows, 'row'))
+        return
+
+    if add_key_value_pairs or delete_keys:
+        ids = [row['id'] for row in db.select(query)]
+        m, n = db.update(ids, delete_keys, **add_key_value_pairs)
+        out('Added %s (%s updated)' %
+            (plural(m, 'key-value pair'),
+             plural(len(add_key_value_pairs) * len(ids) - m, 'pair')))
+        out('Removed', plural(n, 'key-value pair'))
+
+        return
 
     if args.delete:
-        ids = [dct['id'] for dct in rows]
+        ids = [row['id'] for row in db.select(query)]
         if ids and not args.yes:
-            msg = 'Delete %s? (yes/no): ' % plural(len(ids), 'row')
-            if raw_input(msg).lower() != 'yes':
+            msg = 'Delete %s? (yes/No): ' % plural(len(ids), 'row')
+            if input(msg).lower() != 'yes':
                 return
-        con.delete(ids)
-        print('Deleted %s' % plural(len(ids), 'row'))
-        return ids
+        db.delete(ids)
+        out('Deleted %s' % plural(len(ids), 'row'))
+        return
 
-    dcts = list(rows)
-    if len(dcts) > 0:
-        if args.long:
-            long(dcts[0], verbosity)
-            return dcts[0]
-        if args.python_expression:
-            for dct in dcts:
-                print(eval(args.python_expression, {'d': dct}))
-            return
-        f = Formatter(columns=args.columns)
-        return f.format(dcts)
+    if args.plot_data:
+        from ase.db.plot import dct2plot
+        dct2plot(db.get(query).data, args.plot_data)
+        return
 
-    return []
+    if args.plot:
+        if ':' in args.plot:
+            tags, keys = args.plot.split(':')
+            tags = tags.split(',')
+        else:
+            tags = []
+            keys = args.plot
+        keys = keys.split(',')
+        plots = collections.defaultdict(list)
+        X = {}
+        labels = []
+        for row in db.select(query, sort=args.sort, include_data=False):
+            name = ','.join(str(row[tag]) for tag in tags)
+            x = row.get(keys[0])
+            if x is not None:
+                if isinstance(x, basestring):
+                    if x not in X:
+                        X[x] = len(X)
+                        labels.append(x)
+                    x = X[x]
+                plots[name].append([x] + [row.get(key) for key in keys[1:]])
+        import matplotlib.pyplot as plt
+        for name, plot in plots.items():
+            xyy = zip(*plot)
+            x = xyy[0]
+            for y, key in zip(xyy[1:], keys[1:]):
+                plt.plot(x, y, label=name + ':' + key)
+        if X:
+            plt.xticks(range(len(labels)), labels, rotation=90)
+        plt.legend()
+        plt.show()
+        return
 
+    if args.json:
+        row = db.get(query)
+        db2 = connect(sys.stdout, 'json', use_lock_file=False)
+        kvp = row.get('key_value_pairs', {})
+        db2.write(row, data=row.get('data'), **kvp)
+        return
 
-def long(d, verbosity=1):
-    print('id:', d.id)
-    print('formula:', Atoms(d.numbers).get_chemical_formula())
-    print('username:', d.username)
-    print('age: {0}'.format(float_to_time_string((time() - T0) / YEAR -
-                                                 d.timestamp)))
-    if 'calculator_name' in d:
-        print('calculator:', d.calculator_name)
-    if 'energy' in d:
-        print('energy: {0:.3f} eV'.format(d.energy))
-    if 'forces' in d:
-        print('maximum atomic force: {0:.3f} eV/Ang'.format(
-                  (d.forces**2).sum(1).max()**0.5))
-    if 'stress' in d:
-        print('stress tensor:', d.stress)
-    print('magnetic moment:', d.get('magmom', 0))
-    print('periodic boundary conditions:', d.pbc)
-    print('unit cell [Ang]:')
-    for axis in d.cell:
-        print('{0:10.3f}{1:10.3f}{2:10.3f}'.format(*axis))
-    dims = d.pbc.sum()
-    if dims == 1:
-        print('length: {0:.3f} Ang'.format(np.linalg.norm(d.cell[d.pbc][0])))
-    elif dims == 2:
-        print('area: {0:.3f} Ang^2'.format(
-                  np.linalg.norm(np.cross(*d.cell[d.pbc]))))
-    print('volume: {0:.3f} Ang^3'.format(abs(np.linalg.det(d.cell))))
-    if 'charge' in d:
-        print('charge: {0:.6f}'.format(d.charge))
-    if 'masses' in d:
-        m = d.masses.sum()
-    else:
-        m = atomic_masses[d.numbers].sum()
-    print('mass: {0:.3f} au'.format(m))
-    if d.get('keywords'):
-        print('keywords: ', ', '.join(d.keywords))
-    kvp = d.get('key_value_pairs')
-    if kvp:
-        print('key-value pairs:')
-        for key in sorted(kvp):
-            print('    {0}: {1}'.format(key, kvp[key]))
+    db.python = args.metadata_from_python_script
+    db.meta = process_metadata(db, html=args.open_web_browser)
 
-
-def cut(txt, length):
-    if len(txt) <= length:
-        return txt
-    return txt[:length - 3] + '...'
-
-
-class Formatter:
-    def __init__(self, columns):
-        pass
-
-    def format(self, dcts, columns=None, sort=None):
-        columns = ['id', 'age', 'user', 'formula', 'calc',
-                   'energy', 'fmax', 'pbc', 'size', 'keywords', 'keyvals',
-                   'charge', 'mass', 'fixed', 'smax', 'magmom']
-        table = [columns]
-        widths = [0 for column in columns]
-        signs = [1 for column in columns]  # left or right adjust
-        ids = []
-        fd = sys.stdout
-        for dct in dcts:
-            row = []
-            for i, column in enumerate(columns):
+    if args.long:
+        # Remove .png files so that new ones will be created.
+        for func, filenames in db.meta.get('functions', []):
+            for filename in filenames:
                 try:
-                    s = getattr(self, column)(dct)
-                except AttributeError:
-                    s = ''
+                    os.remove(filename)
+                except OSError:  # Python 3 only: FileNotFoundError
+                    pass
+
+        row = db.get(query)
+        summary = Summary(row, db.meta)
+        summary.write()
+    else:
+        if args.open_web_browser:
+            import ase.db.app as app
+            app.databases['default'] = db
+            app.app.run(host='0.0.0.0', debug=True)
+        else:
+            columns = list(all_columns)
+            c = args.columns
+            if c and c.startswith('++'):
+                keys = set()
+                for row in db.select(query,
+                                     limit=args.limit, offset=args.offset,
+                                     include_data=False):
+                    keys.update(row._keys)
+                columns.extend(keys)
+                if c[2:3] == ',':
+                    c = c[3:]
                 else:
-                    if isinstance(s, int):
-                        s = '%d' % s
-                    elif isinstance(s, float):
-                        s = '%.3f' % s
+                    c = ''
+            if c:
+                if c[0] == '+':
+                    c = c[1:]
+                elif c[0] != '-':
+                    columns = []
+                for col in c.split(','):
+                    if col[0] == '-':
+                        columns.remove(col[1:])
                     else:
-                        signs[i] = -1
-                    if len(s) > widths[i]:
-                        widths[i] = len(s)
-                row.append(s)
-            table.append(row)
-            ids.append(dct.id)
-        widths = [w and max(w, len(column))
-                  for w, column in zip(widths, columns)]
-        for row in table:
-            fd.write('|'.join('%*s' % (w * sign, s)
-                              for w, sign, s in zip(widths, signs, row)
-                              if w > 0))
-            fd.write('\n')
-        return ids
-        
-    def id(self, d):
-        return d.id
-    
-    def age(self, d):
-        return float_to_time_string((time() - T0) / YEAR - d.timestamp)
+                        columns.append(col.lstrip('+'))
 
-    def user(self, d):
-        return d.username
-    
-    def formula(self, d):
-        return Atoms(d.numbers).get_chemical_formula()
-
-    def energy(self, d):
-        return d.energy
-
-    def size(self, d):
-        dims = d.pbc.sum()
-        if dims == 0:
-            return ''
-        if dims == 1:
-            return np.linalg.norm(d.cell[d.pbc][0])
-        if dims == 2:
-            return np.linalg.norm(np.cross(*d.cell[d.pbc]))
-        return abs(np.linalg.det(d.cell))
-
-    def pbc(self, d):
-        a, b, c = d.pbc
-        return '%d%d%d' % tuple(d.pbc)
-
-    def calc(self, d):
-        return d.calculator_name
-
-    def fmax(self, d):
-        return (d.forces**2).sum(1).max()**0.5
-
-    def keywords(self, d):
-        return cut(','.join(d.keywords), 30)
-
-    def keyvals(self, d):
-        return cut(','.join(['%s=%s' % (key, cut(str(value), 8))
-                             for key, value in d.key_value_pairs.items()]), 40)
-
-    def charge(self, d):
-        return d.charge
-
-    def mass(self, d):
-        if 'masses' in d:
-            return d.masses.sum()
-        return atomic_masses[d.numbers].sum()
-
-    def fixed(self, d):
-        c = d.constraints
-        if c is None:
-            return ''
-        if len(c) > 1:
-            return '?'
-
-    def smax(self, d):
-        return (d.stress**2).max()**0.5
-
-    def magmom(self, d):
-        return d.magmom
+            table = Table(db, verbosity, args.cut)
+            table.select(query, columns, args.sort, args.limit, args.offset)
+            if args.csv:
+                table.write_csv()
+            else:
+                table.write(query)

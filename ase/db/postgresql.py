@@ -1,6 +1,8 @@
+import json
 import psycopg2
 
-from ase.db.sqlite import init_statements, tables, SQLite3Database
+from ase.db.sqlite import init_statements, index_statements, VERSION
+from ase.db.sqlite import SQLite3Database
 
 
 class Connection:
@@ -9,7 +11,7 @@ class Connection:
 
     def cursor(self):
         return Cursor(self.con.cursor())
-    
+
     def commit(self):
         self.con.commit()
 
@@ -33,34 +35,51 @@ class Cursor:
     def executemany(self, statement, *args):
         self.cur.executemany(statement.replace('?', '%s'), *args)
 
-    
+
 class PostgreSQLDatabase(SQLite3Database):
+    default = 'DEFAULT'
+
     def _connect(self):
-        con = psycopg2.connect(database='postgres', user='ase', password='ase',
-                               host='localhost')
-        return Connection(con)
+        return Connection(psycopg2.connect(self.filename))
 
     def _initialize(self, con):
-        pass
+        if self.initialized:
+            return
 
+        self._metadata = {}
 
-def reset():
-    con = psycopg2.connect(database='postgres', user='postgres')
-    cur = con.cursor()
+        cur = con.cursor()
 
-    cur.execute("select count(*) from pg_tables where tablename='systems'")
-    if cur.fetchone()[0] == 1:
-        cur.execute('drop table %s cascade' % ', '.join(tables))
-        cur.execute('drop role ase')
-        cur.execute("create role ase login password 'ase'")
-        con.commit()
+        try:
+            cur.execute('SELECT name, value FROM information')
+        except psycopg2.ProgrammingError:
+            # Initialize database:
+            sql = ';\n'.join(init_statements)
+            for a, b in [('BLOB', 'BYTEA'),
+                         ('REAL', 'DOUBLE PRECISION'),
+                         ('INTEGER PRIMARY KEY AUTOINCREMENT',
+                          'SERIAL PRIMARY KEY')]:
+                sql = sql.replace(a, b)
 
-    sql = init_statements.replace('blob', 'bytea')
-    sql = sql.replace('real', 'double precision')
-    cur.execute(sql)
-    cur.execute('grant all privileges on %s to ase' % ', '.join(tables))
-    con.commit()
+            con.commit()
+            cur = con.cursor()
+            cur.execute(sql)
+            if self.create_indices:
+                cur.execute(';\n'.join(index_statements))
+            con.commit()
+            self.version = VERSION
+        else:
+            for name, value in cur.fetchall():
+                if name == 'version':
+                    self.version = int(value)
+                elif name == 'metadata':
+                    self._metadata = json.loads(value)
 
+        assert 5 < self.version <= VERSION
 
-if __name__ == '__main__':
-    reset()
+        self.initialized = True
+
+    def get_last_id(self, cur):
+        cur.execute('SELECT last_value FROM systems_id_seq')
+        id = cur.fetchone()[0]
+        return int(id)
