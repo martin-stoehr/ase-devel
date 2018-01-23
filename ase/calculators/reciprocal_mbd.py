@@ -8,8 +8,9 @@ from ase.calculators.calculator import Calculator
 from sys import stderr
 
 
-default_parameters = {'xc':'pbe',
-                      'n_omega_SCS':20,
+default_parameters = {
+                      'xc':'pbe',
+                      'n_omega_SCS':15,
                       'Coulomb_SCS':'fermi,dip,gg',
                       'Coulomb_CFDM':'fermi,dip',
                       'TS_accuracy':1E-6,
@@ -20,7 +21,7 @@ default_parameters = {'xc':'pbe',
                       'vacuum_axis':(True,True,True),
                       'max_nbody_MBD':3,
                       'do_reciprocal':True,
-                      'Ggrid':(3,3,3),
+                      'kgrid':(3,3,3),
                       'do_supercell':False,
                       'supercell':(2,2,2),
                       'do_TS':False,
@@ -33,11 +34,8 @@ default_parameters = {'xc':'pbe',
                       'get_MBD_eigenvectors':False,
                       'set_negative_eigenvalues_zero':True,
                       'use_MBDrsSCS_damping':False, 
-                      'interaction_modes':{'calculate':False, \
-                                           'indices_subsystem1':[], \
-                                           'indices_subsystem2':[], \
-                                           'prefix_mbd_modes':"mbd_eigenmodes"}
-                      }
+                      'use_fractional_ionic_approach':False,
+                     }
 
 
 try:
@@ -61,7 +59,7 @@ class kSpace_MBD_calculator(Calculator):
     
     valid_args = ['xc', \
                   'n_omega_SCS', \
-                  'Ggrid', \
+                  'kgrid', \
                   'Coulomb_SCS', \
                   'Coulomb_CFDM', \
                   'TS_accuracy', \
@@ -84,9 +82,7 @@ class kSpace_MBD_calculator(Calculator):
                   'get_MBD_eigenvectors', \
                   'set_negative_eigenvalues_zero', \
                   'use_MBDrsSCS_damping', \
-                  'interaction_modes']
-    
-    dict_kwargs = ['interaction_modes']
+                  'use_fractional_ionic_approach']
     
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
@@ -99,11 +95,7 @@ class kSpace_MBD_calculator(Calculator):
         ## set or overwrite any additional keyword arguments provided
         for arg, val in kwargs.items():
             if arg in self.valid_args:
-                if (arg in self.dict_kwargs):
-                    for arg2, val2 in kwargs[arg].iteritems():
-                        self.__dict__[arg][arg2] = val2
-                else:
-                    setattr(self, arg, val)
+                setattr(self, arg, val)
             else:
                 raise RuntimeError('unknown keyword arg "%s" : not in %s'
                                    % (arg, self.valid_args))
@@ -234,6 +226,11 @@ class kSpace_MBD_calculator(Calculator):
         
         self.UC = atoms.get_cell()/Bohr
         symbols = atoms.get_chemical_symbols()
+        try:
+            something
+        if self.use_fractional_ionic_approach:
+            self.a_div_a0 *= Z/Npop
+        
         self.alpha_f, self.C6_f, self.RvdW_f = get_free_atom_data(symbols)
         self.alpha_0_TS = self.alpha_f*self.a_div_a0
         self.C6_TS = self.C6_f*self.a_div_a0*self.a_div_a0
@@ -256,18 +253,6 @@ class kSpace_MBD_calculator(Calculator):
                 print("but didn't set do_SCS to True. Skipping...")
             else:
                 self._get_TSSCS_energy1()
-        
-        if self.interaction_modes['calculate']:
-            idx1 = np.array(self.interaction_modes['indices_subsystem1'])
-            idx2 = np.array(self.interaction_modes['indices_subsystem2'])
-            check_ia1 = np.any([idx in idx2 for idx in idx1])
-            check_ia2 = np.any(np.concatenate((idx1,idx1)) > len(atoms))
-            check_ia3 = ( (len(idx1)==0) or (len(idx2)==0) )
-            if ( (check_ia1 or check_ia2 or check_ia3) and (self.myid == 0) ):
-                print('Invalid specification of subsystems! Skipping interaction modes...')
-                print('Please specify non-overlapping indices in Python/C ordering.')
-            else:
-                self._get_interaction_modes()
         
         mbd_mod.destroy_grid()
         
@@ -303,7 +288,7 @@ class kSpace_MBD_calculator(Calculator):
         
     
     def _get_mbd_energy(self):
-        kgrid = mbd_mod.make_k_grid(mbd_mod.make_g_grid(*self.Ggrid), self.UC)
+        kgrid = mbd_mod.make_k_grid(mbd_mod.make_g_grid(*self.kgrid), self.UC)
         
         if self.do_SCS:     # do MBD@(rs)SCS?
             alph, om, rvdwAB = self.alpha_0_SCS, self.omega_SCS, self.RvdW_SCS
@@ -332,28 +317,6 @@ class kSpace_MBD_calculator(Calculator):
                                              a=self.damp_par_a)
         
         self.E_MBD *= Hartree
-        
-    
-    def _get_interaction_modes(self):
-        kgrid = mbd_mod.make_k_grid(mbd_mod.make_g_grid(*self.Ggrid), self.UC)
-        
-        if self.do_SCS:     # do MBD@(rs)SCS?
-            alph, om, rvdwAB, c6 = self.alpha_0_SCS, self.omega_SCS, self.RvdW_SCS, self.C6_SCS
-        else:               # do MBD@TS
-            alph, om, rvdwAB, c6 = self.alpha_0_TS, self.omega_TS, self.RvdW_TS, self.C6_TS
-        
-        idx_sub1 = self.interaction_modes['indices_subsystem1']+1
-        idx_sub2 = self.interaction_modes['indices_subsystem2']+1
-        pref_in = self.interaction_modes['prefix_mbd_modes']
-        mbd_mod.get_interaction_modes(self.modus, \
-                                      self.Coulomb_CFDM, \
-                                      self.pos, alph, om, \
-                                      rvdwAB, self.damp_par_beta, \
-                                      self.damp_par_a, c6, \
-                                      idx_sub1, idx_sub2, \
-                                      unit_cell=self.UC, \
-                                      k_grid=kgrid, \
-                                      prefix_mbd_modes=pref_in)
         
     
     def _get_TS_energy1(self):
