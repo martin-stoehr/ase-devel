@@ -50,8 +50,9 @@ except ImportError:
 
 class kSpace_MBD_calculator(Calculator):
     """
-    Many-Body Dispersion calculator class for reciprocal space formulation.
-    written by Martin Stoehr (martin.stoehr@uni.lu), Feb 2016.
+    Many-Body Dispersion calculator class
+    
+    by Martin Stoehr (martin.stoehr@uni.lu), Jan 2017.
     """
     
     
@@ -82,11 +83,22 @@ class kSpace_MBD_calculator(Calculator):
                   'get_MBD_eigenvectors', \
                   'set_negative_eigenvalues_zero', \
                   'use_MBDrsSCS_damping', \
-                  'use_fractional_ionic_approach']
+                  'use_fractional_ionic_approach', \
+                  'alpha_model', \
+                  'atomic_charges']
     
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
                  label=os.curdir, atoms=None, **kwargs):
+        
+        use_FI = kwargs.get('use_fractional_ionic_approach', False)
+        if use_FI:
+            default_parameters['alpha_model'] = 'PGG_Scaled'
+            valid_models = ['Mixed_Scaled', 'PGG', 'PGG_Scaled', 'RXH_Scaled']
+            if ( kwargs.has_key('alpha_model') and \
+                 kwargs['alpha_model'] not in valid_models ):
+                print("WARNING: alpha_model '"+kwargs['alpha_model']+"' not known. Using 'PGG_Scaled'")
+                del kwargs['alpha_model']
         
         ## set default arguments
         for arg, val in default_parameters.iteritems():
@@ -217,6 +229,7 @@ class kSpace_MBD_calculator(Calculator):
             if not (self.do_reciprocal or self.do_supercell):
                 raise ValueError("You chose periodic boundary condition via vacuum_axis, but did not specify how to handle it (do_reciprocal or do_supercell)!")
         
+        self.n_atoms = len(atoms)
         self.pos = atoms.positions/Bohr
         if np.product(eigvals(atoms.get_cell())) < 1e-2:
             if not np.all(self.vacuum_axis):
@@ -226,18 +239,9 @@ class kSpace_MBD_calculator(Calculator):
         
         self.UC = atoms.get_cell()/Bohr
         symbols = atoms.get_chemical_symbols()
-        try:
-            something
-        if self.use_fractional_ionic_approach:
-            self.a_div_a0 *= Z/Npop
-        
-        self.alpha_f, self.C6_f, self.RvdW_f = get_free_atom_data(symbols)
-        self.alpha_0_TS = self.alpha_f*self.a_div_a0
-        self.C6_TS = self.C6_f*self.a_div_a0*self.a_div_a0
-        self.RvdW_TS = self.RvdW_f*self.a_div_a0**(1./3.)
-        self.omega_TS = mbd_mod.omega_eff(self.C6_TS, self.alpha_0_TS)
-        
+        self._get_dispersion_params(atoms)
         self._get_SCS_and_MBD_damping_params()
+        
         if self.do_SCS:
             self._run_electrostatic_screening()
         
@@ -257,11 +261,55 @@ class kSpace_MBD_calculator(Calculator):
         mbd_mod.destroy_grid()
         
     
+    def _get_dispersion_params(self, atoms):
+        self.alpha_ref, self.C6_ref, self.RvdW_ref = get_free_atom_data(\
+                                            atoms.get_chemical_symbols() )
+        if self.use_fractional_ionic_approach:
+            from alpha_FI.AlphaModel import AlphaModel
+            
+            Z = atoms.get_atomic_numbers()
+            if not hasattr(self, 'atomic_charges'):
+                from ase.calculators.calculator import PropertyNotImplementedError
+                try:
+                    q = atoms.get_charges()
+                except RuntimeError, PropertyNotImplementedError:
+                    msg  = 'WARNING: Cannot get charges for fractional ionic approach from atoms object.\n'
+                    msg += '         Please, provide argument atomic_charges. Using neutral atoms for now...'
+                    print(msg)
+                    q = np.zeros_like(Z)
+            else:
+                q = np.asarray(self.atomic_charges)
+            
+            Npop_l, Npop_u = int(Z - q), int(Z - q + 1)
+            f_FI = Z - q - Npop_l
+            a_FI = AlphaModel(filename='Model'+self.alpha_model+'.dat')
+            for i in xrange(self.n_atoms):
+                self.alpha_ref[i] =   f_FI   * a_FI.GetAlpha((Z[i],Npop_u[i])) + \
+                                   (1.-f_FI) * a_FI.GetAlpha((Z[i],Npop_l[i]))
+                self.C6_ref[i] =   f_FI   * a_FI.GetC6((Z[i],Npop_u[i])) + \
+                                (1.-f_FI) * a_FI.GetC6((Z[i],Npop_l[i]))
+            if self.do_SCS:
+                a_dyn = np.zeros((self.n_omega_SCS+1, self.n_atoms))
+                for i in xrange(self.n_atoms):
+                    a_dyn[:,i] =    f_FI   * a_FI.GetAlpha((Z[i],Npop_u[i]), \
+                                                     omega=mbd_mod.omega_grid) + \
+                                 (1.-f_FI) * a_FI.GetAlpha((Z[i],Npop_l[i]), \
+                                                     omega=mbd_mod.omega_grid)
+            
+            self.a_div_a0 *= Z/(Z - q)
+            self.alpha_dyn_TS = a_dyn*self.a_div_a0
+        
+        self.alpha_0_TS = self.alpha_ref*self.a_div_a0
+        self.C6_TS = self.C6_ref*self.a_div_a0*self.a_div_a0
+        if ( self.do_SCS and not self.use_fractional_ionic_approach):
+            self.alpha_dyn_TS = mbd_mod.alpha_dynamic_ts_all('C', self.n_omega_SCS, \
+                                                      self.alpha_0_TS, c6=self.C6_TS)
+        
+        self.RvdW_TS = self.RvdW_ref*self.a_div_a0**(1./3.)
+        self.omega_TS = mbd_mod.omega_eff(self.C6_TS, self.alpha_0_TS)
+        
+    
     def _run_electrostatic_screening(self):
-        self.alpha_dyn_TS = mbd_mod.alpha_dynamic_ts_all('C', \
-                                                 mbd_mod.n_grid_omega, \
-                                                 self.alpha_0_TS, \
-                                                 c6=self.C6_TS)
         if self.use_scalapack: # use ScaLAPACK?
             self.alpha_dyn_SCS = mbd_mod.run_scs_s(self.modus, \
                                               self.Coulomb_SCS, \
