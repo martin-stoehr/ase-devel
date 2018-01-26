@@ -264,9 +264,13 @@ class kSpace_MBD_calculator(Calculator):
     def _get_dispersion_params(self, atoms):
         self.alpha_ref, self.C6_ref, self.RvdW_ref = get_free_atom_data(\
                                             atoms.get_chemical_symbols() )
+        self.alpha_ref = np.asarray(self.alpha_ref)
+        self.C6_ref, self.RvdW_ref = np.asarray(self.C6_ref), np.asarray(self.RvdW_ref)
         if self.use_fractional_ionic_approach:
-            from alpha_FI.AlphaModel import AlphaModel
+            from ase.calculators.AlphaModel import AlphaModel
+            from os.path import dirname
             
+            dir_ref = dirname(__file__)+'/alpha_FI_refdata/'
             Z = atoms.get_atomic_numbers()
             if not hasattr(self, 'atomic_charges'):
                 from ase.calculators.calculator import PropertyNotImplementedError
@@ -280,28 +284,27 @@ class kSpace_MBD_calculator(Calculator):
             else:
                 q = np.asarray(self.atomic_charges)
             
-            Npop_l, Npop_u = int(Z - q), int(Z - q + 1)
+            Npop_l = np.int64(Z - q)
             f_FI = Z - q - Npop_l
-            a_FI = AlphaModel(filename='Model'+self.alpha_model+'.dat')
+            a_FI = AlphaModel(filename=dir_ref+'Model'+self.alpha_model+'.dat')
+            a_dyn = np.zeros((self.n_omega_SCS+1, self.n_atoms))
             for i in xrange(self.n_atoms):
-                self.alpha_ref[i] =   f_FI   * a_FI.GetAlpha((Z[i],Npop_u[i])) + \
-                                   (1.-f_FI) * a_FI.GetAlpha((Z[i],Npop_l[i]))
-                self.C6_ref[i] =   f_FI   * a_FI.GetC6((Z[i],Npop_u[i])) + \
-                                (1.-f_FI) * a_FI.GetC6((Z[i],Npop_l[i]))
-            if self.do_SCS:
-                a_dyn = np.zeros((self.n_omega_SCS+1, self.n_atoms))
-                for i in xrange(self.n_atoms):
-                    a_dyn[:,i] =    f_FI   * a_FI.GetAlpha((Z[i],Npop_u[i]), \
-                                                     omega=mbd_mod.omega_grid) + \
-                                 (1.-f_FI) * a_FI.GetAlpha((Z[i],Npop_l[i]), \
-                                                     omega=mbd_mod.omega_grid)
+                fi = f_FI[i]
+                ZNu, ZNl = (Z[i],Npop_l[i]+1), (Z[i],Npop_l[i])
+                ZNul = [ZNu, ZNl]
+                a_dyn[:,i] =    fi   * a_FI.GetAlpha(ZNu, omega=mbd_mod.omega_grid) + \
+                             (1.-fi) * a_FI.GetAlpha(ZNl, omega=mbd_mod.omega_grid)
+                self.C6_ref[i] =    fi*fi     * a_FI.GetC6(ZNu) + \
+                                2.*fi*(1.-fi) * a_FI.GetC6(ZNul) + \
+                               (1.-fi)*(1.-fi)* a_FI.GetC6(ZNl)
             
+            self.alpha_ref = a_dyn[0,:]
             self.a_div_a0 *= Z/(Z - q)
             self.alpha_dyn_TS = a_dyn*self.a_div_a0
         
         self.alpha_0_TS = self.alpha_ref*self.a_div_a0
         self.C6_TS = self.C6_ref*self.a_div_a0*self.a_div_a0
-        if ( self.do_SCS and not self.use_fractional_ionic_approach):
+        if not self.use_fractional_ionic_approach:
             self.alpha_dyn_TS = mbd_mod.alpha_dynamic_ts_all('C', self.n_omega_SCS, \
                                                       self.alpha_0_TS, c6=self.C6_TS)
         
@@ -420,7 +423,17 @@ class kSpace_MBD_calculator(Calculator):
         self.a_div_a0 = np.array(rescaling)
         
     
-    def get_frequency_dependent_alpha_TS(self, atoms=None):
+    def get_static_polarizability_TS(self, atoms=None):
+        if (not hasattr(self, 'atoms')) and (atoms is None):
+            raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
+        
+        if not hasattr(self, 'alpha_0_TS'):
+            self.update_properties(atoms, do_MBD=False)
+        
+        return self.alpha_0_TS
+        
+    
+    def get_dynamic_polarizability_TS(self, atoms=None):
         if (not hasattr(self, 'atoms')) and (atoms is None):
             raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
         
@@ -430,7 +443,7 @@ class kSpace_MBD_calculator(Calculator):
         return self.alpha_dyn_TS
         
     
-    def get_static_alpha_SCS(self, atoms=None):
+    def get_static_polarizability_SCS(self, atoms=None):
         if self.do_SCS:
             if (not hasattr(self, 'atoms')) and (atoms is None):
                 raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
@@ -443,7 +456,7 @@ class kSpace_MBD_calculator(Calculator):
             raise ValueError("Please specify 'do_SCS = True' in order to get alpha0 after SCS")
         
     
-    def get_frequency_dependent_alpha_SCS(self, atoms=None):
+    def get_dynamic_polarizability_SCS(self, atoms=None):
         if self.do_SCS:
             if (not hasattr(self, 'atoms')) and (atoms is None):
                 raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
@@ -549,6 +562,7 @@ class kSpace_MBD_calculator(Calculator):
             return self.E_TS_SCS
         else:
             raise ValueError("Please specify 'do_TSSCS = True' in order to get TS+SCS energy")
+        
     
     def get_effective_masses(self, charges=None, atoms=None):
         """

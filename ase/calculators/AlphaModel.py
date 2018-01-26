@@ -2,8 +2,8 @@ import numpy as np
 
 """
 Python class for dealing with polarizability model data as described in
-[Gould, Bucko J. Chem. Theory Comput., 2016, 12 (8), pp 3603–3613; doi:10.1021/acs.jctc.6b00361].
-(adapted for use in ASE MBD calculator by Martin Stoehr \@ Uni Luxembourg, Jan 2018)
+[Gould, Bucko J. Chem. Theory Comput., 2016, 12 (8), pp 3603-3613, doi:10.1021/acs.jctc.6b00361].
+adapted for use in ASE MBD calculator by Martin Stoehr (martin.stoehr@uni.lu), Jan 2018.
 
 Methods are:
  
@@ -48,7 +48,7 @@ class AlphaModel:
 
     """Initialisation.
     By default loads the benchmark set (must be present)"""
-    def __init__(self, filename="ModelPGG_Scaled.dat"):
+    def __init__(self, filename="alpha_FI_refdata/ModelPGG_Scaled.dat"):
         from os.path import exists as pexists
         
         err_msg = "ERROR: Could not find dataset. Please, make sure dataset "+filename+" exists!\n"
