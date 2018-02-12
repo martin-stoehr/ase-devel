@@ -260,7 +260,8 @@ class DFTD3(FileIOCalculator):
         if pbc:
             fname = os.path.join(self.directory,
                                  '{}.POSCAR'.format(self.label))
-            write_vasp(fname, atoms)
+            write_vasp(fname, atoms, label='Periodic geometry passed to DFTD3', \
+                       vasp5=True)
         else:
             fname = os.path.join(self.directory, '{}.xyz'.format(self.label))
             write_xyz(fname, atoms, plain=True)

@@ -5,6 +5,7 @@ Atoms object in VASP POSCAR format.
 """
 
 import os
+import re
 import ase.units
 
 from ase.utils import basestring
@@ -261,7 +262,11 @@ def read_vasp_out(filename='OUTCAR', index=-1, force_consistent=False):
     ecount = 0
     poscount = 0
     magnetization = []
+    magmom = None
 
+    for n, line in enumerate(data):
+        if re.search('[0-9]-[0-9]',line):
+            data[n] = re.sub('([0-9])-([0-9])',r'\1 -\2',line)
     for n, line in enumerate(data):
         if 'POTCAR:' in line:
             temp = line.split()[2]
@@ -302,6 +307,10 @@ def read_vasp_out(filename='OUTCAR', index=-1, force_consistent=False):
             magnetization = []
             for i in range(natoms):
                 magnetization += [float(data[n + 4 + i].split()[4])]
+        if 'number of electron' in line:
+            parts = line.split()
+            if len(parts) > 5 and parts[0].strip() != "NELECT":
+                magmom = float(parts[5])
         if 'in kB ' in line:
             stress = -np.array([float(a) for a in line.split()[2:]])
             stress = stress[[0, 1, 2, 4, 5, 3]] * 1e-1 * ase.units.GPa
@@ -323,6 +332,8 @@ def read_vasp_out(filename='OUTCAR', index=-1, force_consistent=False):
                 mag = np.array(magnetization, float)
                 images[-1].calc.magmoms = mag
                 images[-1].calc.results['magmoms'] = mag
+            if magmom:
+                images[-1].calc.results['magmom'] = magmom
             atoms = Atoms(pbc=True, constraint=constr)
             poscount += 1
 
@@ -437,7 +448,7 @@ def __get_xml_parameter(par):
     var_type = to_type[par.attrib.get('type', 'float')]
 
     if par.tag == 'v':
-        return map(var_type, text.split())
+        return list(map(var_type, text.split()))
     else:
         return var_type(text.strip())
 
@@ -463,6 +474,7 @@ def read_vasp_xml(filename='vasprun.xml', index=-1):
     atoms_init = None
     calculation = []
     ibz_kpts = None
+    kpt_weights = None
     parameters = OrderedDict()
 
     try:
@@ -483,6 +495,9 @@ def read_vasp_xml(filename='vasprun.xml', index=-1):
 
                     for i, kpt in enumerate(kpts):
                         ibz_kpts[i] = [float(val) for val in kpt.text.split()]
+
+                    kpt_weights = elem.findall('varray[@name="weights"]/v')
+                    kpt_weights = [float(val.text) for val in kpt_weights]
 
                 elif elem.tag == 'parameters':
                     for par in elem.iter():
@@ -626,7 +641,7 @@ def read_vasp_xml(filename='vasprun.xml', index=-1):
             kblocks = step.findall(
                 'eigenvalues/array/set/set/set[@comment="kpoint %d"]' % ikpt)
             if kblocks is not None:
-                for i, kpoint in enumerate(kblocks):
+                for spin, kpoint in enumerate(kblocks):
                     eigenvals = kpoint.findall('r')
                     eps_n = np.zeros(len(eigenvals))
                     f_n = np.zeros(len(eigenvals))
@@ -636,7 +651,8 @@ def read_vasp_xml(filename='vasprun.xml', index=-1):
                         f_n[j] = float(val[1])
                     if len(kblocks) == 1:
                         f_n *= 2
-                    kpoints.append(SinglePointKPoint(1, 0, ikpt, eps_n, f_n))
+                    kpoints.append(SinglePointKPoint(kpt_weights[ikpt - 1],
+                                                     spin, ikpt, eps_n, f_n))
         if len(kpoints) == 0:
             kpoints = None
 
@@ -678,6 +694,12 @@ def write_vasp(filename, atoms, label='', direct=False, sort=None,
                                'one image to VASP input')
         else:
             atoms = atoms[0]
+
+    # Check lattice vectors are finite
+    if np.any(atoms.get_cell_lengths_and_angles() == 0.):
+        raise RuntimeError(
+            'Lattice vectors must be finite and not coincident. '
+            'At least one lattice length or angle is zero.')
 
     # Write atom positions in scaled or cartesian coordinates
     if direct:
