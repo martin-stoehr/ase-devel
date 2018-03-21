@@ -130,8 +130,6 @@ class Dftb(FileIOCalculator):
             self.default_parameters['Driver_MaxForceComponent']='1E-4'
             self.default_parameters['Driver_MaxSteps']=0
         else:
-            print("You chose not to calculate forces (Options_CalculateForces = 'No').\
-Be aware that this might limit capabilities.")
             self.default_parameters['Driver']='{}'
         
         minmem = kwargs.get('Options_MinimiseMemoryUsage', 'No')

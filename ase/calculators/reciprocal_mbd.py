@@ -35,6 +35,7 @@ default_parameters = {
                       'set_negative_eigenvalues_zero':True,
                       'use_MBDrsSCS_damping':False, 
                       'use_fractional_ionic_approach':False,
+                      'use_RvdW_from_alpha':False,
                      }
 
 
@@ -85,7 +86,10 @@ class kSpace_MBD_calculator(Calculator):
                   'use_MBDrsSCS_damping', \
                   'use_fractional_ionic_approach', \
                   'alpha_model', \
-                  'atomic_charges']
+                  'atomic_charges', \
+                  'custom_damping_TS', \
+                  'custom_damping_SCSMBD', \
+                  'use_RvdW_from_alpha']
     
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
@@ -152,7 +156,14 @@ class kSpace_MBD_calculator(Calculator):
         
         damp_dict = get_damping(self.xc)
         self.ts_d = damp_dict['ts_d']
-        self.ts_s_r = damp_dict['ts_s_r']
+        if self.use_RvdW_from_alpha:
+            if (self.xc.lower() == 'pbe'):
+                self.ts_s_r = 0.91
+            else:
+                print("TS damping parameter using RvdW_from_alpha only for PBE available. Using XC-default.")
+                self.ts_s_r = damp_dict['ts_s_r']
+        else:
+            self.ts_s_r = damp_dict['ts_s_r']
         
     
     def _get_SCS_and_MBD_damping_params(self):
@@ -240,7 +251,11 @@ class kSpace_MBD_calculator(Calculator):
         self.UC = atoms.get_cell()/Bohr
         symbols = atoms.get_chemical_symbols()
         self._get_dispersion_params(atoms)
-        self._get_SCS_and_MBD_damping_params()
+        if hasattr(self, 'custom_damping_SCSMBD'):
+            self.damp_par_a = self.custom_damping_SCSMBD['a']
+            self.damp_par_beta = self.custom_damping_SCSMBD['beta']
+        else:
+            self._get_SCS_and_MBD_damping_params()
         
         if self.do_SCS:
             self._run_electrostatic_screening()
@@ -308,7 +323,11 @@ class kSpace_MBD_calculator(Calculator):
             self.alpha_dyn_TS = mbd_mod.alpha_dynamic_ts_all('C', self.n_omega_SCS, \
                                                       self.alpha_0_TS, c6=self.C6_TS)
         
-        self.RvdW_TS = self.RvdW_ref*self.a_div_a0**(1./3.)
+        if self.use_RvdW_from_alpha:
+            self.RvdW_TS = 2.54*self.alpha_0_TS**(1./7.)
+        else:
+            self.RvdW_TS = self.RvdW_ref*self.a_div_a0**(1./3.)
+        
         self.omega_TS = mbd_mod.omega_eff(self.C6_TS, self.alpha_0_TS)
         
     
@@ -371,7 +390,11 @@ class kSpace_MBD_calculator(Calculator):
         
     
     def _get_TS_energy1(self):
-        self._get_TS_damping_params()
+        if hasattr(self, 'custom_damping_TS'):
+            self.ts_d = self.custom_damping_TS['d']
+            self.ts_s_r = self.custom_damping_TS['s_r']
+        else:
+            self._get_TS_damping_params()
         
         if self.use_scalapack:
             self.E_TS = mbd_mod.get_ts_energy_lowmem(self.modus, \
