@@ -3,6 +3,7 @@ import numpy as np
 import os.path
 from ase.data.vdw import vdw_radii
 
+
 chemical_symbols = ['X',  'H',  'He', 'Li', 'Be',
                     'B',  'C',  'N',  'O',  'F',
                     'Ne', 'Na', 'Mg', 'Al', 'Si',

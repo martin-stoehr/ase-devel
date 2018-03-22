@@ -1,7 +1,7 @@
 ##########################################################
 #                                                        #
 ##      This module provides data for the S66 set       ##
-#   [J. Chem. Theory Comput. 7 (8), 2427–2438 (2011)]    #
+#   [J. Chem. Theory Comput. 7 (8), 2427-2438 (2011)]    #
 ##  With most accurate reference interaction energies   ##
 #   from CCSD(T)/CBS CP using heavily aug-cc TZ basis    #
 ##  [J. Chem. Theory Comput. 7 (11), 3466-3470 (2011)]  ##
@@ -11,28 +11,50 @@
 ##########################################################
 
 
+import numpy as np
+from ase.units import kcal, mol
+from ase.atoms import Atoms
+
+
 """
 Implemented Properties:
     names:          list of names for systems in data set, list len = 66
-                    return via s66.get_s66_names()
+                    return via get_names()
     systems:        from dictionary of ASE atoms objects corresponding to name
-                    return via s66x8.create_s66_system(<name>)
+                    return via create_s66_system(<name>)
     monomer atoms:  dictionary of number of monomer atoms
-                    return via s66.get_number_monomer_atoms_s66(<name>)
+                    return via get_number_monomer_atoms(<name>)
     
     interaction energies (IAE)
     ==========================
         . CCSD(T)/CBS(haug-cc-pVTZ) CP reference, IAE in eV
-          return via s66.get_interaction_energy_CC_s66(<name>)
+          return via get_interaction_energy_CC(<name>)
         . MP2/CBS CP reference, IAE in eV
-          return via s66.get_interaction_energy_MP2_s66(<name>)
+          return via get_interaction_energy_MP2(<name>)
 
 """
 
-from ase.atoms import Atoms
+s66_names = ['WaterWater', 'WaterMeOH', 'WaterMeNH2', 'WaterPeptide', \
+             'MeOHMeOH', 'MeOHMeNH2', 'MeOHPeptide', 'MeOHWater', \
+             'MeNH2MeOH', 'MeNH2MeNH2', 'MeNH2Peptide', 'MeNH2Water', \
+             'PeptideMeOH', 'PeptideMeNH2', 'PeptidePeptide', 'PeptideWater', \
+             'UracilUracilBP', 'WaterPyridine', 'MeOHPyridine', 'AcOHAcOH', \
+             'AcNH2AcNH2', 'AcOHUracil', 'AcNH2Uracil', 'BenzeneBenzenepipi', \
+             'PyridinePyridinepipi', 'UracilUracilpipi', 'BenzenePyridinepipi', \
+             'BenzeneUracilpipi', 'PyridineUracilpipi', 'BenzeneEthene', \
+             'UracilEthene', 'UracilEthyne', 'PyridineEthene', 'PentanePentane', \
+             'NeopentanePentane', 'NeopentaneNeopentane', 'CyclopentaneNeopentane', \
+             'CyclopentaneCyclopentane', 'BenzeneCyclopentane', 'BenzeneNeopentane', \
+             'UracilPentane', 'UracilCyclopentane', 'UracilNeopentane', \
+             'EthenePentane', 'EthynePentane', 'PeptidePentane', 'BenzeneBenzeneTS', \
+             'PyridinePyridineTS', 'BenzenePyridineTS', 'BenzeneEthyneCHpi', \
+             'EthyneEthyneTS', 'BenzeneAcOHOHpi', 'BenzeneAcNH2NHpi', \
+             'BenzeneWaterOHpi', 'BenzeneMeOHOHpi', 'BenzeneMeNH2NHpi', \
+             'BenzenePeptideNHpi', 'PyridinePyridineCHN', 'EthyneWaterCHO', \
+             'EthyneAcOHOHpi', 'PentaneAcOH', 'PentaneAcNH2', 'BenzeneAcOH', \
+             'PeptideEthene', 'PyridineEthyne', 'MeNH2Pyridine']
 
-
-s66_names = ['WaterWater', 'WaterMeOH', 'WaterMeNH2', 'WaterPeptide', 'MeOHMeOH', 'MeOHMeNH2', 'MeOHPeptide', 'MeOHWater', 'MeNH2MeOH', 'MeNH2MeNH2', 'MeNH2Peptide', 'MeNH2Water', 'PeptideMeOH', 'PeptideMeNH2', 'PeptidePeptide', 'PeptideWater', 'UracilUracilBP', 'WaterPyridine', 'MeOHPyridine', 'AcOHAcOH', 'AcNH2AcNH2', 'AcOHUracil', 'AcNH2Uracil', 'BenzeneBenzenepipi', 'PyridinePyridinepipi', 'UracilUracilpipi', 'BenzenePyridinepipi', 'BenzeneUracilpipi', 'PyridineUracilpipi', 'BenzeneEthene', 'UracilEthene', 'UracilEthyne', 'PyridineEthene', 'PentanePentane', 'NeopentanePentane', 'NeopentaneNeopentane', 'CyclopentaneNeopentane', 'CyclopentaneCyclopentane', 'BenzeneCyclopentane', 'BenzeneNeopentane', 'UracilPentane', 'UracilCyclopentane', 'UracilNeopentane', 'EthenePentane', 'EthynePentane', 'PeptidePentane', 'BenzeneBenzeneTS', 'PyridinePyridineTS', 'BenzenePyridineTS', 'BenzeneEthyneCHpi', 'EthyneEthyneTS', 'BenzeneAcOHOHpi', 'BenzeneAcNH2NHpi', 'BenzeneWaterOHpi', 'BenzeneMeOHOHpi', 'BenzeneMeNH2NHpi', 'BenzenePeptideNHpi', 'PyridinePyridineCHN', 'EthyneWaterCHO', 'EthyneAcOHOHpi', 'PentaneAcOH', 'PentaneAcNH2', 'BenzeneAcOH', 'PeptideEthene', 'PyridineEthyne', 'MeNH2Pyridine']
+s66_index = {'MeNH2Pyridine': 65, 'AcNH2AcNH2': 20, 'BenzenePeptideNHpi': 56, 'BenzeneWaterOHpi': 53, 'PyridineEthyne': 64, 'MeOHMeNH2': 5, 'MeNH2Peptide': 10, 'BenzeneAcOH': 62, 'AcOHUracil': 21, 'MeNH2MeNH2': 9, 'PyridineUracilpipi': 28, 'MeOHWater': 7, 'BenzenePyridineTS': 48, 'NeopentaneNeopentane': 35, 'BenzeneAcOHOHpi': 51, 'PeptideMeNH2': 13, 'PyridinePyridineTS': 47, 'WaterPeptide': 3, 'WaterMeOH': 1, 'BenzeneCyclopentane': 38, 'CyclopentaneCyclopentane': 37, 'BenzeneEthyneCHpi': 49, 'MeOHPeptide': 6, 'UracilEthyne': 31, 'PeptideEthene': 63, 'PeptidePentane': 45, 'NeopentanePentane': 34, 'BenzeneUracilpipi': 27, 'BenzeneMeNH2NHpi': 55, 'BenzeneNeopentane': 39, 'BenzeneBenzenepipi': 23, 'PeptideMeOH': 12, 'PyridineEthene': 32, 'WaterPyridine': 17, 'MeNH2MeOH': 8, 'UracilNeopentane': 42, 'UracilUracilBP': 16, 'WaterWater': 0, 'MeNH2Water': 11, 'PentaneAcNH2': 61, 'BenzeneAcNH2NHpi': 52, 'BenzeneEthene': 29, 'BenzenePyridinepipi': 26, 'UracilPentane': 40, 'MeOHPyridine': 18, 'PyridinePyridinepipi': 24, 'UracilCyclopentane': 41, 'BenzeneMeOHOHpi': 54, 'PeptideWater': 15, 'BenzeneBenzeneTS': 46, 'UracilEthene': 30, 'PentanePentane': 33, 'EthyneEthyneTS': 50, 'PentaneAcOH': 60, 'MeOHMeOH': 4, 'AcNH2Uracil': 22, 'PyridinePyridineCHN': 57, 'CyclopentaneNeopentane': 36, 'UracilUracilpipi': 25, 'EthyneAcOHOHpi': 59, 'EthenePentane': 43, 'PeptidePeptide': 14, 'EthyneWaterCHO': 58, 'WaterMeNH2': 2, 'AcOHAcOH': 19, 'EthynePentane': 44}
 
 s66_systems = {}
 s66_systems['WaterWater'] = Atoms(symbols='OHHOHH', positions=([[-0.702196054, -0.056060256, 0.009942262], [-1.022193224, 0.846775782, -0.011488714], [0.257521062, 0.042121496, 0.005218999], [2.220871067, 0.026716792, 0.000620476], [2.597492682, -0.411663274, 0.766744858], [2.593135384, -0.449496183, -0.744782026]]))
@@ -108,18 +130,27 @@ s66_nAtoms_monomers = {'WaterWater':[3, 3], 'WaterMeOH':[3, 6], 'WaterMeNH2':[3,
 
 s66_IAE_CC = {'WaterWater':-4.966, 'WaterMeOH':-5.653, 'WaterMeNH2':-6.984, 'WaterPeptide':-8.169, 'MeOHMeOH':-5.811, 'MeOHMeNH2':-7.619, 'MeOHPeptide':-8.292, 'MeOHWater':-5.052, 'MeNH2MeOH':-3.085, 'MeNH2MeNH2':-4.193, 'MeNH2Peptide':-5.451, 'MeNH2Water':-7.347, 'PeptideMeOH':-6.242, 'PeptideMeNH2':-7.517, 'PeptidePeptide':-8.681, 'PeptideWater':-5.167, 'UracilUracilBP':-17.356, 'WaterPyridine':-6.931, 'MeOHPyridine':-7.475, 'AcOHAcOH':-19.301, 'AcNH2AcNH2':-16.434, 'AcOHUracil':-19.681, 'AcNH2Uracil':-19.37, 'BenzeneBenzenepipi':-2.758, 'PyridinePyridinepipi':-3.831, 'UracilUracilpipi':-9.771, 'BenzenePyridinepipi':-3.375, 'BenzeneUracilpipi':-5.628, 'PyridineUracilpipi':-6.734, 'BenzeneEthene':-1.388, 'UracilEthene':-3.341, 'UracilEthyne':-3.707, 'PyridineEthene':-1.827, 'PentanePentane':-3.749, 'NeopentanePentane':-2.591, 'NeopentaneNeopentane':-1.756, 'CyclopentaneNeopentane':-2.386, 'CyclopentaneCyclopentane':-2.977, 'BenzeneCyclopentane':-3.533, 'BenzeneNeopentane':-2.863, 'UracilPentane':-4.811, 'UracilCyclopentane':-4.098, 'UracilNeopentane':-3.689, 'EthenePentane':-1.988, 'EthynePentane':-1.727, 'PeptidePentane':-4.243, 'BenzeneBenzeneTS':-2.843, 'PyridinePyridineTS':-3.513, 'BenzenePyridineTS':-3.304, 'BenzeneEthyneCHpi':-2.86, 'EthyneEthyneTS':-1.536, 'BenzeneAcOHOHpi':-4.715, 'BenzeneAcNH2NHpi':-4.387, 'BenzeneWaterOHpi':-3.277, 'BenzeneMeOHOHpi':-4.168, 'BenzeneMeNH2NHpi':-3.204, 'BenzenePeptideNHpi':-5.258, 'PyridinePyridineCHN':-4.205, 'EthyneWaterCHO':-2.899, 'EthyneAcOHOHpi':-4.933, 'PentaneAcOH':-2.894, 'PentaneAcNH2':-3.516, 'BenzeneAcOH':-3.76, 'PeptideEthene':-2.995, 'PyridineEthyne':-4.068, 'MeNH2Pyridine':-3.963}
 
- 
+
+s66_IAE_MP2 = {'MeNH2Pyridine': -4.552, 'AcNH2AcNH2': -16.122, 'BenzenePeptideNHpi': -6.199, 'BenzeneWaterOHpi': -3.567, 'PyridineEthyne': -4.207, 'MeOHMeNH2': -7.727, 'MeNH2Peptide': -5.53, 'BenzeneAcOH': -4.556, 'AcOHUracil': -19.401, 'MeNH2MeNH2': -4.29, 'PyridineUracilpipi': -8.626, 'MeOHWater': -5.031, 'BenzenePyridineTS': -4.175, 'NeopentaneNeopentane': -1.737, 'BenzeneAcOHOHpi': -5.25, 'PeptideMeNH2': -7.682, 'PyridinePyridineTS': -4.39, 'WaterPeptide': -8.071, 'WaterMeOH': -5.694, 'BenzeneCyclopentane': -4.58, 'CyclopentaneCyclopentane': -3.137, 'BenzeneEthyneCHpi': -3.463, 'MeOHPeptide': -8.181, 'UracilEthyne': -4.409, 'PeptideEthene': -3.168, 'PeptidePentane': -4.513, 'NeopentanePentane': -2.675, 'BenzeneUracilpipi': -7.535, 'BenzeneMeNH2NHpi': -3.843, 'BenzeneNeopentane': -3.599, 'BenzeneBenzenepipi': -4.703, 'PeptideMeOH': -6.324, 'PyridineEthene': -2.826, 'WaterPyridine': -7.069, 'MeNH2MeOH': -3.059, 'UracilNeopentane': -4.05, 'UracilUracilBP': -17.168, 'WaterWater': -4.955, 'MeNH2Water': -7.52, 'PentaneAcNH2': -3.657, 'BenzeneAcNH2NHpi': -4.722, 'BenzeneEthene': -2.325, 'BenzenePyridinepipi': -5.432, 'UracilPentane': -5.441, 'MeOHPyridine': -7.675, 'PyridinePyridinepipi': -6.006, 'UracilCyclopentane': -4.698, 'BenzeneMeOHOHpi': -4.762, 'PeptideWater': -5.148, 'BenzeneBenzeneTS': -3.745, 'UracilEthene': -4.011, 'PentanePentane': -3.968, 'EthyneEthyneTS': -1.661, 'PentaneAcOH': -3.029, 'MeOHMeOH': -5.838, 'AcNH2Uracil': -19.101, 'PyridinePyridineCHN': -4.367, 'CyclopentaneNeopentane': -2.485, 'UracilUracilpipi': -11.139, 'EthyneAcOHOHpi': -5.029, 'EthenePentane': -2.151, 'PeptidePeptide': -8.674, 'EthyneWaterCHO': -2.873, 'WaterMeNH2': -7.084, 'AcOHAcOH': -19.0, 'EthynePentane': -2.104}
+
+################################ END DATA #################################
 
 
 
-#####################
-### FUNCTIONALITY ###
-#####################
+
+
+############################## FUNCTIONALITY ##############################
 
 def get_names():
     """ return list of names for systems contained in S66 set. """
     
     return s66_names
+    
+
+def get_S66_ID(name_system):
+    """ return the numerical identifier of system <name_system>. (= official ID -1) """
+    
+    return s66_index[name_system]
     
 
 def create_s66_system(name_system):
@@ -141,23 +172,23 @@ def get_number_monomer_atoms(name_system):
     return np.array(s66_nAtoms_monomers[name_system])
     
 
-def get_interaction_energy_CC_s66(name_system):
+def get_interaction_energy_CC(name_system):
     """
     return interaction energy for S66 dimer <name_system>
     in eV as obtained by CCSD(T)/CBS(haTZ) CP.
     """
     
-    return s66_IAE_CC[name_system]
+    return s66_IAE_CC[name_system]*kcal/mol
     
 
-def get_interaction_energy_MP2_s66(name_system):
+def get_interaction_energy_MP2(name_system):
     """
     return interaction energy for S66 dimer <name_system>
     in eV as obtained by MP2/CBS CP.
     """
     
-    return s66_IAE_MP2[name_system]
+    return s66_IAE_MP2[name_system]*kcal/mol
     
-
+    
 
 #--EOF--#
