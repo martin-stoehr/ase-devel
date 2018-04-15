@@ -536,12 +536,9 @@ class Dftb(FileIOCalculator):
     
     def get_hvr_CPA(self):
         """  Return rescaling ratios as obtained by charge population approach.  """
-        doCPA = np.array([False, False, False, False])
-        doCPA[0] = (self.parameters['Options_WriteCPA'] == 'Yes')
-        doCPA[1] = (self.parameters['Options_WriteCPA'] == 'YES')
-        doCPA[2] = (self.parameters['Options_WriteCPA'] == 'True')
-        doCPA[3] = (self.parameters['Options_WriteCPA'] == 'TRUE')
-        if np.any(doCPA):
+        doCPA1 = (self.parameters['Options_WriteCPA'].lower() == 'yes')
+        doCPA2 = (self.parameters['Options_WriteCPA'].lower() == 'true')
+        if (doCPA1 or doCPA2):
             self.read_CPA()
         else:
             raise ValueError("Sorry, you need to set Options_WriteCPA = 'Yes' for this feature.")
