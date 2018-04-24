@@ -574,12 +574,13 @@ class kSpace_MBD_calculator(Calculator):
             raise ValueError("Please specify 'do_TS = True' in order to get TS energy")
         
     
-    def get_TSSCS_energy(self):
+    def get_TSSCS_energy(self, atoms=None):
         if self.do_TSSCS:
             if (not hasattr(self, 'atoms')) and (atoms is None):
                 raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
             
             if not hasattr(self, 'E_TS_SCS'):
+                self.do_SCS = True
                 self.update_properties(atoms, do_MBD=False)
             
             return self.E_TS_SCS
