@@ -291,7 +291,7 @@ class kSpace_MBD_calculator(Calculator):
                 from ase.calculators.calculator import PropertyNotImplementedError
                 try:
                     q = atoms.get_charges()
-                except RuntimeError, PropertyNotImplementedError:
+                except (RuntimeError, PropertyNotImplementedError):
                     msg  = 'WARNING: Cannot get charges for fractional ionic approach from atoms object.\n'
                     msg += '         Please, provide argument atomic_charges. Using neutral atoms for now...'
                     print(msg)
