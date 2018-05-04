@@ -185,10 +185,7 @@ class kSpace_MBD_calculator(Calculator):
         if self.use_MBDrsSCS_damping:
             self.damp_par_beta = damp_dict['mbd_rsscs_beta']
         elif self.do_SCS:
-            if self.rsSCS:
-                self.damp_par_beta = damp_dict['mbd_rsscs_beta']
-            else:
-                self.damp_par_beta = damp_dict['mbd_scs_beta']
+            self.damp_par_beta = damp_dict['mbd_rsscs_beta']
         elif ('erf' in self.Coulomb_CFDM):
                 self.damp_par_beta = damp_dict['mbd_ts_erf_beta']
         elif ('fermi' in self.Coulomb_CFDM):
@@ -554,6 +551,7 @@ class kSpace_MBD_calculator(Calculator):
                 raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
             
             if not hasattr(self, 'omega_SCS'):
+                print "recalculating..."
                 self.update_properties(atoms, do_MBD=False)
             
             return self.omega_SCS
