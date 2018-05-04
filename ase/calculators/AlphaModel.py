@@ -49,11 +49,12 @@ class AlphaModel:
     """Initialisation.
     By default loads the benchmark set (must be present)"""
     def __init__(self, filename="alpha_FI_refdata/ModelPGG_Scaled.dat"):
-        from os.path import exists as pexists
+        from os.path import join, dirname, exists
         
+        filename = join(dirname(__file__), filename)
         err_msg = "ERROR: Could not find dataset. Please, make sure dataset "+filename+" exists!\n"
         err_msg += "       In case, see Supporting Material of dx.doi.org/10.1021/acs.jctc.6b00361"
-        assert(pexists(filename), err_msg)
+        assert exists(filename), err_msg
         
         self.DataFile = filename
         self.Data = np.loadtxt(filename)
