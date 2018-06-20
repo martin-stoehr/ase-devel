@@ -375,7 +375,11 @@ class Dftb(FileIOCalculator):
             ## reshape array into shape = (n_kpoints, n_Orbitals)
             self.f = textoccs.reshape((self.nOrbs, self.nk)).T
         
-        ## dispersion energy (MBD/TS)
+        ## electronic energy: move this out of read_additional_info!!
+        textelec = textdet.split('Total Electronic energy:')[1].split('\n')[0]
+        self.electronic_energy = float(textelec.split()[-2])
+        
+        ## dispersion energy (MBD/TS): move this out of read_additional_info!!
         try:
             vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
         except KeyError:
@@ -384,8 +388,8 @@ class Dftb(FileIOCalculator):
         if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
             textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
             self.dispersion_energy = float(textdisp.split()[-2])
-        else:
-            print('No dispersion model defined.')
+#        else:
+#            print('No dispersion model defined.')
         
         ## k-point weighting
         myfile = open('dftb_in.hsd','r')
@@ -559,6 +563,13 @@ class Dftb(FileIOCalculator):
             return self.dispersion_energy
         else:
             raise ValueError('You did not specify a dispersion model.')
+        
+    
+    def get_electronic_energy(self):
+        """
+        Return electronic energy = Etot - EBS - EC (- E3rd) in eV.
+        """
+        return self.electronic_energy
         
     
 

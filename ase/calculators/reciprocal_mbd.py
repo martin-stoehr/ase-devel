@@ -36,6 +36,7 @@ default_parameters = {
                       'use_MBDrsSCS_damping':False, 
                       'use_fractional_ionic_approach':False,
                       'use_RvdW_from_alpha':False,
+                      'use_alpha_vs_V_for_QDO':False,
                      }
 
 
@@ -89,7 +90,8 @@ class kSpace_MBD_calculator(Calculator):
                   'atomic_charges', \
                   'custom_damping_TS', \
                   'custom_damping_SCSMBD', \
-                  'use_RvdW_from_alpha']
+                  'use_RvdW_from_alpha', \
+                  'use_alpha_vs_V_for_QDO']
     
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
@@ -224,6 +226,7 @@ class kSpace_MBD_calculator(Calculator):
         assert hasattr(self, 'a_div_a0'), \
         "Please provide rescaling to obtain initial dispersion parameters from accurate free atom reference data via 'set_rescaling(rescaling)'!"
         
+        if use_alpha_vs_V_for_QDO: self.a_div_a0 **= (4./3.)
         self.modus = ''
         if (self.ntasks > 1): self.modus += 'P'
         if np.any(self.vacuum_axis == atoms.pbc):
