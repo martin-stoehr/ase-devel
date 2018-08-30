@@ -236,7 +236,7 @@ class Amber(FileIOCalculator):
         f = netcdf.netcdf_file(filename, 'r')
         forces = f.variables['forces']
         self.results['forces'] = forces[-1, :, :] \
-            / units.Ang * units.kJ / units.mol
+            / units.Ang * units.kcal / units.mol
         f.close()
 
     def set_charges(self, selection, charges, parmed_filename=None):
@@ -265,6 +265,26 @@ class Amber(FileIOCalculator):
         if errorcode:
             raise RuntimeError('%s returned an error: %d' %
                                (self.label, errorcode))
+
+    def get_virtual_charges(self, atoms):
+        topology = open(self.topologyfile, 'r').readlines()
+        for n, line in enumerate(topology):
+            if '%FLAG CHARGE' in line:
+                chargestart = n + 2
+        lines1 = topology[chargestart:(chargestart
+                                       + (len(atoms)-1)//5 + 1)]
+        mm_charges = []
+        for line in lines1:
+            for el in line.split():
+                mm_charges.append(float(el)/18.2223)
+        charges = np.array(mm_charges)
+        return charges
+
+    def add_virtual_sites(self, positions):
+        return positions  # no virtual sites
+
+    def redistribute_forces(self, forces):
+        return forces
 
 
 def map(atoms, top):

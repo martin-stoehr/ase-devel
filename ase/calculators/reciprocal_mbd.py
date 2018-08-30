@@ -554,7 +554,6 @@ class kSpace_MBD_calculator(Calculator):
                 raise ValueError("Please specify atoms object on input or run get_potential_energy() first!")
             
             if not hasattr(self, 'omega_SCS'):
-                print "recalculating..."
                 self.update_properties(atoms, do_MBD=False)
             
             return self.omega_SCS

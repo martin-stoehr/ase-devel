@@ -141,54 +141,65 @@ s66_IAE_MP2 = {'MeNH2Pyridine': -4.552, 'AcNH2AcNH2': -16.122, 'BenzenePeptideNH
 
 ############################## FUNCTIONALITY ##############################
 
-def get_names():
-    """ return list of names for systems contained in S66 set. """
-    
-    return s66_names
-    
 
-def get_S66_ID(name_system):
-    """ return the numerical identifier of system <name_system>. (= official ID -1) """
+class s66_class:
+    def __init__(self):
+        pass
+        
     
-    return s66_index[name_system]
+    def get_names(self):
+        """ return list of names for systems contained in S66 set. """
+        
+        return s66_names
+        
     
+    def get_S66_ID(self, name):
+        """ return the numerical identifier of system <name>. (= official ID -1) """
+        
+        return s66_index[name]
+        
+    
+    def create_s66_system(self, name):
+        """ return ASE atoms object of system in S66 set named <name>. """
+        
+        return s66_systems[name]
+        
+    
+    def create_s66_monomer1(self, name):
+        """
+        return first monomer for system in S66 set named <name>.
+        """
+        
+        return s66_systems[name][:s66_nAtoms_monomers[name]]
+        
+    
+    def create_s66_monomer2(self, name):
+        """
+        return second monomer for system in S66 set named <name>.
+        """
+ 
+        return s66_systems[name][s66_nAtoms_monomers[name]:]
+        
+    
+    def get_interaction_energy_CC(name):
+        """
+        return interaction energy for S66 dimer <name>
+        in eV as obtained by CCSD(T)/CBS(haTZ) CP.
+        """
+        
+        return s66_IAE_CC[name]*kcal/mol
+        
+    
+    def get_interaction_energy_MP2(name):
+        """
+        return interaction energy for S66 dimer <name>
+        in eV as obtained by MP2/CBS CP.
+        """
+        
+        return s66_IAE_MP2[name]*kcal/mol
+        
+    
+s66 = s66_class()
 
-def create_s66_system(name_system):
-    """ return ASE atoms object of system in S66 set named <name_system>. """
-    
-    return s66_systems[name_system]
-    
-
-def get_number_monomer_atoms(name_system):
-    """
-    return number of atoms in monomers for system in S66 set named <name_system>.
-    
-    NOTE:
-    =====
-        Monomer1 = s66_systems[<name_system>][:n_mono_atoms[0]]
-        Monomer2 = s66_systems[<name_system>][n_mono_atoms[0]:]
-    """
-    
-    return np.array(s66_nAtoms_monomers[name_system])
-    
-
-def get_interaction_energy_CC(name_system):
-    """
-    return interaction energy for S66 dimer <name_system>
-    in eV as obtained by CCSD(T)/CBS(haTZ) CP.
-    """
-    
-    return s66_IAE_CC[name_system]*kcal/mol
-    
-
-def get_interaction_energy_MP2(name_system):
-    """
-    return interaction energy for S66 dimer <name_system>
-    in eV as obtained by MP2/CBS CP.
-    """
-    
-    return s66_IAE_MP2[name_system]*kcal/mol
-    
-    
 
 #--EOF--#

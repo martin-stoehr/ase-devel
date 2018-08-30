@@ -15,6 +15,15 @@ L7_interaction_energy['coronene-dimer'] = -1.0564
 L7_interaction_energy['GCbasepair-dimer'] = np.nan
 
 
+L7_nAtoms_mono1 = {}
+L7_nAtoms_mono1['circumcoronene-adenine'] = 15
+L7_nAtoms_mono1['circumcoronene-GCbasepair'] = 29
+L7_nAtoms_mono1['phenylalanine-trimer'] = 29
+L7_nAtoms_mono1['octadecane-dimer'] = 56
+L7_nAtoms_mono1['guanine-trimer'] = 16
+L7_nAtoms_mono1['coronene-dimer'] = 36
+L7_nAtoms_mono1['GCbasepair-dimer'] = 28
+
 L7_systems = {}
 L7_systems['circumcoronene-adenine'] = Atoms(symbols='C5N5H5C54H18',
           pbc=np.array([False, False, False], dtype=bool),
@@ -630,3 +639,41 @@ L7_systems['GCbasepair-dimer'] = Atoms(symbols='C4N3OH5C5N5OH5C5N5OH5C4N3OH5',
        [  4.57632000e+00,   2.07773000e+00,   0.00000000e+00],
        [  2.25652900e+00,   2.81382200e+00,   0.00000000e+00],
        [  9.14102000e-01,   1.73291100e+00,   0.00000000e+00]]))
+
+
+class l7_class:
+    def __init__(self):
+        pass
+        
+    
+    def get_names(self):
+        return L7_names
+        
+    
+    def get_interaction_energy(self, name):
+        if name == "GCbasepair-dimer":
+            raise RuntimeError("Reference interaction energy for '"+name+"' not defined.")
+        else:
+            return L7_interaction_energy[name]
+        
+    
+    def create_l7_system(self, name):
+        return L7_systems[name]
+        
+    
+    def create_l7_monomer1(self, name):
+            return L7_systems[name][:L7_nAtoms_mono1]
+        
+    
+    def create_l7_monomer2(self, name):
+        if 'trimer' in name:
+            return [L7_systems[name][L7_nAtoms_mono1:2*L7_nAtoms_mono1:, \
+                    L7_systems[name][2*L7_nAtoms_mono1:]]
+        else:
+            return L7_systems[name][L7_nAtoms_mono1:]
+        
+
+l7 = l7_class()
+
+
+#--EOF--#

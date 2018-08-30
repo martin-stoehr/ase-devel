@@ -10,7 +10,7 @@
 #                                                            #
 ##     Module by Martin Stoehr (martin.stoehr@tum.de),      ##
 #      Technische Universitaet Muenchen,                     #
-##     Dec/2015                                             ##
+##     Aug/2018                                             ##
 #                                                            #
 ##############################################################
 
@@ -95,62 +95,71 @@ x23_num_mono_UC = {'naph':2, 'ethcar':2, 'cytosine':4, 'uracil':4, 'benzene':4, 
                    'adaman':2, 'acetic':4, 'imdazole':4, 'ammonia':4, 'CO2':4, 'hexamine':1, \
                    'pyrazine':2, 'pyrazole':8, 'succinic':2, 'triazine':6, 'trioxane':6}
 
-######################  FUNCTIONS  ######################
+######################  FUNCTIONALITY  ######################
 
-def get_names():
-    """ return names for X23 crystal data set """
+class x23_class:
+    """ X23 reference set of molecular crystals """
+    def __init__(self):
+        pass
+        
     
-    return x23_names
+    def get_names(self):
+        """ return names for X23 crystal data set """
+        
+        return x23_names
+        
     
+    def get_number_of_monomers_in_cell(self, name):
+        """ return number of monomer units per unit cell """
+        
+        return x23_num_mono_UC[name]
+        
+    
+    def get_unit_cell(self, name):
+        """ return unic cell for <name> as obtained by PBE+TS """
+        
+        return x23_PBE_UC[name]
+        
+    
+    def get_lattice_energy(self, name):
+        """ return experimental lattice energy for X23 crystal <name> in eV """
+        
+        return x23_exp_lattice_energy[name]*kJ/mol
+        
+    
+    def create_x23_crystal(self, name):
+        """ create ASE atoms object for X23 crystal <name> as obtained by PBE+TS """
+        from os import listdir
+        
+        try:
+            atoms = x23_crystals[name]
+        except KeyError:
+            print("Something went wrong with reading geometry from x23_geometries.py for '"+name+"' crystal")
+            raise
+        
+        atoms.set_cell(x23_PBE_UC[name])
+        atoms.set_pbc([True, True, True])
+        
+        return atoms
+        
+    
+    def create_x23_monomer(self, name):
+        """ create ASE atoms object of X23 monomer <name> as obtained by PBE+TS """
+        
+        try:
+            atoms = x23_monomers[name]
+        except KeyError:
+            print("Something went wrong with reading geometry from x23_geometries.py for '"+name+"' molecule")
+            raise
+        
+        atoms.set_cell(np.array([[1000.,0.,0.], [0.,1000.,0.], [0.,0.,1000.]]))
+        atoms.set_pbc([True, True, True])
+        
+        return atoms
+        
 
-def get_number_of_monomers_in_cell(name):
-    """ return number of monomer units per unit cell """
     
-    return x23_num_mono_UC[name]
-    
-
-def get_unit_cell(name):
-    """ return unic cell for <name> as obtained by PBE+TS """
-    
-    return x23_PBE_UC[name]
-    
-
-def get_lattice_energy_x23_experiment(name):
-    """ return experimental lattice energy for X23 crystal <name> in eV """
-    
-    return x23_exp_lattice_energy[name]*kJ/mol
-    
-
-def create_x23_crystal(name):
-    """ create ASE atoms object for X23 crystal <name> as obtained by PBE+TS """
-    from os import listdir
-    
-    try:
-        atoms = x23_crystals[name]
-    except KeyError:
-        print("Something went wrong with reading geometry from x23_geometries.py for '"+name+"' crystal")
-        raise
-    
-    atoms.set_cell(x23_PBE_UC[name])
-    atoms.set_pbc([True, True, True])
-    
-    return atoms
-    
-
-def create_x23_monomer(name):
-    """ create ASE atoms object of X23 monomer <name> as obtained by PBE+TS """
-    
-    try:
-        atoms = x23_monomers[name]
-    except KeyError:
-        print("Something went wrong with reading geometry from x23_geometries.py for '"+name+"' molecule")
-        raise
-    
-    atoms.set_cell(np.array([[100.,0.,0.], [0.,100.,0.], [0.,0.,100.]]))
-    atoms.set_pbc([True, True, True])
-    
-    return atoms
-    
+x23 = x23_class()
 
 
 #--EOF--#

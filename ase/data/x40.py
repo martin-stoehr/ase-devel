@@ -55,6 +55,48 @@ x40_interaction_energy['HBr-methanol'] = -0.2323
 x40_interaction_energy['methanol-fluoromethane'] = -0.1688
 x40_interaction_energy['iodobenzene-trimethylamine'] = -0.2518
 
+x40_nAtoms_mono1 = {}
+x40_nAtoms_mono1['methane-Br2'] = 5
+x40_nAtoms_mono1['hexafluorobenzene-benzene'] = 12
+x40_nAtoms_mono1['bromobenzene-acetone'] = 12
+x40_nAtoms_mono1['chlorobenzene-acetone'] = 12
+x40_nAtoms_mono1['bromobenzene-methanethiol'] = 12
+x40_nAtoms_mono1['HCl-methylamine'] = 2
+x40_nAtoms_mono1['HF-methanol'] = 2
+x40_nAtoms_mono1['trifluoroiodomethane-formaldehyde'] = -5
+x40_nAtoms_mono1['methane-Cl2'] = 5
+x40_nAtoms_mono1['chloromethane-dimer'] = 5
+x40_nAtoms_mono1['methane-F2'] = 5
+x40_nAtoms_mono1['trifluoromethanol-water'] = 6
+x40_nAtoms_mono1['HF-methylamine'] = 2
+x40_nAtoms_mono1['trifluoroiodomethane-benzene'] = 5
+x40_nAtoms_mono1['trifluorobromomethane-benzene'] = 5
+x40_nAtoms_mono1['trifluorobenzene-benzene'] = 12
+x40_nAtoms_mono1['trifluorobromomethane-formaldehyde'] = 5
+x40_nAtoms_mono1['trifluoromethane-methane'] = 5
+x40_nAtoms_mono1['methanol-chloromethane'] = 6
+x40_nAtoms_mono1['bromobenzene-trimethylamine'] = 12
+x40_nAtoms_mono1['HI-methanol'] = 2
+x40_nAtoms_mono1['chlorobenzene-trimethylamine'] = 12
+x40_nAtoms_mono1['HCl-methanol'] = 2
+x40_nAtoms_mono1['fluoromethane-methane'] = 5
+x40_nAtoms_mono1['iodobenzene-acetone'] = 12
+x40_nAtoms_mono1['trichloromethane-methane'] = 5
+x40_nAtoms_mono1['iodomethane-formaldehyde'] = 5
+x40_nAtoms_mono1['iodobenzene-methanethiol'] = 12
+x40_nAtoms_mono1['trifluorochloromethane-formaldehyde'] = 5
+x40_nAtoms_mono1['fluoromethane-dimer'] = 5
+x40_nAtoms_mono1['chloromethane-methane'] = 5
+x40_nAtoms_mono1['chloromethane-formaldehyde'] = 5
+x40_nAtoms_mono1['methane-I2'] = 5
+x40_nAtoms_mono1['bromomethane-formaldehyde'] = 5
+x40_nAtoms_mono1['bromomethane-benzene'] = 5
+x40_nAtoms_mono1['iodomethane-benzene'] = 5
+x40_nAtoms_mono1['trichloromethanol-water'] = 6
+x40_nAtoms_mono1['HBr-methanol'] = 2
+x40_nAtoms_mono1['methanol-fluoromethane'] = 6
+x40_nAtoms_mono1['iodobenzene-trimethylamine'] = 12
+
 
 x40_systems = {}
 x40_systems['methane-Br2'] = Atoms(symbols='CH4Br2',
@@ -862,3 +904,34 @@ x40_systems['iodobenzene-trimethylamine'] = Atoms(symbols='C6IH5NC3H9',
        [ -6.16682928e+00,  -1.37221170e+00,   4.37631040e+00],
        [ -5.37006028e+00,  -1.50860870e+00,   2.79416441e+00],
        [ -4.53989128e+00,  -2.07443670e+00,   4.24625341e+00]]))
+
+
+class x40_class:
+    def __init__(self):
+        pass
+        
+    
+    def get_names(self):
+        return x40_names
+        
+    
+    def get_interaction_energy(self, name):
+        return x40_interaction_energy[name]
+        
+    
+    def create_x40_system(self, name):
+        return x40_systems[name]
+        
+    
+    def create_x40_monomer1(self, name):
+            return x40_systems[name][:x40_nAtoms_mono1]
+        
+    
+    def create_x40_monomer2(self, name):
+        return x40_systems[name][x40_nAtoms_mono1:]
+        
+
+x40 = x40_class()
+
+
+#--EOF--#
