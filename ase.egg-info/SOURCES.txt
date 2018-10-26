@@ -205,7 +205,6 @@ ase/data/h2o_clusters.py
 ase/data/l7.py
 ase/data/molecules.py
 ase/data/s22.py
-ase/data/s66.py
 ase/data/s66x8.py
 ase/data/s66x8_data.py
 ase/data/smc13.py
