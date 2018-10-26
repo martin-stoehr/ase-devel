@@ -170,7 +170,7 @@ class s66_class:
         return first monomer for system in S66 set named <name>.
         """
         
-        return s66_systems[name][:s66_nAtoms_monomers[name]]
+        return s66_systems[name][:s66_nAtoms_monomers[name][0]]
         
     
     def create_s66_monomer2(self, name):
@@ -178,10 +178,10 @@ class s66_class:
         return second monomer for system in S66 set named <name>.
         """
  
-        return s66_systems[name][s66_nAtoms_monomers[name]:]
+        return s66_systems[name][s66_nAtoms_monomers[name][0]:]
         
     
-    def get_interaction_energy_CC(name):
+    def get_interaction_energy_CC(self, name):
         """
         return interaction energy for S66 dimer <name>
         in eV as obtained by CCSD(T)/CBS(haTZ) CP.
@@ -190,7 +190,7 @@ class s66_class:
         return s66_IAE_CC[name]*kcal/mol
         
     
-    def get_interaction_energy_MP2(name):
+    def get_interaction_energy_MP2(self, name):
         """
         return interaction energy for S66 dimer <name>
         in eV as obtained by MP2/CBS CP.
