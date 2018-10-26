@@ -181,6 +181,7 @@ class s66_class:
         return s66_systems[name][s66_nAtoms_monomers[name][0]:]
         
     
+<<<<<<< HEAD
     def get_interaction_energy_CC(self, name):
         """
         return interaction energy for S66 dimer <name>
