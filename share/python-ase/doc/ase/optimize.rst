@@ -3,7 +3,8 @@
 ======================
 Structure optimization
 ======================
-.. module:: optimize
+
+.. module:: ase.optimize
    :synopsis: Structure Optimization
 
 The optimization algorithms can be roughly divided into local
@@ -15,17 +16,15 @@ minimum (a much harder task).
 Local optimization
 ==================
 
-The local optimization algorithms available in ASE are:
-``BFGS``, ``LBFGS``, ``BFGSLineSearch``, ``LBFGSLineSearch``,
-``MDMin``, and ``FIRE``.
+The local optimization algorithms available in ASE are: :class:`BFGS`,
+:class:`BFGSLineSearch`, :class:`LBFGS`, :class:`LBFGSLineSearch`,
+:class:`GPMin`, :class:`MDMin` and :class:`FIRE`.
 
 .. seealso::
 
     `Performance test
-    <https://wiki.fysik.dtu.dk/gpaw/devel/ase_optimize/ase_optimize.html>`_ for all
-    ASE local optimizers.
-
-
+    <https://wiki.fysik.dtu.dk/gpaw/devel/ase_optimize/ase_optimize.html>`_
+    for all ASE local optimizers.
 
 
 ``MDMin`` and ``FIRE`` both use Newtonian dynamics with added
@@ -51,8 +50,8 @@ should be less than *fmax*:
 
 BFGS
 ----
-.. module:: optimize.qn
-   :synopsis: Quasi-Newton
+
+.. class:: BFGS
 
 The ``BFGS`` object is one of the minimizers in the ASE package. The below
 script uses ``BFGS`` to optimize the structure of a water molecule, starting
@@ -65,10 +64,10 @@ with the experimental geometry::
    d = 0.9575
    t = np.pi / 180 * 104.51
    water = Atoms('H2O',
-		 positions=[(d, 0, 0),
-			    (d * np.cos(t), d * np.sin(t), 0),
-			    (0, 0, 0)],
-		 calculator=EMT())
+                 positions=[(d, 0, 0),
+                            (d * np.cos(t), d * np.sin(t), 0),
+                            (0, 0, 0)],
+                 calculator=EMT())
    dyn = BFGS(water)
    dyn.run(fmax=0.05)
 
@@ -89,23 +88,22 @@ be followed during or after the run::
   dyn = BFGS(water, trajectory='H2O.traj')
   dyn.run(fmax=0.05)
 
-Use the command ``ase-gui H2O.traj`` to see what is going on (more here:
-:mod:`gui`).  The trajectory file can also be accessed using the
+Use the command ``ase gui H2O.traj`` to see what is going on (more here:
+:mod:`ase.gui`).  The trajectory file can also be accessed using the
 module :mod:`ase.io.trajectory`.
 
 The ``attach`` method takes an optional argument ``interval=n`` that can
 be used to tell the structure optimizer object to write the
 configuration to the trajectory file only every ``n`` steps.
 
-During a structure optimization, the :class:`BFGS` and
-:class:`LBFGS` optimizers use two quantities to decide where to move
-the atoms on each step:
+During a structure optimization, the BFGS and LBFGS optimizers use two
+quantities to decide where to move the atoms on each step:
 
- * the forces on each atom, as returned by the associated :class:`Calculator`
-   object
- * the Hessian matrix, i.e. the matrix of second derivatives
-   :math:`\frac{\partial^2 E}{\partial x_i \partial x_j}` of the
-   total energy with respect to nuclear coordinates.
+* the forces on each atom, as returned by the associated
+  :class:`~ase.calculators.calculator.Calculator` object
+* the Hessian matrix, i.e. the matrix of second derivatives
+  :math:`\frac{\partial^2 E}{\partial x_i \partial x_j}` of the
+  total energy with respect to nuclear coordinates.
 
 If the atoms are close to the minimum, such that the potential energy
 surface is locally quadratic, the Hessian and forces accurately
@@ -139,10 +137,10 @@ assembled so far::
 This will read through each iteration stored in :file:`history.traj`,
 performing adjustments to the Hessian as appropriate.  Note that these
 steps will not be written to :file:`qn.traj`.  If restarting with more than
-one previous trajectory file, use :command:`ase-gui` to concatenate them
+one previous trajectory file, use :ref:`ase-gui` to concatenate them
 into a single trajectory file first::
 
-  $ ase-gui part1.traj part2.traj -o history.traj
+  $ ase gui part1.traj part2.traj -o history.traj
 
 The file :file:`history.traj` will then contain all necessary
 information.
@@ -155,7 +153,9 @@ retained by replaying the trajectory as above.
 
 LBFGS
 -----
-.. module:: optimize.lbfgs
+
+.. class:: LBFGS
+.. class:: LBFGSLineSearch
 
 LBFGS is the limited memory version of the BFGS algorithm, where
 the inverse of Hessian matrix is updated instead of the Hessian
@@ -176,9 +176,28 @@ where the trajectory and the restart save the trajectory of the
 optimization and the vectors needed to generate the Hessian Matrix.
 
 
+GPMin
+-----
+
+.. class:: GPMin
+
+The GPMin (Gaussian Process minimizer) produces a model for the Potential
+Energy Surface using the information about the potential energies and
+the forces of the configurations it has already visited and uses it
+to speed up BFGS local minimzations.
+
+Read more about this algorithm here:
+
+  | Estefanía Garijo del Río, Jens Jørgen Mortensen, Karsten W. Jacobsen
+  | `A local Bayesian optimizer for atomic structures`__
+
+__ https://arxiv.org/abs/1808.08588
+
+
 FIRE
 ----
-.. module:: optimize.fire
+
+.. class:: FIRE
 
 Read about this algorithm here:
 
@@ -191,7 +210,8 @@ __ http://dx.doi.org/10.1103/PhysRevLett.97.170201
 
 MDMin
 -----
-.. module:: optimize.mdmin
+
+.. class:: MDMin
 
 The MDmin algorithm is a modification of the usual velocity-Verlet
 molecular dynamics algorithm.  Newtons second law is solved
@@ -218,7 +238,6 @@ Newton*.
 
 SciPy optimizers
 ----------------
-.. module:: optimize.sciopt
 
 SciPy provides a number of optimizers. An interface module for a couple of
 these have been written for ASE. Most notable are the optimizers SciPyFminBFGS
@@ -230,15 +249,12 @@ as::
 .. autoclass:: ase.optimize.sciopt.SciPyFminBFGS
 .. autoclass:: ase.optimize.sciopt.SciPyFminCG
 
-.. seealso::
-
-  :epydoc:`optimize.sciopt.SciPyFminBFGS`,
-  :epydoc:`optimize.sciopt.SciPyFminCG`
-
 
 BFGSLineSearch
 --------------
-.. module:: optimize.bfgslinesearch
+
+.. class:: BFGSLineSearch
+.. class:: QuasiNewton
 
 BFGSLineSearch is the BFGS algorithm with a line search mechanism
 that enforces the step taken fulfills the Wolfe conditions, so that
@@ -264,6 +280,155 @@ The BFGSLineSearch algorithm is not compatible with nudged elastic band
 calculations.
 
 
+.. module:: ase.optimize.precon
+
+Preconditioned optimizers
+=========================
+
+Preconditioners can speed up optimization approaches by incorporating
+information about the local bonding topology into a redefined metric
+through a coordinate transformation. Preconditioners are problem
+dependent, but the general purpose-implementation in ASE provides a
+basis that can be adapted to achieve optimized performance for
+specific applications.
+
+While the approach is general, the implementation is specific to a
+given optimizer: currently LBFGS and FIRE can be preconditioned using
+the :class:`ase.optimize.precon.lbfgs.PreconLBFGS` and
+:class:`ase.optimize.precon.fire.PreconFIRE` classes, respectively.
+
+You can read more about the theory and implementation here:
+
+  | D. Packwood, J.R. Kermode; L. Mones, N. Bernstein, J. Woolley, N. Gould, C. Ortner and G. Csányi
+  | `A universal preconditioner for simulating condensed phase materials`__
+  | J. Chem. Phys. *144*, 164109 (2016).
+
+__ http://dx.doi.org/10.1063/1.4947024
+
+Tests with a variety of solid-state systems using both DFT and classical
+interatomic potentials driven though ASE calculators show speedup factors of up
+to an order of magnitude for preconditioned L-BFGS over standard L-BFGS, and the
+gain grows with system size. Precomputations are performed to automatically
+estimate all parameters required. A linesearch based on enforcing only the first
+Wolff condition (i.e. the Armijo sufficient descent condition) is also provided
+in :mod:`ase.utils.linesearcharmijo`; this typically leads to a further speed up
+when used in conjunction with the preconditioner.
+
+For small systems, unless they are highly ill-conditioned due to large
+variations in bonding stiffness, it is unlikely that preconditioning provides a
+performance gain, and standard BFGS and LBFGS should be preferred. Therefore,
+for systems with fewer than 100 atoms, `PreconLBFGS` reverts to standard LBFGS.
+Preconditioning can be enforces with the keyword argument `precon`.
+
+The preconditioned L-BFGS method implemented in ASE does not require external
+dependencies, but the :mod:`scipy.sparse` module can be used for efficient
+sparse linear algebra, and the :mod:`matscipy` package is used for fast
+computation of neighbour lists if available. The PyAMG package can be used to
+efficiently invert the preconditioner using an adaptive multigrid method.
+
+Usage is very similar to the standard optimizers. The example below compares
+unpreconditioned LBGFS with the default `Exp` preconditioner for a 3x3x3 bulk
+cube of copper containing a vacancy::
+
+    import numpy as np
+    from ase.build import bulk
+    from ase.calculators.emt import EMT
+    from ase.optimize.precon import Exp, PreconLBFGS
+
+    from ase.calculators.loggingcalc import LoggingCalculator
+    import matplotlib as mpl
+    mpl.use('Agg')
+    import matplotlib.pyplot as plt
+
+    a0 = bulk('Cu', cubic=True)
+    a0 *= [3, 3, 3]
+    del a0[0]
+    a0.rattle(0.1)
+
+    nsteps = []
+    energies = []
+    log_calc = LoggingCalculator(EMT())
+
+    for precon, label in zip([None, Exp(A=3)],
+                             ['None', 'Exp(A=3)']):
+       log_calc.label = label
+       atoms = a0.copy()
+       atoms.set_calculator(log_calc)
+       opt = PreconLBFGS(atoms, precon=precon, use_armijo=True)
+       opt.run(fmax=1e-3)
+
+    log_calc.plot(markers=['r-', 'b-'], energy=False, lw=2)
+    plt.savefig("precon_exp.png")
+
+For molecular systems in gas phase the force field based `FF` preconditioner
+can be applied. An example below compares the effect of FF preconditioner to
+the unpreconditioned LBFGS for Buckminsterfullerene. Parameters are taken from
+Z. Berkai at al. Energy Procedia, 74, 2015, 59-64. and the underlying potential
+is computed using a standalone force field calculator::
+
+    import numpy as np
+    from ase.build import molecule
+    from ase.utils.ff import Morse, Angle, Dihedral, VdW
+    from ase.calculators.ff import ForceField
+    from ase.optimize.precon import get_neighbours, FF, PreconLBFGS
+
+    from ase.calculators.loggingcalc import LoggingCalculator
+    import matplotlib as mpl
+    mpl.use('Agg')
+    import matplotlib.pyplot as plt
+
+    a0 = molecule('C60')
+    a0.set_cell(50.0*np.identity(3))
+    neighbor_list = [[] for _ in range(len(a0))]
+    vdw_list = np.ones((len(a0), len(a0)), dtype=bool)
+    morses = []; angles = []; dihedrals = []; vdws = []
+
+    i_list, j_list, d_list, fixed_atoms = get_neighbours(atoms=a0, r_cut=1.5)
+    for i, j in zip(i_list, j_list):
+        neighbor_list[i].append(j)
+    for i in range(len(neighbor_list)):
+        neighbor_list[i].sort()
+
+    for i in range(len(a0)):
+        for jj in range(len(neighbor_list[i])):
+            j = neighbor_list[i][jj]
+            if j > i:
+                morses.append(Morse(atomi=i, atomj=j, D=6.1322, alpha=1.8502, r0=1.4322))
+            vdw_list[i, j] = vdw_list[j, i] = False
+            for kk in range(jj+1, len(neighbor_list[i])):
+                k = neighbor_list[i][kk]
+                angles.append(Angle(atomi=j, atomj=i, atomk=k, k=10.0, a0=np.deg2rad(120.0), cos=True))
+                vdw_list[j, k] = vdw_list[k, j] = False
+                for ll in range(kk+1, len(neighbor_list[i])):
+                    l = neighbor_list[i][ll]
+                    dihedrals.append(Dihedral(atomi=j, atomj=i, atomk=k, atoml=l, k=0.346))
+    for i in range(len(a0)):
+        for j in range(i+1, len(a0)):
+            if vdw_list[i, j]:
+                vdws.append(VdW(atomi=i, atomj=j, epsilonij=0.0115, rminij=3.4681))
+
+    log_calc = LoggingCalculator(ForceField(morses=morses, angles=angles, dihedrals=dihedrals, vdws=vdws))
+
+    for precon, label in zip([None, FF(morses=morses, angles=angles, dihedrals=dihedrals)],
+                             ['None', 'FF']):
+        log_calc.label = label
+        atoms = a0.copy()
+        atoms.set_calculator(log_calc)
+        opt = PreconLBFGS(atoms, precon=precon, use_armijo=True)
+        opt.run(fmax=1e-4)
+
+    log_calc.plot(markers=['r-', 'b-'], energy=False, lw=2)
+    plt.savefig("precon_ff.png")
+
+For molecular crystals the `Exp_FF` preconditioner is recommended, which is a
+synthesis of `Exp` and `FF` preconditioners.
+
+The :class:`ase.calculators.loggingcalc.LoggingCalculator` provides
+a convenient tool for plotting convergence and walltime.
+
+  .. image:: precon.png
+
+
 Global optimization
 ===================
 
@@ -272,7 +437,8 @@ There are currently two global optimisation algorithms available.
 
 Basin hopping
 -------------
-.. module:: optimize.basin
+
+.. module:: ase.optimize.basin
 
 The global optimization algorithm can be used quite similar as a
 local optimization algorithm::
@@ -281,11 +447,11 @@ local optimization algorithm::
   from ase.optimize.basin import BasinHopping
 
   bh = BasinHopping(atoms=system,         # the system to optimize
-		    temperature=100 * kB, # 'temperature' to overcome barriers
-		    dr=0.5,               # maximal stepwidth
-		    optimizer=LBFGS,      # optimizer to find local minima
-		    fmax=0.1,             # maximal force for the optimizer
-		    )
+                    temperature=100 * kB, # 'temperature' to overcome barriers
+                    dr=0.5,               # maximal stepwidth
+                    optimizer=LBFGS,      # optimizer to find local minima
+                    fmax=0.1,             # maximal force for the optimizer
+                    )
 
 Read more about this algorithm here:
 

@@ -1,12 +1,12 @@
-.. module:: transport
+.. module:: ase.transport
    :synopsis: Electron transport
 
 ==================
 Electron transport
 ==================
 
-The :mod:`transport` module of ASE assumes the generic setup of the system in
-question sketched below:
+The :mod:`ase.transport` module of ASE assumes the generic setup of the system
+in question sketched below:
 
 . . . |setup| . . .
 
@@ -31,9 +31,9 @@ The Hamiltonian can thus be decomposed as:
     H = \begin{pmatrix}
       \ddots      & V_L         &             &             &     \\
       V_L^\dagger & H_L         & V_L         &             &     \\
-		  & V_L^\dagger & H_C         & V_R         &     \\
-		  &             & V_R^\dagger & H_R         & V_R \\
-		  &             &             & V_R^\dagger & \ddots
+                  & V_L^\dagger & H_C         & V_R         &     \\
+                  &             & V_R^\dagger & H_R         & V_R \\
+                  &             &             & V_R^\dagger & \ddots
     \end{pmatrix}
 
 where `H_{L/R}` describes the left/right principal layer, and `H_C`
@@ -52,35 +52,40 @@ Green Function (NEGF) method.  This is achieved by the class:
 ase.transport.calculators) which makes no requirement on the origin of
 these five matrices.
 
-.. class:: ase.transport.calculators.TransportCalculator(energies, h, h1, h2, s=None, s1=None, s2=None, align_bf=False)
+.. autoclass:: TransportCalculator
 
-  Determine transport properties of device sandwiched between
-  semi-infinite leads using non-equillibrium Green function methods.
 
-  energies is the energy grid on which the transport properties should
-  be determined.
 
-  h1 (h2) is a matrix representation of the Hamiltonian of two
-  principal layers of the left (right) lead, and the coupling between
-  such layers.
+..    .. class:: ase.transport.calculators.TransportCalculator(energies, h, h1, h2, s=None, s1=None, s2=None, align_bf=False)
 
-  h is a matrix representation of the Hamiltonian of the scattering
-  region. This must include at least on lead principal layer on each
-  side. The coupling in (out) of the scattering region is assumed to
-  be identical to the coupling between left (right) principal layers.
+      Determine transport properties of device sandwiched between
+      semi-infinite leads using non-equillibrium Green function methods.
 
-  s, s1, and s2 are the overlap matrices corresponding to h, h1, and
-  h2. Default is the identity operator.
+      energies is the energy grid on which the transport properties should
+      be determined.
 
-  If align_bf is True, the onsite elements of the Hamiltonians will be
-  shifted to a common fermi level.
+      h1 (h2) is a matrix representation of the Hamiltonian of two
+      principal layers of the left (right) lead, and the coupling between
+      such layers.
+
+      h is a matrix representation of the Hamiltonian of the scattering
+      region. This must include at least on lead principal layer on each
+      side. The coupling in (out) of the scattering region is assumed to
+      be identical to the coupling between left (right) principal layers.
+
+      s, s1, and s2 are the overlap matrices corresponding to h, h1, and
+      h2. Default is the identity operator.
+
+      If align_bf is True, the onsite elements of the Hamiltonians will be
+      shifted to a common fermi level.
 
 
 This module is stand-alone in the sense that it makes no requirement
 on the origin of these five matrices. They can be model Hamiltonians
 or derived from different kinds of electronic structure codes.
 
-For an example of how to use the :mod:`transport` module, see the GPAW
+For an example of how to use the :mod:`ase.transport` module, see the GPAW
 exercise on `electron transport`_
 
-.. _electron transport: http://wiki.fysik.dtu.dk/gpaw/exercises/transport/transport.html
+.. _electron transport: http://wiki.fysik.dtu.dk/gpaw/exercises/transport/
+                        transport.html

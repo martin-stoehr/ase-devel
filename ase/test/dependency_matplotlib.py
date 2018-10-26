@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 
 msg = "\nThe matplotlib python module is missing or not installed properly.\n"
@@ -6,8 +7,8 @@ msg += "Please verify your installation by running on the command line:\n"
 msg += "python -c 'import matplotlib'\n"
 msg += "\n"
 msg += "This module is optional and required in order to use "
-msg += "ASE's simple GUI (ase-gui).\n"
-msg += "If you don't wish to use ase-gui ignore this error, otherwise\n"
+msg += "ASE's simple GUI.\n"
+msg += "If you don't wish to use ASE's GUI ignore this error, otherwise\n"
 msg += "please install the package using "
 msg += "your distribution package manager, i.e.:\n"
 msg += "\n"
@@ -23,6 +24,7 @@ msg += "following http://matplotlib.sourceforge.net/users/installing.html."
 if locals().get('display'):
     try:
         import matplotlib
+        matplotlib  # silence pyflakes
     except ImportError:
-        print >> sys.stderr, msg
+        print(msg, file=sys.stderr)
         raise

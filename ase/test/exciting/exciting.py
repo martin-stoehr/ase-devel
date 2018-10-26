@@ -1,8 +1,6 @@
-import os
 from ase import Atoms
 from ase.io import read, write
 from ase.calculators.exciting import Exciting
-from ase.units import Bohr, Hartree
 
 
 a = Atoms('N3O',
@@ -12,13 +10,12 @@ a = Atoms('N3O',
 write('geo.exi', a)
 b = read('geo.exi')
 
-print a
-print a.get_positions()
-print b
-print b.get_positions()
+print(a)
+print(a.get_positions())
+print(b)
+print(b.get_positions())
 
 calculator = Exciting(dir='excitingtestfiles',
                       kpts=(4, 4, 3),
-                      maxscl=3,
-                      #bin='/fshome/chm/git/exciting/bin/excitingser'
-                      )
+                      # bin='/fshome/chm/git/exciting/bin/excitingser',
+                      maxscl=3)

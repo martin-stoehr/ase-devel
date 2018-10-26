@@ -1,4 +1,4 @@
-.. module:: test
+.. module:: ase.test
 
 ================
 Testing the code
@@ -8,13 +8,16 @@ All additions and modifications to ASE should be tested.
 
 .. index:: testase
 
-Test scripts should be put in the :trac:`ase/test` directory.  The
-scripts in this directory may be run by using the script
-:svn:`tools/testase` or by using the function:
+Test scripts should be put in the :git:`ase/test` directory.
+Run all tests with::
+
+  python -c "from ase.test import test; test(2)"
+
+It is using the function:
 
 .. function:: test.test(verbosity=1, dir=None)
     
-    Runs the test scripts in :trac:`ase/test`.
+    Runs the test scripts in :git:`ase/test`.
 
 
 .. important::
@@ -28,7 +31,7 @@ How to fail successfully
 ========================
 
 The test suite provided by :func:`test.test` automatically runs all test
-scripts in the :trac:`ase/test` directory and summarizes the results.
+scripts in the :git:`ase/test` directory and summarizes the results.
 
 .. note::
 
@@ -40,7 +43,7 @@ scripts in the :trac:`ase/test` directory and summarizes the results.
 If a test script causes an exception to be thrown, or otherwise terminates
 in an unexpected way, it will show up in this summary. This is the most
 effective way of raising awareness about emerging conflicts and bugs during
-the development cycle of the :ref:`latest revision <Latest_development_release>`.
+the development cycle of the latest revision.
 
 
 Remember, great tests should serve a dual purpose:
@@ -52,7 +55,7 @@ Remember, great tests should serve a dual purpose:
 
 **Replicable results**
     Even if a calculation makes it to the end without crashing, you can never
-    be too sure that the numerical results are consistent. Don't just assume 
+    be too sure that the numerical results are consistent. Don't just assume
     they are, :func:`assert` it!
 
 .. function:: assert(expression)

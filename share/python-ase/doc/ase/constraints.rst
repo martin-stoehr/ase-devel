@@ -1,10 +1,9 @@
-.. module:: constraints
+.. module:: ase.constraints
    :synopsis: Constraining some degrees of freedom
 
 ===========
 Constraints
 ===========
-
 
 When performing minimizations or dynamics one may wish to keep some
 degrees of freedom in the system fixed. One way of doing this is by
@@ -13,7 +12,7 @@ attaching constraint object(s) directly to the atoms object.
 Important: setting constraints will freeze the corresponding atom positions.
 Changing such atom positions can be achieved:
 
-- by directly setting the :attr:`~ase.atoms.Atoms.positions` attribute
+- by directly setting the :attr:`~ase.Atoms.positions` attribute
   (see example of setting :ref:`atoms_special_attributes`),
 
 - alternatively, by removing the constraints first::
@@ -24,7 +23,8 @@ Changing such atom positions can be achieved:
 
     atoms.set_constraint()
 
-  and using the :meth:`~ase.atoms.Atoms.set_positions` method.
+  and using the :meth:`~ase.Atoms.set_positions` method.
+
 
 The FixAtoms class
 ==================
@@ -40,6 +40,7 @@ if the atoms should be kept fixed.
 For example, to fix the positions of all the Cu atoms in a simulation
 with the indices keyword:
 
+>>> from ase.constraints import FixAtoms
 >>> c = FixAtoms(indices=[atom.index for atom in atoms if atom.symbol == 'Cu'])
 >>> atoms.set_constraint(c)
 
@@ -47,6 +48,7 @@ or with the mask keyword:
 
 >>> c = FixAtoms(mask=[atom.symbol == 'Cu' for atom in atoms])
 >>> atoms.set_constraint(c)
+
 
 The FixBondLength class
 =======================
@@ -72,61 +74,91 @@ length (see the :ref:`mep2` tutorial).
 Important: If fixing multiple bond lengths, use the FixBondLengths class
 below, particularly if the same atom is fixed to multiple partners.
 
+.. _FixBondLengths:
 
 The FixBondLengths class
 ========================
 
-More than one bond length can be fixed by using this class. Especially
-for cases in which more than one bond length constraint is applied on
-the same atom. It is done by specifying the indices of the two atoms
-forming the bond in pairs.
+RATTLE-type holonomic constraints. More than one bond length can be fixed by
+using this class. Especially for cases in which more than one bond length
+constraint is applied on the same atom. It is done by specifying the indices
+of the two atoms forming the bond in pairs.
 
 .. class:: FixBondLengths(pairs)
 
 Example of use::
 
   >>> c = FixBondLengths([[0, 1], [0, 2]])
-  >>> atoms.set_constraint(c)
+    >>> atoms.set_constraint(c)
 
-Here the distances between atoms with indices 0 and 1 and atoms with
-indices 0 and 2 will be fixed. The constraint is for the same purpose
-as the FixBondLength class.
+    Here the distances between atoms with indices 0 and 1 and atoms with
+    indices 0 and 2 will be fixed. The constraint is for the same purpose
+    as the FixBondLength class.
+
 
 The FixedLine class
-====================
+===================
 
-.. autoclass:: ase.constraints.FixedLine
+.. autoclass:: FixedLine
+
 
 The FixedPlane class
 ====================
 
-.. autoclass:: ase.constraints.FixedPlane
+.. autoclass:: FixedPlane
 
-Example of use: :ref:`constraints_diffusion_tutorial`.
+Example of use: :ref:`constraints diffusion tutorial`.
+
 
 The FixedMode class
 ===================
 
-.. autoclass:: ase.constraints.FixedMode
+.. autoclass:: FixedMode
 
-A mode is a list of vectors specifying a direction for each atom. It often comes from :meth:`ase.vibrations.Vibrations.get_mode`.
+A mode is a list of vectors specifying a direction for each atom. It often
+comes from :meth:`ase.vibrations.Vibrations.get_mode`.
+
+
+The FixCom class
+===================
+
+.. autoclass:: FixCom
+
+Example of use::
+
+  >>> from ase.constraints import FixCom
+  >>> c = FixCom()
+  >>> atoms.set_constraint(c)
+
 
 The Hookean class
-====================
+=================
 
-This class of constraints, based on Hooke's Law, is generally used to conserve molecular identity in optimization schemes and can be used in three different ways. In the first, it applies a Hookean restorative force between two atoms if the distance between them exceeds a threshold. This is useful to maintain the identity of molecules in quenched molecular dynamics, without changing the degrees of freedom or violating conservation of energy. When the distance between the two atoms is less than the threshold length, this constraint is completely inactive.
+This class of constraints, based on Hooke's Law, is generally used to
+conserve molecular identity in optimization schemes and can be used in three
+different ways. In the first, it applies a Hookean restorative force between
+two atoms if the distance between them exceeds a threshold. This is useful to
+maintain the identity of molecules in quenched molecular dynamics, without
+changing the degrees of freedom or violating conservation of energy. When the
+distance between the two atoms is less than the threshold length, this
+constraint is completely inactive.
 
 The below example tethers atoms at indices 3 and 4 together::
 
   >>> c = Hookean(a1=3, a2=4, rt=1.79, k=5.)
   >>> atoms.set_constraint(c)
 
-Alternatively, this constraint can tether a single atom to a point in space, for example to prevent the top layer of a slab from subliming during a high-temperature MD simulation. An example of tethering atom at index 3 to its original position::
+Alternatively, this constraint can tether a single atom to a point in space,
+for example to prevent the top layer of a slab from subliming during a
+high-temperature MD simulation. An example of tethering atom at index 3 to its
+original position:
 
-  >>> c = Hookean(a1=3, a2=atoms[3].position, rt=0.94, k=2.)
-  >>> atoms.set_constraint(c)
+>>> from ase.constraints import Hookean
+>>> c = Hookean(a1=3, a2=atoms[3].position, rt=0.94, k=2.)
+>>> atoms.set_constraint(c)
 
-Reasonable values of the threshold (rt) and spring constant (k) for some common bonds are below.
+Reasonable values of the threshold (rt) and spring constant (k) for some
+common bonds are below.
 
 .. list-table::
 
@@ -165,6 +197,37 @@ For an example of use, see the :ref:`mhtutorial` tutorial.
 
   In previous versions of ASE, this was known as the BondSpring constraint.
 
+
+The ExternalForce class
+=======================
+
+This class can be used to simulate a constant external force
+(e.g. the force of atomic force microscope).
+One can set the absolute value of the force *f_ext* (in eV/Ang) and two
+atom indices *a1* and *a2* to define on which atoms the force should act.
+If the sign of the force is positive, the two atoms will be pulled apart.
+The external forces which acts on both atoms are parallel to the
+connecting line of the two atoms.
+
+.. class:: ExternalForce(a1, a2, f_ext)
+
+Example of use::
+
+  >>> form ase.constraints import ExternalForce
+  >>> c = ExternalForce(0, 1, 0.5)
+  >>> atoms.set_constraint(c)
+
+One can combine this constraint with :class:`FixBondLength` but one has to
+consider the correct ordering when setting both constraints.
+:class:`ExternalForce` must come first in the list as shown in the following
+example.
+
+  >>> from ase.constraints import ExternalForce, FixBondLength
+  >>> c1 = ExternalForce(0, 1, 0.5)
+  >>> c2 = FixBondLength(1, 2)
+  >>> atoms.set_constraint([c1, c2])
+
+
 The FixInternals class
 ======================
 
@@ -175,51 +238,32 @@ atoms object on which the constraint works (needed for atomic
 masses), a list of bond, angle and dihedral constraints.
 Those constraint definitions are always list objects containing
 the value to be set and a list of atomic indices. The epsilon value
-specifies the accuracy to which the constraints are fulfilled. If 
-used together with cartesian constraints (FixAtoms, FixCOM) 
-FixInternals should always be set last.
+specifies the accuracy to which the constraints are fulfilled.
 
-.. class:: FixInternals(atoms, bonds=[bond1, bond2], \
-    angles=[angle1], dihedrals=[dihedral1, dihedral2], epsilon=1.e-7)
+.. autoclass:: FixInternals
+
+.. note::
+
+    The :class:`FixInternals` class use radians for angles!  Most other
+    places in ASE degrees are used.
 
 Example of use::
 
+  >>> from math import pi
   >>> bond1 = [1.20, [1, 2]]
   >>> angle_indices1 = [2, 3, 4]
   >>> dihedral_indices1 = [2, 3, 4, 5]
-  >>> angle1 = [atoms.get_angle(angle_indices1), angle_indices1]
-  >>> dihedral1 = [atoms.get_dihedral(dihedral_indices1), \
-    dihedral_indices1]
-  >>> c = FixInternals(atoms, bonds=[bonds1], angles=[angles1], \
-    dihedrals=[dihedral1])
+  >>> angle1 = [atoms.get_angle(*angle_indices1) * pi / 180,
+                angle_indices1]
+  >>> dihedral1 = [atoms.get_dihedral(*dihedral_indices1) * pi / 180,
+  ...              dihedral_indices1]
+  >>> c = FixInternals(bonds=[bond1], angles=[angle1],
+  ...                  dihedrals=[dihedral1])
   >>> atoms.set_constraint(c)
 
-This example defines a bond an angle and a dihedral angle constraint
+This example defines a bond, an angle and a dihedral angle constraint
 to be fixed at the same time.
 
-The FixCOM class
-================
-
-This class enables to constrain the center of mass of a subset of 
-atoms within an atoms object. The center of mass can also be 
-defined by an even smaller subset. To define the constraint one needs 
-to specify the list of atom indices, which define the subset, the envisioned 
-value of the com, the list that defines the 'com' and a string containing 
-the cartesian directions 'xyz', depending on which of these should 
-be constrained.
-
-.. class:: FixCOM(indices, old_com, com_indices, 'xyz')
-
-Example of use::
-
-  >>> com = [[0,1,2,3,4,5], [0,1], 'xy']
-  >>> masses = atoms.get_masses().take(com[1])
-  >>> old_com = np.dot(masses, atoms.positions[com[1]]) / masses.sum()
-  >>> cc = FixCOM(com[0], masses, old_com, com[1], com[2])
-  >>> atoms.set_constraint(cc)
-
-This example constrains the first 6 atoms to the center of mass of 
-the first two, but only for the cartesian directions x and y.
 
 Combining constraints
 =====================
@@ -246,13 +290,13 @@ fixed while relaxing it on a fixed ruthenium surface::
   >>> atoms.set_constraint([fa, fb])
 
 When applying more than one constraint they are passed as a list in
-the :meth:`set_constraint` method, and they will be applied one after
-the other.
+the :meth:`~ase.Atoms.set_constraint` method, and they will be applied
+one after the other.
 
 Important: If wanting to fix the length of more than one bond in the
-simulation, do not supply a list of :class:`~ase.constraints.FixBondLength`
+simulation, do not supply a list of :class:`FixBondLength`
 instances; instead, use a single instance of
-:class:`~ase.constraints.FixBondLengths`.
+:class:`FixBondLengths`.
 
 
 Making your own constraint class
@@ -275,18 +319,29 @@ A simple example::
   class MyConstraint:
       """Constrain an atom to move along a given direction only."""
       def __init__(self, a, direction):
-	  self.a = a
-	  self.dir = direction / sqrt(np.dot(direction, direction))
+          self.a = a
+          self.dir = direction / sqrt(np.dot(direction, direction))
 
-      def adjust_positions(self, oldpositions, newpositions):
-	  step = newpositions[self.a] - oldpositions[self.a]
-	  step = np.dot(step, self.dir)
-	  newpositions[self.a] = oldpositions[self.a] + step * self.dir
+      def adjust_positions(self, atoms, newpositions):
+          step = newpositions[self.a] - atoms.positions[self.a]
+          step = np.dot(step, self.dir)
+          newpositions[self.a] = atoms.positions[self.a] + step * self.dir
 
-      def adjust_forces(self, positions, forces):
-	  forces[self.a] = self.dir * np.dot(forces[self.a], self.dir)
+      def adjust_forces(self, atoms, forces):
+          forces[self.a] = self.dir * np.dot(forces[self.a], self.dir)
 
+A constraint can optionally have two additional methods, which
+will be ignored if missing:
 
+.. method:: adjust_momenta(atoms, momenta)
+
+   Adjust the *momenta* array inplace.
+
+.. method:: adjust_potential_energy(atoms, energy)
+
+   Provide the difference in the *potential energy* due to the constraint.
+   (Note that inplace adjustment is not possible for energy, which is a
+   float.)
 
 
 The Filter class
@@ -334,12 +389,28 @@ In all three filters only the hydrogen atoms are made
 visible.  When asking for the positions only the positions of the
 hydrogen atoms are returned.
 
+
 The UnitCellFilter class
 ========================
 
-.. autoclass:: ase.constraints.UnitCellFilter
+The unit cell filter is for optimizing positions and unit cell
+simultaneously.  Note that :class:`ExpCellFilter` will probably
+perform better.
+
+.. autoclass:: UnitCellFilter
 
 The StrainFilter class
 ======================
 
-.. autoclass:: ase.constraints.StrainFilter
+The strain filter is for optimizing the unit cell while keeping
+scaled positions fixed.
+
+.. autoclass:: StrainFilter
+
+The ExpCellFilter class
+=======================
+
+The exponential cell filter is an improved :class:`UnitCellFilter`
+which is parameter free.
+
+.. autoclass:: ExpCellFilter

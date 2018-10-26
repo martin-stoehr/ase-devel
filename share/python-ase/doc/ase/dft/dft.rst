@@ -1,4 +1,4 @@
-.. module:: dft
+.. module:: ase.dft
    :synopsis: Tools specific to DFT calculators
 
 
@@ -11,5 +11,6 @@ Density Functional Theory
    kpoints
    wannier
    dos
+   bandgap
    stm
    bader

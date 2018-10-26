@@ -1,17 +1,17 @@
-.. module:: exciting
+.. module:: ase.calculators.exciting
 
 ========
 exciting
 ========
 
-.. image:: ../../_static/exciting.png
+.. image:: ../../static/exciting.png
 
 Introduction
 ============
 
 ``exciting`` is a full-potential *all-electron*
-density-functional-theory (:term:`DFT`) package based on the
-linearized augmented planewave (:term:`LAPW`) method. It can be
+density-functional-theory (DFT) package based on the
+linearized augmented planewave (LAPW) method. It can be
 applied to all kinds of materials, irrespective of the atomic species
 involved, and also allows for the investigation of the core
 region. The website is http://exciting-code.org/
@@ -19,11 +19,12 @@ region. The website is http://exciting-code.org/
 The module depends on lxml  http://lxml.de
 
 
-There are two ways to construct the exciting calculator. 
+There are two ways to construct the exciting calculator.
 
 1. Using keyword arguments to specify groundstate attributes
 2. Use paramdict to specify an input file  structure with a data structure of dictionaries.
- 
+
+See also the tutorial on the web page of exciting: http://exciting-code.org/lithium-atomic-simulation-environment
 
 
 Constructor with Groundstate Keywords
@@ -40,7 +41,7 @@ Parameter Dictionary
 --------------------
 
 When the paramdict keyword is used, the calculator translates the dictionary given into the exciting XML file format.
-Note $EXCITINGROOT environmental variable should be set: details at http://exciting-code.org/tutorials
+Note $EXCITINGROOT environmental variable should be set: details at http://exciting-code.org/tutorials-boron
 
 .. literalinclude:: exciting.py
 
@@ -87,10 +88,10 @@ The calculator constructure above is used to create this exciting input file:
       </properties>
     </input>
 
-The translation follows the following rules:    
-String values are translated to attributes. Nested dictionaries are translated to sub elements. 
+The translation follows the following rules:
+String values are translated to attributes. Nested dictionaries are translated to sub elements.
 A list of dictionaries is translated to a list of sub elements named after the key of which the list is the value.
-The special key "text()" results in text content of the enclosing tag. 
+The special key "text()" results in text content of the enclosing tag.
  
 
 Muffin Tin Radius

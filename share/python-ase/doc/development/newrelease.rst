@@ -4,56 +4,72 @@
 New release
 ===========
 
-When it is time for a new release of the code, here is what you have to do:
+* Make sure all tests pass.
 
-** **Warning:** use only three digits release numbers, e.g. *3.1.0*,
+* Go through the git-logs and make sure all important changes since last
+  stable release are mentioned in the :ref:`releasenotes`.
 
-* Checkout the :ref:`latest_development_release`.
+* Build the web-page::
 
-* :ref:`running_tests`.
+      $ cd doc
+      $ make clean
+      $ make
 
-* Make sure version.py has the correct version number.
+  and check the generated images with ``make inspect``.
 
-* Make a tag in svn, using the current version number
-  (to make sure **not** to include changes done by other developers
-  in the meantime!)::
+* Update ``__version__`` to ``"x.y.z"`` in :git:`ase/__init__.py`.
 
-    svn copy -r 845 https://svn.fysik.dtu.dk/projects/ase/trunk https://svn.fysik.dtu.dk/projects/ase/tags/3.1.0 -m "Version 3.1.0"
+* Upload to PyPI::
 
-  **Note** the resulting tag's revision ``tags_revision``.
+      $ python3 setup.py sdist
+      $ python3 setup.py bdist_wheel
+      $ twine upload dist/*
 
-* **Checkout** the source, specyfing the version number in the directory name::
+* Push and make a tag "x.y.z".
 
-   svn co -r tags_revision https://svn.fysik.dtu.dk/projects/ase/tags/3.1.0 ase-3.1.0
+* Create pull-request for Easy-Build.  The EasyBuild (``.eb``) files
+  are in docs/development/easybuild.
 
-* Create the tar file::
+  * Rename the old ``.eb`` files, updating the ASE version number.
+    There are two ``.eb`` files, one for Python 2.7.12 and one for
+    Python 3.5.2.  Use ``git mv`` to rename the files.
 
-   cd ase-3.1.0
-   rm -f MANIFEST ase/svnversion.py*; python setup.py sdist
+  * Edit file file.
 
-  Note that the ``tags_revision`` is put into the name of the
-  tar file automatically. Make sure that you are getting only
-  ``tags_revision`` in the tar file name! Any changes to the source
-  will be reflected as a mixed or modified revision tag!
+    * Update the **version number**.
 
-* Put the tar file on webX (set it read-able for all)::
+    * Remove the checksum (delete the entire line in the file).
 
-   scp dist/python-ase-3.1.0."tags_revision".tar.gz root@webX:/var/www/wiki/ase-files
+  * Check the syntax and style, and insert new checksums by running
+    these commands::
 
-* Add a link on :ref:`news` and update the information
-  on the :ref:`download_and_install` page and the :ref:`releasenotes` page.
+      eb --check-style ASE-X.Y.X-Python*.eb
+      eb --inject-checksums sha256 ASE-X.Y.X-Python*.eb
 
-* Add the new release on https://pypi.python.org/pypi/python-ase/:
+  * Submit the new files::
 
-  - under the ``edit`` menu increase the version number to *3.1.0*
-  - under the ``files`` menu add the tar file as ``File Type`` ``Source``
+      eb --new-pr --pr-commit-message "ASE updated to version X.Y.Z" ASE-X.Y.X-Python*.eb
 
-* Increase the version number in ase/version.py, and commit the change::
+  * Commit the updated ``*.eb`` files, so they will be part of the
+    *next* release.
+    
+  If the commands above fails, your need to `integrate EasyBuild with github`_.
 
-    cd ~/ase
-    svn ci -m "Version 3.2.0"
+* Export issues, MR's, ... from GitLab (https://gitlab.com/ase/ase/export)
+  and store the tar-file in a safe place.
 
-  Now the trunk is ready for work on the new version.
+* Merge *master* into the *web-page* branch (which is used for creating the
+  web-page for the stable version).
 
-* Send announcement email to the ``ase-users`` mailing list (see :ref:`mailing_lists`).
+* Update version numbers in :ref:`news`, :ref:`releasenotes` and
+  :ref:`download_and_install` pages.
 
+* Increase the version number and push ("x.y+1.0b1").
+
+* Send announcement email to the ``ase-users`` mailing list.
+
+  Number of commits since last release::
+
+      $ git shortlog -s -n 3.13.0..
+
+.. _`integrate EasyBuild with github`: https://wiki.fysik.dtu.dk/niflheim/EasyBuild_modules#setting-up-github-integration

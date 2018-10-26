@@ -4,37 +4,27 @@
 Writing documentation
 =====================
 
-We use the Sphinx_ tool to generate the documentation (both HTML
-and PDF_).  The documentation is stored in SVN as text files in the
-:trac:`doc` directory using the reStructuredText_ markup language.
+We use the Sphinx_ tool to generate the documentation.  The documentation is
+stored on GitLab as text files in the :git:`doc` directory using the
+reStructuredText_ markup language.
 
-.. _reStructuredText: http://docutils.sf.net/rst.html
+.. _reStructuredText: http://docutils.sourceforge.net/rst.html
 .. _Sphinx: http://sphinx.pocoo.org
-.. _PDF: ../ase-manual.pdf
 
 
 Installing Docutils and Sphinx
 ==============================
 
-The reStructuredText_ parser that Sphinx needs, is part of the Docutils_
-project.  So, we need to install docutils and sphinx (version>= 0.5).
+.. highlight:: bash
 
-.. _Docutils: http://docutils.sf.net
+If you do::
 
+    $ pip install sphinx_rtd_theme --user
 
-Other requirements
-==================
-
-When building the documentation, a number of png-files are generated_.
-For that to work, you need the following installed:
-
-* matplotlib
-* povray
-* dvipng
-* pdflatex
-* bibtex
-* AUCTex
-* convert (ImageMagick)
+and add ``~/.local/bin`` to you :envvar:`PATH` environment variable, then
+you should be ready to go.  You may need the following installed, but they
+are not required: scipy, matplotlib, povray, dvipng, pdflatex, bibtex,
+AUCTex, fontconfig, convert (ImageMagick).
 
 
 .. _using_sphinx:
@@ -42,39 +32,35 @@ For that to work, you need the following installed:
 Using Sphinx
 ============
 
-.. highlight:: bash
-
 First, you should take a look at the documentation for Sphinx_ and
 reStructuredText_.
 
-If you don't already have your own copy of the ASE package, then get
-the :ref:`latest_development_release` and install it.
+If you don't already have your own copy of the ASE package, then read
+:ref:`here <contribute>` how to get everthing set up.
 
 Then :command:`cd` to the :file:`doc` directory and build the html-pages::
 
   $ cd ~/ase/doc
-  $ sphinx-build . _build
+  $ make
+
+This might take a long time the first time you do it.
 
 .. Note::
 
    Make sure that you build the Sphinx documentation using the
    corresponding ASE version by setting the environment variables
-   :envvar:`$PYTHONPATH` and :envvar:`$PATH`.
+   :envvar:`PYTHONPATH` and :envvar:`PATH`.
 
-Make your changes to the ``.rst`` files, run the
-:command:`sphinx-build` command again, check the results and if things
-looks ok, commit::
+Create a branch for your work, make your changes to the ``.rst`` files, run
+:command:`make` again, check the results and if things
+look ok, create a *merge request*::
 
-  $ emacs index.rst
-  $ sphinx-build . _build
-  $ firefox _build/index.html
-  $ svn ci -m "..." index.rst
-
-To build a pdf-file, you do this::
-
-  $ sphinx-build -b latex . _build
-  $ cd _build
-  $ make ase-manual.pdf
+    $ git checkout -b fixdoc
+    $ idle index.rst
+    $ make
+    $ make browse
+    $ git commit -am "..."
+    $ git push -u origin fixdoc
 
 
 Extensions to Sphinx
@@ -88,32 +74,18 @@ We have a couple of extensions to Sphinx:
 
    Use ``:mol:`CH_3OH``` to get :mol:`CH_3OH`.
 
-**:svn:**
+**:git:**
 
-   A role for creating a link to a file in SVN.  If you write
-   ``:svn:`ase/atoms.py```, you
-   will get: :svn:`ase/atoms.py`.
-
-**:trac:**
-
-   A role for creating a link to a file in Trac.  If you write
-   ``:trac:`ase/atoms.py```, you
-   will get: :trac:`ase/atoms.py`.
-
-**:epydoc:**
-
-   A role for creating a link to the API-documentation generated with
-   epydoc_.  If you
-   write ``:epydoc:`ase.atoms.Atoms```, you will get:
-   :epydoc:`ase.atoms.Atoms`.
+   A role for creating a link to a file on GitLab.  If you write
+   ``:git:`ase/atoms.py```, you
+   will get: :git:`ase/atoms.py`.
 
 **:math:**
 
    This role is for inline LaTeX-style math.  Example:
    ``:math:`\sin(x_n^2)``` gives you :math:`\sin(x_n^2)`.  This role
-   is actually the default for ASE's documentation, so you can leave
+   is actually the default for ASE's documentation, so you should leave
    out the ``:math:`` part like here: ```\sin(x_n^2)```.
-
 
 **.. math::**
 
@@ -126,29 +98,26 @@ We have a couple of extensions to Sphinx:
    .. math:: \frac{1}{1+x^2}
 
 
-.. _epydoc:  http://epydoc.sf.net
-
-
 .. _generated:
 
 Running Python code to create figures
 =====================================
 
 If you want to include a picture in your page, *you should not* check
-in the png-file to our SVN repositoy!  Instead, you should check in
+in the png-file to our Git repositoy!  Instead, you should check in
 the Python script you used to generate the picture (you can also
 generate csv-files or pdf-files like this).  The first line of the
 script should look like this::
 
-    # creates: fig1.png fig2.png table1.csv
+    # creates: fig1.png, fig2.png, table1.csv
 
 Sphinx will run the script and generate the files that you can
 then use in your rst-file.  Examples:
 
-* :ref:`eos`.  Source: :trac:`doc/tutorials/eos/eos.py`,
-  :trac:`doc/tutorials/eos/eos.rst`
-* :ref:`lattice_constant`.  Source: :trac:`doc/tutorials/lattice_constant.py`,
-  :trac:`doc/tutorials/lattice_constant.rst`
+* :ref:`eos`.  Source: :git:`doc/tutorials/eos/eos.py`,
+  :git:`doc/tutorials/eos/eos.rst`
+* :ref:`lattice_constant`.  Source: :git:`doc/tutorials/lattice_constant.py`,
+  :git:`doc/tutorials/lattice_constant.rst`
 
 
 reStructedText in emacs
@@ -175,50 +144,5 @@ something like::
 
 In your ``.emacs`` file.
 
-.. _reStructuredText extension: http://docutils.sourceforge.net/tools/editors/emacs/rst.el
-
-Updating Sphinx
-===============
-
-Starting a new project with sphinx requires an initial configuration.
-This is achieved by running :command:`sphinx-quickstart`.
-When updating from a very old sphinx you may consider
-generating new configuration files and updating the old files accordingly.
-
-**Note** that the current project is configured up-to-date,
-so if you are "simply" writing the documentation
-you **must** skip the :command:`sphinx-quickstart` step
-and focus on :ref:`using_sphinx`.
-
-Here is how do you setup the GPAW project with sphinx:
-
- - :command:`cd` to the :file:`doc` directory,
-
- - run :command:`sphinx-quickstart`
-   and answer the questions (example given for GPAW)::
-
-    > Root path for the documentation [.]:
-
-    > Separate source and build directories (y/N) [n]:
-
-    > Name prefix for templates and static dir [.]: _
-
-    > Project name: GPAW
-    > Author name(s): 2008, CAMd et al.
-  
-    > Project version: 0.5
-    > Project release [0.5]:
-
-    > Source file suffix [.rst]:
-
-    > Name of your master document (without suffix) [index]: contents
-
-    > autodoc: automatically insert docstrings from modules (y/N) [n]: y
-    > doctest: automatically test code snippets in doctest blocks (y/N) [n]:
-    > intersphinx: link between Sphinx documentation of different projects (y/N) [n]: y
-
-   This will create :file:`doc/conf.py` and :file:`doc/contents.rst`.
-   Both these files need to be edited further
-   (:file:`doc/conf.py` may for example include
-   options for ``sphinx.ext.pngmath``)
-
+.. _reStructuredText extension: http://docutils.sourceforge.net/
+                                tools/editors/emacs/rst.el

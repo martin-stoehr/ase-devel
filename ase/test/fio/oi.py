@@ -1,78 +1,153 @@
-import sys
+from __future__ import print_function
+import os
+import warnings
 
 import numpy as np
 from ase import Atoms
-from ase.io import write, read
+from ase.io import write, read, iread
+from ase.io.formats import all_formats, get_ioformat
+from ase.calculators.singlepoint import SinglePointCalculator
 
-a = 5.0
-d = 1.9
-c = a / 2
-atoms = Atoms('AuH',
-              positions=[(c, c, 0), (c, c, d)],
-              cell=(a, a, 2 * d),
-              pbc=(0, 0, 1))
-extra = np.array([ 2.3, 4.2 ])
-atoms.set_array('extra', extra)
-atoms *= (1, 1, 2)
-images = [atoms.copy(), atoms.copy()]
-r = ['xyz', 'traj', 'cube', 'pdb', 'cfg', 'struct', 'cif', 'gen']
-
-try:
-    import json
-except ImportError:
-    pass
-else:
-    r += ['json', 'db']
-
-try:
-    import Scientific
-    version = Scientific.__version__.split('.')
-    print 'Found ScientificPython version: ', Scientific.__version__
-    if map(int, version) < [2, 8]:
-        print('ScientificPython 2.8 or greater required for numpy support')
-        raise ImportError
-except ImportError:
-    print('No Scientific python found. Check your PYTHONPATH')
-else:
-    r += ['etsf']
-
-w = r + ['xsf', 'findsym']
 try:
     import matplotlib
 except ImportError:
-    pass
-else:
-    w += ['png', 'eps']
+    matplotlib = 0
 
-only_one_image = ['cube', 'png', 'eps', 'cfg', 'struct', 'etsf', 'gen',
-                  'json', 'db']
+try:
+    from lxml import etree
+except ImportError:
+    etree = 0
 
-for format in w:
-    print format, 'O',
-    fname1 = 'io-test.1.' + format
-    fname2 = 'io-test.2.' + format
-    write(fname1, atoms, format=format)
-    if format not in only_one_image:
-        write(fname2, images, format=format)
+try:
+    import Scientific
+except ImportError:
+    Scientific = 0
 
-    if format in r:
-        print 'I'
-        a1 = read(fname1)
-        assert np.all(np.abs(a1.get_positions() -
-                             atoms.get_positions()) < 1e-6)
-        if format in ['traj', 'cube', 'cfg', 'struct', 'gen']:
-            assert np.all(np.abs(a1.get_cell() - atoms.get_cell()) < 1e-6)
-        if format in ['cfg']:
-            assert np.all(np.abs(a1.get_array('extra') -
-                                 atoms.get_array('extra')) < 1e-6)
-        if format not in only_one_image:
-            a2 = read(fname2)
-            a3 = read(fname2, index=0)
-            a4 = read(fname2, index=slice(None))
-            if format in ['cif'] and sys.platform in ['win32']:
-                pass  # Fails on Windows:
-                      # https://trac.fysik.dtu.dk/projects/ase/ticket/62
-            else:
-                assert len(a4) == 2
-    else:
-        print
+try:
+    import netCDF4
+except ImportError:
+    netCDF4 = 0
+
+
+def get_atoms():
+    a = 5.0
+    d = 1.9
+    c = a / 2
+    atoms = Atoms('AuH',
+                  positions=[(0, c, c), (d, c, c)],
+                  cell=(2 * d, a, a),
+                  pbc=(1, 0, 0))
+    extra = np.array([2.3, 4.2])
+    atoms.set_array('extra', extra)
+    atoms *= (2, 1, 1)
+
+    # attach some results to the Atoms.
+    # These are serialised by the extxyz writer.
+
+    spc = SinglePointCalculator(atoms,
+                                energy=-1.0,
+                                stress=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+                                forces=-1.0 * atoms.positions)
+    atoms.set_calculator(spc)
+    return atoms
+
+
+def check(a, ref_atoms, format):
+    assert abs(a.positions - ref_atoms.positions).max() < 1e-6, \
+        (a.positions - ref_atoms.positions)
+    if format in ['traj', 'cube', 'cfg', 'struct', 'gen', 'extxyz',
+                  'db', 'json', 'trj']:
+        assert abs(a.cell - ref_atoms.cell).max() < 1e-6
+    if format in ['cfg', 'extxyz']:
+        assert abs(a.get_array('extra') -
+                   ref_atoms.get_array('extra')).max() < 1e-6
+    if format in ['extxyz', 'traj', 'trj', 'db', 'json']:
+        assert (a.pbc == ref_atoms.pbc).all()
+        assert a.get_potential_energy() == ref_atoms.get_potential_energy()
+        assert (a.get_stress() == ref_atoms.get_stress()).all()
+        assert abs(a.get_forces() - ref_atoms.get_forces()).max() < 1e-12
+
+
+testdir = 'tmp_io_testdir'
+if os.path.isdir(testdir):
+    import shutil
+    shutil.rmtree(testdir)
+
+os.mkdir(testdir)
+
+
+def test(format):
+    if format in ['abinit', 'castep-cell', 'dftb', 'eon', 'gaussian']:
+        # Someone should do something ...
+        return
+
+    if format in ['v-sim', 'mustem']:
+        # Standalone test used as not compatible with 1D periodicity
+        return
+
+    if format in ['mustem']:
+        # Standalone test used as specific arguments are required
+        return
+
+    if format in ['dmol-arc', 'dmol-car', 'dmol-incoor']:
+        # We have a standalone dmol test
+        return
+
+    if format in ['gif', 'mp4']:
+        # Complex dependencies; see animate.py test
+        return
+
+    if format in ['postgresql', 'trj', 'vti', 'vtu']:
+        # Let's not worry about these.
+        return
+
+    if not matplotlib and format in ['eps', 'png']:
+        return
+
+    if not etree and format == 'exciting':
+        return
+
+    if not Scientific and format == 'etsf':
+        return
+
+    if not netCDF4 and format == 'netcdftrajectory':
+        return
+
+    atoms = get_atoms()
+
+    images = [atoms, atoms]
+
+    io = get_ioformat(format)
+    print('{0:20}{1}{2}{3}{4}'.format(format,
+                                      ' R'[bool(io.read)],
+                                      ' W'[bool(io.write)],
+                                      '+1'[io.single],
+                                      'SF'[io.acceptsfd]))
+    fname1 = '{}/io-test.1.{}'.format(testdir, format)
+    fname2 = '{}/io-test.2.{}'.format(testdir, format)
+    if io.write:
+        write(fname1, atoms, format=format)
+        if not io.single:
+            write(fname2, images, format=format)
+
+        if io.read:
+            for a in [read(fname1, format=format), read(fname1)]:
+                check(a, atoms, format)
+
+            if not io.single:
+                if format in ['json', 'db']:
+                    aa = read(fname2 + '@id=1') + read(fname2 + '@id=2')
+                else:
+                    aa = [read(fname2), read(fname2, 0)]
+                aa += read(fname2, ':')
+                for a in iread(fname2, format=format):
+                    aa.append(a)
+                assert len(aa) == 6, aa
+                for a in aa:
+                    check(a, atoms, format)
+
+for format in sorted(all_formats):
+    with warnings.catch_warnings():
+        if format in ['proteindatabank', 'netcdftrajectory']:
+            warnings.simplefilter('ignore', UserWarning)
+        test(format)

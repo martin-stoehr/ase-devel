@@ -1,136 +1,105 @@
-from math import sqrt
+from __future__ import unicode_literals
+import pickle
+import sys
 
-import gtk
-from gettext import gettext as _
-from ase.gui.widgets import pack, help
+import numpy as np
+
+from ase.gui.i18n import _
+import ase.gui.ui as ui
 
 graph_help_text = _("""\
-Help for plot ...
-
 Symbols:
-<c>e</c>:\t\t\t\ttotal energy
-<c>epot</c>:\t\t\tpotential energy
-<c>ekin</c>:\t\t\tkinetic energy
-<c>fmax</c>:\t\t\tmaximum force
-<c>fave</c>:\t\t\taverage force
-<c>R[n,0-2]</c>:\t\t\tposition of atom number <c>n</c>
-<c>d(n<sub>1</sub>,n<sub>2</sub>)</c>:\t\t\tdistance between two atoms <c>n<sub>1</sub></c> and <c>n<sub>2</sub></c>
-<c>i</c>:\t\t\t\tcurrent image number
-<c>E[i]</c>:\t\t\t\tenergy of image number <c>i</c>
-<c>F[n,0-2]</c>:\t\t\tforce on atom number <c>n</c>
-<c>V[n,0-2]</c>:\t\t\tvelocity of atom number <c>n</c>
-<c>M[n]</c>:\t\t\tmagnetic moment of atom number <c>n</c>
-<c>A[0-2,0-2]</c>:\t\tunit-cell basis vectors
-<c>s</c>:\t\t\t\tpath length
-<c>a(n1,n2,n3)</c>:\t\tangle between atoms <c>n<sub>1</sub></c>, <c>n<sub>2</sub></c> and <c>n<sub>3</sub></c>, centered on <c>n<sub>2</sub></c>
-<c>dih(n1,n2,n3,n4)</c>:\tdihedral angle between <c>n<sub>1</sub></c>, <c>n<sub>2</sub></c>, <c>n<sub>3</sub></c> and <c>n<sub>4</sub></c>
-<c>T</c>:\t\t\t\ttemperature (K)\
+<c>e</c>: total energy
+<c>epot</c>: potential energy
+<c>ekin</c>: kinetic energy
+<c>fmax</c>: maximum force
+<c>fave</c>: average force
+<c>R[n,0-2]</c>: position of atom number <c>n</c>
+<c>d(n<sub>1</sub>,n<sub>2</sub>)</c>: distance between two atoms \
+<c>n<sub>1</sub></c> and <c>n<sub>2</sub></c>
+<c>i</c>: current image number
+<c>E[i]</c>: energy of image number <c>i</c>
+<c>F[n,0-2]</c>: force on atom number <c>n</c>
+<c>V[n,0-2]</c>: velocity of atom number <c>n</c>
+<c>M[n]</c>: magnetic moment of atom number <c>n</c>
+<c>A[0-2,0-2]</c>: unit-cell basis vectors
+<c>s</c>: path length
+<c>a(n1,n2,n3)</c>: angle between atoms <c>n<sub>1</sub></c>, \
+<c>n<sub>2</sub></c> and <c>n<sub>3</sub></c>, centered on <c>n<sub>2</sub></c>
+<c>dih(n1,n2,n3,n4)</c>: dihedral angle between <c>n<sub>1</sub></c>, \
+<c>n<sub>2</sub></c>, <c>n<sub>3</sub></c> and <c>n<sub>4</sub></c>
+<c>T</c>: temperature (K)\
 """)
 
-class Graphs(gtk.Window):
+
+class Graphs:
     def __init__(self, gui):
-        gtk.Window.__init__(self)
-        #self.window.set_position(gtk.WIN_POS_CENTER)
-        #self.window.connect("destroy", lambda w: gtk.main_quit())
-        #self.window.connect('delete_event', self.exit)
-        self.set_title('Graphs')
-        vbox = gtk.VBox()
-        self.expr = pack(vbox, [gtk.Entry(64),
-                                help(graph_help_text)])[0]
-        self.expr.connect('activate', self.plot)
+        win = ui.Window('Graphs')
+        self.expr = ui.Entry('', 50, self.plot)
+        win.add([self.expr, ui.helpbutton(graph_help_text)])
 
-        completion = gtk.EntryCompletion()
-        self.liststore = gtk.ListStore(str)
-        for s in ['fmax', 's, e-E[0]', 'i, d(0,1)']:
-            self.liststore.append([s])
-        completion.set_model(self.liststore)
-        self.expr.set_completion(completion)
-        completion.set_text_column(0)
+        win.add([ui.Button(_('Plot'), self.plot, 'xy'),
+                 ' x, y1, y2, ...'], 'w')
+        win.add([ui.Button(_('Plot'), self.plot, 'y'),
+                 ' y1, y2, ...'], 'w')
+        win.add([ui.Button(_('Save'), self.save)], 'w')
 
-        button = pack(vbox, [gtk.Button(_('Plot')),
-                             gtk.Label(' x, y1, y2, ...')])[0]
-        button.connect('clicked', self.plot, 'xy')
-        button = pack(vbox, [gtk.Button(_('Plot')),
-                             gtk.Label(' y1, y2, ...')])[0]
-        button.connect('clicked', self.plot, 'y')
-        save_button = gtk.Button(stock=gtk.STOCK_SAVE)
-        save_button.connect('clicked',self.save)
-        clear_button = gtk.Button(_('clear'))
-        clear_button.connect('clicked', self.clear)
-        pack(vbox, [save_button,clear_button])
-        
-
-        self.add(vbox)
-        vbox.show()
-        self.show()
         self.gui = gui
 
-    def plot(self, button=None, type=None, expr=None):
+    def plot(self, type=None, expr=None, ignore_if_nan=False):
         if expr is None:
-            expr = self.expr.get_text()
+            expr = self.expr.value
         else:
-            self.expr.set_text(expr)
+            self.expr.value = expr
 
-        if expr not in [row[0] for row in self.liststore]:
-            self.liststore.append([expr])
-
-        data = self.gui.images.graph(expr)
-        
-        import matplotlib
-        matplotlib.interactive(True)
-        matplotlib.use('GTKAgg')
-        #matplotlib.use('GTK', warn=False)# Not avail. in 0.91 (it is in 0.98)
-        import pylab
-        pylab.ion()
-
-        x = 2.5
-        self.gui.graphs.append(pylab.figure(figsize=(x * 2.5**0.5, x)))
-        i = self.gui.frame
-        m = len(data)
-
-        if type is None:
-            if m == 1:
-                type = 'y'
-            else:
-                type = 'xy'
-                
-        if type == 'y':
-            for j in range(m):
-                pylab.plot(data[j])
-                pylab.plot([i], [data[j, i]], 'o')
-        else:
-            for j in range(1, m):
-                pylab.plot(data[0], data[j])
-                pylab.plot([data[0, i]], [data[j, i]], 'o')
-        pylab.title(expr)
-        #pylab.show()
-
-    python = plot
-
-    def save(self, filename):
-        chooser = gtk.FileChooserDialog(
-            _('Save data to file ... '), None, gtk.FILE_CHOOSER_ACTION_SAVE,
-            (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-             gtk.STOCK_SAVE, gtk.RESPONSE_OK))
-        save = chooser.run()
-        if save == gtk.RESPONSE_OK:
-            filename = chooser.get_filename()
-            expr = self.expr.get_text()
+        try:
             data = self.gui.images.graph(expr)
-            expr = '# '+expr
-            fd = open(filename,'w')
-            fd.write("%s \n" % (expr))
-            for s in range(len(data[0])):
-                for i in range(len(data)):
-                    val = data[i,s]
-                    fd.write("%12.8e\t" % (val))
-                fd.write("\n")
-            fd.close()
-        chooser.destroy()
+        except Exception as ex:
+            ui.error(ex)
+            return
 
-    def clear(self, button):
-        import pylab
-        for graph in self.gui.graphs:
-            pylab.close(graph)
-        self.gui.graphs = []
-        
+        if ignore_if_nan and len(data) == 2 and np.isnan(data[1]).all():
+            return
+        pickledata = (data, self.gui.frame, expr, type)
+        self.gui.pipe('graph', pickledata)
+
+    def save(self):
+        dialog = ui.SaveFileDialog(self.gui.window.win,
+                                   _('Save data to file ... '))
+        filename = dialog.go()
+        if filename:
+            expr = self.expr.value
+            data = self.gui.images.graph(expr)
+            np.savetxt(filename, data.T, header=expr)
+
+
+def make_plot(data, i, expr, type, show=True):
+    import matplotlib.pyplot as plt
+    basesize = 4
+    plt.figure(figsize=(basesize * 2.5**0.5, basesize))
+    m = len(data)
+
+    if type is None:
+        if m == 1:
+            type = 'y'
+        else:
+            type = 'xy'
+
+    if type == 'y':
+        for j in range(m):
+            plt.plot(data[j])
+            plt.plot([i], [data[j, i]], 'o')
+    else:
+        for j in range(1, m):
+            plt.plot(data[0], data[j])
+            plt.plot([data[0, i]], [data[j, i]], 'o')
+    plt.title(expr)
+    if show:
+        plt.show()
+
+
+if __name__ == '__main__':
+    if sys.version_info[0] == 2:
+        make_plot(*pickle.load(sys.stdin))
+    else:
+        make_plot(*pickle.load(sys.stdin.buffer))

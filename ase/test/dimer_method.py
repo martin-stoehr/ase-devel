@@ -1,4 +1,4 @@
-from ase.lattice.surface import fcc100, add_adsorbate
+from ase.build import fcc100, add_adsorbate
 from ase.constraints import FixAtoms
 from ase.calculators.emt import EMT
 from ase.dimer import DimerControl, MinModeAtoms, MinModeTranslate
@@ -21,7 +21,7 @@ d_control = DimerControl(initial_eigenmode_method = 'displacement', \
                          mask = [0, 0, 0, 0, 1])
 d_atoms = MinModeAtoms(atoms, d_control)
 
-# Dispalce the atoms
+# Displace the atoms
 displacement_vector = [[0.0]*3]*5
 displacement_vector[-1][1] = -0.1
 d_atoms.displace(displacement_vector = displacement_vector)

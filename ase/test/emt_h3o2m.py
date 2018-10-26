@@ -1,6 +1,6 @@
 from math import radians, sin, cos
 
-from ase import Atom, Atoms
+from ase import Atoms
 from ase.neb import NEB
 from ase.constraints import FixAtoms
 from ase.calculators.emt import EMT
@@ -13,20 +13,20 @@ doht = 0.957
 doh = 0.977
 angle = radians(104.5)
 initial = Atoms('HOHOH',
-                positions=[(- sin(angle)*doht, 0., cos(angle)*doht),
+                positions=[(-sin(angle) * doht, 0., cos(angle) * doht),
                            (0., 0., 0.),
                            (0., 0., doh),
                            (0., 0., doo),
-                           (sin(angle)*doht, 0., doo - cos(angle)*doht)])
+                           (sin(angle) * doht, 0., doo - cos(angle) * doht)])
 if 0:
     view(initial)
 
 final = Atoms('HOHOH',
-              positions=[(- sin(angle)*doht, 0., cos(angle)*doht),
+              positions=[(-sin(angle) * doht, 0., cos(angle) * doht),
                          (0., 0., 0.),
                          (0., 0., doo - doh),
                          (0., 0., doo),
-                         (sin(angle)*doht, 0., doo - cos(angle)*doht)])
+                         (sin(angle) * doht, 0., doo - cos(angle) * doht)])
 if 0:
     view(final)
 
@@ -44,7 +44,7 @@ for image in images:
     image.set_constraint(constraint)
 
 for image in images:  # O-H(shared) distance
-    print image.get_distance(1, 2), image.get_potential_energy()
+    print(image.get_distance(1, 2), image.get_potential_energy())
 
 # Relax initial and final states:
 if 1:
@@ -61,10 +61,10 @@ if 1:
 neb.interpolate()
 
 for image in images:
-    print image.get_distance(1, 2), image.get_potential_energy()
+    print(image.get_distance(1, 2), image.get_potential_energy())
 
 dyn = BFGS(neb, trajectory='emt_h3o2m.traj')
 dyn.run(fmax=0.05)
 
 for image in images:
-    print image.get_distance(1, 2), image.get_potential_energy()
+    print(image.get_distance(1, 2), image.get_potential_energy())

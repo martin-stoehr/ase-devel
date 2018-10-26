@@ -1,13 +1,14 @@
-from __future__ import division, print_function
+from __future__ import division, print_function, absolute_import
 import fractions
 import functools
 import re
+from collections import OrderedDict
 
 import numpy as np
 from scipy.spatial import ConvexHull
 
 import ase.units as units
-from ase.atoms import string2symbols
+from ase.symbols import string2symbols
 from ase.utils import formula_hill, basestring
 
 _solvated = []
@@ -31,12 +32,12 @@ def float2str(x):
     n = f.numerator
     d = f.denominator
     if abs(n / d - f) > 1e-6:
-        return '{0:.3f}'.format(f)
+        return '{:.3f}'.format(f)
     if d == 0:
         return '0'
     if f.denominator == 1:
         return str(n)
-    return '{0}/{1}'.format(f.numerator, f.denominator)
+    return '{}/{}'.format(f.numerator, f.denominator)
 
 
 def solvated(symbols):
@@ -118,9 +119,9 @@ def print_results(results):
         total_energy += coef * energy
         if abs(coef) < 1e-7:
             continue
-        print('{0:14}{1:>10}{2:12.3f}'.format(name, float2str(coef), energy))
+        print('{:14}{:>10}{:12.3f}'.format(name, float2str(coef), energy))
     print('------------------------------------')
-    print('Total energy: {0:22.3f}'.format(total_energy))
+    print('Total energy: {:22.3f}'.format(total_energy))
     print('------------------------------------')
 
 
@@ -218,7 +219,7 @@ class Pourbaix:
                 if aq:
                     energy -= entropy
             if verbose:
-                print('{0:<5}{1:10}{2:10.3f}'.format(len(energies),
+                print('{:<5}{:10}{:10.3f}'.format(len(energies),
                                                      name, energy))
             energies.append(energy)
             names.append(name)
@@ -268,7 +269,6 @@ class Pourbaix:
             name = re.sub('(\S)([+-]+)', r'\1$^{\2}$', name)
             name = re.sub('(\d+)', r'$_{\1}$', name)
             text.append((x, y, name))
-
 
         if plot:
             import matplotlib.pyplot as plt
@@ -322,11 +322,15 @@ class PhaseDiagram:
             Write information.
         """
 
+        if not references:
+            raise ValueError("You must provide a non-empty list of references"
+                             " for the phase diagram! "
+                             "You have provided '{}'".format(references))
         filter = parse_formula(filter)[0]
 
         self.verbose = verbose
 
-        self.species = {}
+        self.species = OrderedDict()
         self.references = []
         for name, energy in references:
             if isinstance(name, basestring):
@@ -345,7 +349,8 @@ class PhaseDiagram:
                     self.species[symbol] = len(self.species)
             self.references.append((count, energy, name, natoms))
 
-        self.symbols = [None] * len(self.species)
+        ns = len(self.species)
+        self.symbols = [None] * ns
         for symbol, id in self.species.items():
             self.symbols[id] = symbol
 
@@ -353,24 +358,29 @@ class PhaseDiagram:
             print('Species:', ', '.join(self.symbols))
             print('References:', len(self.references))
             for i, (count, energy, name, natoms) in enumerate(self.references):
-                print('{0:<5}{1:10}{2:10.3f}'.format(i, name, energy))
+                print('{:<5}{:10}{:10.3f}'.format(i, name, energy))
 
-        self.points = np.zeros((len(self.references), len(self.species) + 1))
+        self.points = np.zeros((len(self.references), ns + 1))
         for s, (count, energy, name, natoms) in enumerate(self.references):
             for symbol, n in count.items():
                 self.points[s, self.species[symbol]] = n / natoms
             self.points[s, -1] = energy / natoms
 
-        hull = ConvexHull(self.points[:, 1:])
+        if len(self.points) == ns:
+            # Simple case that qhull would choke on:
+            self.simplices = np.arange(ns).reshape((1, ns))
+            self.hull = np.ones(ns, bool)
+        else:
+            hull = ConvexHull(self.points[:, 1:])
 
-        # Find relevant simplices:
-        ok = hull.equations[:, -2] < 0
-        self.simplices = hull.simplices[ok]
+            # Find relevant simplices:
+            ok = hull.equations[:, -2] < 0
+            self.simplices = hull.simplices[ok]
 
-        # Create a mask for those points that are on the convex hull:
-        self.hull = np.zeros(len(self.points), bool)
-        for simplex in self.simplices:
-            self.hull[simplex] = True
+            # Create a mask for those points that are on the convex hull:
+            self.hull = np.zeros(len(self.points), bool)
+            for simplex in self.simplices:
+                self.hull[simplex] = True
 
         if verbose:
             print('Simplices:', len(self.simplices))
@@ -404,12 +414,13 @@ class PhaseDiagram:
 
         # Find the simplex with positive coordinates that sum to
         # less than one:
+        eps = 1e-15
         for i, Y in enumerate(X):
             try:
                 x = np.linalg.solve((Y[1:] - Y[:1]).T, -Y[0])
             except np.linalg.linalg.LinAlgError:
                 continue
-            if (x >= 0).all() and x.sum() <= 1:
+            if (x > -eps).all() and x.sum() < 1 + eps:
                 break
         else:
             assert False, X
@@ -457,7 +468,8 @@ class PhaseDiagram:
                 projection = '3d'
                 from mpl_toolkits.mplot3d import Axes3D
                 Axes3D  # silence pyflakes
-            ax = plt.gca(projection=projection)
+            fig = plt.figure()
+            ax = fig.gca(projection=projection)
         else:
             if dims == 3 and not hasattr(ax, 'set_zlim'):
                 raise ValueError('Cannot make 3d plot unless axes projection '
@@ -483,32 +495,47 @@ class PhaseDiagram:
             plt.show()
         return ax
 
-    def plot2d2(self, ax):
+    def plot2d2(self, ax=None):
         x, e = self.points[:, 1:].T
-        for i, j in self.simplices:
-            ax.plot(x[[i, j]], e[[i, j]], '-b')
-        ax.plot(x[self.hull], e[self.hull], 'og')
-        ax.plot(x[~self.hull], e[~self.hull], 'sr')
-        for a, b, ref in zip(x, e, self.references):
-            name = re.sub('(\d+)', r'$_{\1}$', ref[2])
-            ax.text(a, b, name,
-                     horizontalalignment='center', verticalalignment='bottom')
+        names = [re.sub('(\d+)', r'$_{\1}$', ref[2])
+                 for ref in self.references]
+        hull = self.hull
+        simplices = self.simplices
+        xlabel = self.symbols[1]
+        ylabel = 'energy [eV/atom]'
 
-        ax.set_xlabel(self.symbols[1])
-        ax.set_ylabel('energy [eV/atom]')
+        if ax:
+            for i, j in simplices:
+                ax.plot(x[[i, j]], e[[i, j]], '-b')
+            ax.plot(x[hull], e[hull], 'sg')
+            ax.plot(x[~hull], e[~hull], 'or')
 
-    def plot2d3(self, ax):
+            for a, b, name in zip(x, e, names):
+                ax.text(a, b, name, ha='center', va='top')
+
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+
+        return (x, e, names, hull, simplices, xlabel, ylabel)
+
+    def plot2d3(self, ax=None):
         x, y = self.points[:, 1:-1].T.copy()
         x += y / 2
         y *= 3**0.5 / 2
-        for i, j, k in self.simplices:
-            ax.plot(x[[i, j, k, i]], y[[i, j, k, i]], '-b')
-        ax.plot(x[self.hull], y[self.hull], 'og')
-        ax.plot(x[~self.hull], y[~self.hull], 'sr')
-        for a, b, ref in zip(x, y, self.references):
-            name = re.sub('(\d+)', r'$_{\1}$', ref[2])
-            ax.text(a, b, name,
-                     horizontalalignment='center', verticalalignment='bottom')
+        names = [re.sub('(\d+)', r'$_{\1}$', ref[2])
+                 for ref in self.references]
+        hull = self.hull
+        simplices = self.simplices
+
+        if ax:
+            for i, j, k in simplices:
+                ax.plot(x[[i, j, k, i]], y[[i, j, k, i]], '-b')
+            ax.plot(x[hull], y[hull], 'og')
+            ax.plot(x[~hull], y[~hull], 'sr')
+            for a, b, name in zip(x, y, names):
+                ax.text(a, b, name, ha='center', va='top')
+
+        return (x, y, names, hull, simplices)
 
     def plot3d3(self, ax):
         x, y, e = self.points[:, 1:].T

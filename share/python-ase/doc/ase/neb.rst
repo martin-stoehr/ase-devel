@@ -2,7 +2,7 @@
 Nudged elastic band
 ===================
 
-.. module:: neb
+.. module:: ase.neb
    :synopsis: Nudged Elastic Band method.
 
 The Nudged Elastic Band method is a technique for finding transition paths
@@ -19,13 +19,17 @@ Relevant literature References:
    formulation]
 
 2. 'Improved Tangent Estimate in the NEB method for Finding Minimum
-   Energy Paths and Saddle Points', Graeme Henkelman and Hannes
+   Energy Paths and Saddle Points', G. Henkelman and H.
    Jonsson, J. Chem. Phys. 113, 9978 (2000) [improved tangent
    estimates]
 
 3. 'A Climbing-Image NEB Method for Finding Saddle Points and Minimum
-   Energy Paths', Graeme Henkelman, Blas P. Uberuaga and Hannes
+   Energy Paths', G. Henkelman, B. P. Uberuaga and H.
    Jonsson, J. Chem. Phys. 113, 9901 (2000)
+
+4. 'Improved initial guess for minimum energy path calculations.',
+   S. Smidstrup, A. Pedersen, K. Stokbro and H. Jonsson,
+   J. Chem. Phys. 140, 214106 (2014)
 
 
 The NEB class
@@ -33,7 +37,7 @@ The NEB class
 
 This module defines one class:
 
-.. autoclass:: ase.neb.NEB
+.. autoclass:: NEB
 
 Example of use, between initial and final state which have been previously
 saved in A.traj and B.traj::
@@ -63,12 +67,26 @@ of atoms within the list of images fed to the NEB. Do *not* use something
 like [initial for i in range(3)], as it will only create references to
 the original atoms object.
 
-Notice the use of the :meth:`~NEB.interpolate` method to get a good
+Notice the use of the :meth:`~NEB.interpolate` method to obtain an
 initial guess for the path from A to B.
+
+Interpolation
+=============
 
 .. method:: NEB.interpolate()
 
    Interpolate path linearly from initial to final state.
+
+.. method:: NEB.interpolate('idpp')
+
+   From a linear interpolation, create an improved path
+   from initial to final state using the IDPP approach [4].
+
+.. method:: NEB.idpp_interpolate()
+
+   Generate an idpp pathway from a set of images. This differs
+   from above in that an initial guess for the IDPP, other than
+   linear interpolation can be provided.
 
 Only the internal images (not the endpoints) need have
 calculators attached.
@@ -76,26 +94,27 @@ calculators attached.
 
 .. seealso::
 
-   :mod:`optimize`:
+   :mod:`ase.optimize`:
         Information about energy minimization (optimization). Note that you
         cannot use the default optimizer, BFGSLineSearch, with NEBs. (This is
         the optimizer imported when you import QuasiNewton.) If you would
         like a quasi-newton optimizer, use BFGS instead.
 
-   :mod:`calculators`:
+   :mod:`ase.calculators`:
         How to use calculators.
 
    :ref:`tutorials`:
 
-        * :ref:`diffusion_tutorial`
+        * :ref:`diffusion tutorial`
         * :ref:`neb2`
-
+        * :ref:`idpp_tutorial`
 
 .. note::
 
   If there are `M` images and each image has `N` atoms, then the NEB
   object behaves like one big Atoms object with `MN` atoms, so its
-  :meth:`get_positions` method will return a `MN \times 3` array.
+  :meth:`~ase.Atoms.get_positions` method will return a `MN \times 3`
+  array.
 
 
 Trajectories
@@ -104,20 +123,20 @@ Trajectories
 The code::
 
   from ase.optimize import BFGS
-  optimizer = BFGS(neb, trajectory='A2B.traj')
+  opt = BFGS(neb, trajectory='A2B.traj')
 
 will write all images to one file.  The Trajectory object knows about
 NEB calculations, so it will write `M` images with `N` atoms at every
 iteration and not one big configuration containing `MN` atoms.
 
 The result of the latest iteration can now be analysed with this
-command: :command:`ase-gui A2B.traj@-5:`.
+command: :command:`ase gui A2B.traj@-5:`.
 
 For the example above, you can write the images to individual
 trajectory files like this::
 
   for i in range(1, 4):
-      qn.attach(io.PickleTrajectory('A2B-%d.traj' % i, 'w', images[i]))
+      opt.attach(io.Trajectory('A2B-%d.traj' % i, 'w', images[i]))
 
 The result of the latest iteration can be analysed like this:
 
@@ -125,7 +144,7 @@ The result of the latest iteration can be analysed like this:
 
 ::
 
-  $ ase-gui A.traj A2B-?.traj B.traj -n -1 
+  $ ase gui A.traj A2B-?.traj B.traj -n -1
 
 .. highlight:: python
 
@@ -179,16 +198,21 @@ only some of them have a calculator attached::
       if i == j:
           image.set_calculator(EMT())
 
-Create the NEB object with ``NEB(images, parallel=True)`` and let the
-master processes write the images::
-
-  if rank % (size // n) == 0:
-      traj = io.PickleTrajectory('neb%d.traj' % j, 'w', images[1 + j],
-                                 master=True)
-      optimizer.attach(traj)
-
+Create the NEB object with ``NEB(images, parallel=True)``.
 For a complete example using GPAW_, see here_.
 
 .. _GPAW: http://wiki.fysik.dtu.dk/gpaw
 .. _gpaw-python: https://wiki.fysik.dtu.dk/gpaw/documentation/manual.html#parallel-calculations
 .. _here: https://wiki.fysik.dtu.dk/gpaw/tutorials/neb/neb.html
+
+
+.. _nebtools:
+
+Analysis of output
+==================
+
+A class exists to help in automating the analysis of NEB jobs. See the
+:ref:`Diffusion Tutorial <diffusion tutorial>` for some examples of its use.
+
+.. autoclass:: NEBTools
+   :members:

@@ -1,5 +1,0 @@
-#!/opt/apps/resif/data/production/v0.1-20170602/default/software/lang/Python/2.7.13-intel-2017a/bin/python
-
-from ase.cli.build import main
-
-main()

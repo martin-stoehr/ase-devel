@@ -1,25 +1,79 @@
-#!/usr/bin/env python
-
+from __future__ import print_function
+import platform
 import os
-from optparse import OptionParser
-from ase.io.trajectory import print_trajectory_info
+import sys
+
+from ase.utils import import_module, FileNotFoundError
+from ase.utils import search_current_git_hash
+from ase.io.formats import filetype, all_formats, UnknownFileTypeError
+from ase.io.ulm import print_ulm_info
 from ase.io.bundletrajectory import print_bundletrajectory_info
+from ase.io.formats import all_formats as fmts
 
-description = 'Print summary of information from trajectory files.'
 
-def main():
-    p = OptionParser(usage='%prog file.traj [file2.traj ...]',
-                     description=description)
+class CLICommand:
+    short_description = 'Print information about files or system'
 
-    opts, args = p.parse_args()
+    @staticmethod
+    def add_arguments(parser):
+        parser.add_argument('filenames', nargs='*')
+        parser.add_argument('-v', '--verbose', action='store_true')
+        parser.add_argument('--formats', action='store_true',
+                            help='list file formats known to ase')
 
-    if len(args) == 0:
-        p.error('Usage: ase.info file.traj [file2.traj ...]')
+    @staticmethod
+    def run(args):
+        if not args.filenames:
+            print_info()
+            if args.formats:
+                print()
+                print_formats()
+            return
 
-    for f in args:
-        if os.path.isfile(f):
-            print_trajectory_info(f)
-        elif os.path.isdir(f):
-            print_bundletrajectory_info(f)
+        n = max(len(filename) for filename in args.filenames) + 2
+        for filename in args.filenames:
+            try:
+                format = filetype(filename)
+            except FileNotFoundError:
+                format = '?'
+                description = 'No such file'
+            except UnknownFileTypeError:
+                format = '?'
+                description = '?'
+            else:
+                description, code = all_formats.get(format, ('?', '?'))
+
+            print('{:{}}{} ({})'.format(filename + ':', n,
+                                        description, format))
+            if args.verbose:
+                if format == 'traj':
+                    print_ulm_info(filename)
+                elif format == 'bundletrajectory':
+                    print_bundletrajectory_info(filename)
+
+
+def print_info():
+    versions = [('platform', platform.platform()),
+                ('python-' + sys.version.split()[0], sys.executable)]
+    for name in ['ase', 'numpy', 'scipy']:
+        try:
+            module = import_module(name)
+        except ImportError:
+            versions.append((name, 'no'))
         else:
-            p.error('%s is neither a file nor a directory!' % f)
+            # Search for git hash
+            githash = search_current_git_hash(module)
+            if githash is None:
+                githash = ''
+            else:
+                githash = '-{:.10}'.format(githash)
+            versions.append((name + '-' + module.__version__ + githash,
+                            module.__file__.rsplit(os.sep, 1)[0] + os.sep))
+
+    for a, b in versions:
+        print('{:25}{}'.format(a, b))
+
+def print_formats():
+    print('Supported formats:')
+    for f in list(sorted(fmts)):
+        print('  {}: {}'.format(f, fmts[f][0]))

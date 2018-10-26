@@ -3,7 +3,7 @@
 Translate ASE
 =============
 
-You can contribute by translating the ASE GUI, :file:`ase-gui`, into your
+You can contribute by translating the ASE GUI, :ref:`ase-gui`, into your
 language.
 
 
@@ -11,7 +11,7 @@ How to translate
 ----------------
 
 If any of the below steps prove difficult, be sure to ask on the
-:ref:`developer mailing list <mailing_lists>`.  These steps should work on GNU/Linux.
+:ref:`developer mailing list <contact>`.  These steps should work on GNU/Linux.
 
 * :ref:`Download <download_and_install>` ASE.
 * Go to :file:`ase/gui/po`.  There is a directory of the form :file:`{ll}` or :file:`{ll}_{LL}` for each language, where :file:`{ll}` is the `language code`_ and :file:`{LL}` the `country code`_.  The latter is necessary only if variants of the same language are spoken in multiple countries.
@@ -65,15 +65,15 @@ Check and commit your translation
 * You can check the syntax by running :file:`msgfmt -cv ag.po`.  This will
   report any syntax errors.
 
-* You can test your translation in :file:`ase-gui` directly.  First issue
+* You can test your translation in :ref:`ase-gui` directly.  First issue
   the command :file:`make` in :file:`ase/gui/po`, then reinstall ASE
   using the usual procedure.  The translations will then be in the
   newly installed ASE.  If you translate into the same language as
   your computer's locale, you should see the translations when you
-  start :file:`ase-gui` normally.  If you translate ASE into another
-  language, then run :file:`LANG={ll}_{LL}.UTF-8 ase-gui`.  On some
+  start :ref:`ase-gui` normally.  If you translate ASE into another
+  language, then run :file:`LANG={ll}_{LL}.UTF-8 ase gui`.  On some
   operating systems you may need to run
-  :file:`LANGUAGE={ll}_{LL}.UTF-8 ase-gui` instead.
+  :file:`LANGUAGE={ll}_{LL}.UTF-8 ase gui` instead.
 
 Depending on your operating system, you may need to install
 :file:`gettext` or :file:`locales`.
@@ -102,7 +102,7 @@ or untranslated messages.  The obvious time to do this is shortly
 before a new stable release.
 
 If you are a committer, please run :file:`make` before committing and
-briefly check by running the translated ase-gui that nothing is obviously horrible.
+briefly check by running the translated GUI that nothing is obviously horrible.
 
 .. _language code: http://www.gnu.org/software/gettext/manual/gettext.html#Language-Codes
 .. _country code: http://www.gnu.org/software/gettext/manual/gettext.html#Country-Codes

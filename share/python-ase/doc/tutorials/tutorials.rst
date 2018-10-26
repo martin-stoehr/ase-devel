@@ -6,7 +6,7 @@ Tutorials
 Python
 ------
 
-If you are not familiar with Python please read :ref:`python_info`.
+If you are not familiar with Python please read :ref:`what is python`.
 
 .. toctree::
    :maxdepth: 3
@@ -16,26 +16,34 @@ If you are not familiar with Python please read :ref:`python_info`.
 ASE
 ---
 
-Most of the tutorials will use the :mod:`EMT <emt>` potential, but any
-other :mod:`Calculator <calculators>` could be plugged in instead.
+Most of the tutorials will use the :mod:`EMT <ase.calculators.emt>` potential,
+but any other :mod:`Calculator <ase.calculators>` could be plugged in instead.
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 1
 
    surface
-
    manipulating_atoms
    atomization
    lattice_constant
    eos/eos
-   spacegroup/spacegroup
-   dissociation
-   neb/diffusion
+   db/db
    constraints/diffusion
+   selfdiffusion/al110
+   neb/diffusion
+   neb/idpp
+   dissociation
    md/md
+   tipnp_equil/tipnp_equil
    wannier/wannier
    minimahopping/minimahopping
- 
+   ga/ga_optimize
+   ga/ga_fcc_alloys
+   ga/ga_convex_hull
+   defects/defects
+   qmmm/qmmm
+
+
 NumPy
 -----
 
@@ -46,22 +54,15 @@ If your ASE scripts make extensive use of matrices you may want to familiarize y
 
    ../numpy
 
+
 Further reading
 ---------------
 
 For more details:
 
-* Look at the documentation for the individual :mod:`modules <ase>`.
-* See the automatically generated documentation ``Epydoc``: :epydoc:`ase`.
-* Browse the `source code`_ online.
-* Have a look at :mod:`~calculators.siesta` exercises:
+* Look at the documentation for the individual :ref:`modules <ase>`.
+* Browse the :git:`source code <>` online.
 
-.. toctree::
-   :maxdepth: 3
-
-   ../exercises/exercises
-
-.. _source code: http://trac.fysik.dtu.dk/projects/ase/browser/trunk
 
 Videos
 ------
@@ -70,9 +71,9 @@ The following video tutorials are available:
 
  - **Overview and installation of ASE**, by Anthony Goodrow (duration: ~5min 30sec; size: 26 MB) - en: |oi_en|
 
-.. |oi_en| image:: ../_static/United_States_of_America.png
+.. |oi_en| image:: ../static/United_States_of_America.png
    :target: https://wiki.fysik.dtu.dk/ase-files/oi_en.avi
 
-.. |oi_cn| image:: ../_static/China.png
+.. |oi_cn| image:: ../static/China.png
    :target: https://wiki.fysik.dtu.dk/ase-files/oi_ch.avi
 

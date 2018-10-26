@@ -1,3 +1,4 @@
+import time
 
 def read_aims(filename):
     """Import FHI-aims geometry type files.
@@ -72,7 +73,7 @@ def read_aims(filename):
         fix.append(i)
     elif xyz.any():
         fix_cart.append(FixCartesian(i, xyz))
-    
+
     if cart_positions and scaled_positions:
         raise Exception("Can't specify atom positions with mixture of "
                         'Cartesian and fractional coordinates')
@@ -93,7 +94,7 @@ def read_aims(filename):
     return atoms
 
 
-def write_aims(filename, atoms, ghosts=None):
+def write_aims(filename, atoms, scaled=False, ghosts=None):
     """Method to write FHI-aims geometry files.
 
     Writes the atoms positions and constraints (only FixAtoms is
@@ -112,8 +113,9 @@ def write_aims(filename, atoms, ghosts=None):
 
     fd = open(filename, 'w')
     fd.write('#=======================================================\n')
-    fd.write('#FHI-aims file: ' + filename + '\n')
-    fd.write('#Created using the Atomic Simulation Environment (ASE)\n')
+    fd.write('# FHI-aims file: ' + filename + '\n')
+    fd.write('# Created using the Atomic Simulation Environment (ASE)\n')
+    fd.write('# ' + time.asctime() + '\n')
     fd.write('#=======================================================\n')
     i = 0
     if atoms.get_pbc().any():
@@ -123,6 +125,10 @@ def write_aims(filename, atoms, ghosts=None):
                 fd.write('%16.16f ' % vector[i])
             fd.write('\n')
     fix_cart = np.zeros([len(atoms), 3])
+
+    # else aims crashes anyways
+    # better be more explicit
+    write_magmoms = np.any([a.magmom for a in atoms])
 
     if atoms.constraints:
         for constr in atoms.constraints:
@@ -135,14 +141,21 @@ def write_aims(filename, atoms, ghosts=None):
         ghosts = np.zeros(len(atoms))
     else:
         assert len(ghosts) == len(atoms)
+    scaled_positions = atoms.get_scaled_positions()
     for i, atom in enumerate(atoms):
         if ghosts[i] == 1:
             atomstring = 'empty '
+        elif scaled:
+            atomstring = 'atom_frac '
         else:
             atomstring = 'atom '
         fd.write(atomstring)
-        for pos in atom.position:
-            fd.write('%16.16f ' % pos)
+        if scaled:
+            for pos in scaled_positions[i]:
+                fd.write('%16.16f ' % pos)
+        else:
+            for pos in atom.position:
+                fd.write('%16.16f ' % pos)
         fd.write(atom.symbol)
         fd.write('\n')
         # (1) all coords are constrained:
@@ -156,7 +169,7 @@ def write_aims(filename, atoms, ghosts=None):
                     fd.write('constrain_relaxation %s\n' % 'xyz'[n])
         if atom.charge:
             fd.write('initial_charge %16.6f\n' % atom.charge)
-        if atom.magmom:
+        if write_magmoms:
             fd.write('initial_moment %16.6f\n' % atom.magmom)
 # except KeyError:
 #     continue
@@ -271,7 +284,9 @@ def read_aims_output(filename, index=-1):
             f = []
             for i in range(n_atoms):
                 inp = fd.readline().split()
-                f.append([float(inp[2]), float(inp[3]), float(inp[4])])
+                # FlK: use inp[-3:] instead of inp[1:4] to make sure this works
+                # when atom number is not preceded by a space.
+                f.append([float(i) for i in inp[-3:]])
             if not found_aims_calculator:
                 e = images[-1].get_potential_energy()
                 images[-1].set_calculator(SinglePointCalculator(atoms,

@@ -667,7 +667,7 @@ class l7_class:
     
     def create_l7_monomer2(self, name):
         if 'trimer' in name:
-            return [L7_systems[name][L7_nAtoms_mono1:2*L7_nAtoms_mono1:, \
+            return [L7_systems[name][L7_nAtoms_mono1:2*L7_nAtoms_mono1:], \
                     L7_systems[name][2*L7_nAtoms_mono1:]]
         else:
             return L7_systems[name][L7_nAtoms_mono1:]

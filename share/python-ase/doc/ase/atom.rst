@@ -10,13 +10,13 @@ script, atoms can be created like this:
 >>> from ase import Atom
 >>> a1 = Atom('Si', (0, 0, 0))
 >>> a2 = Atom('H', (1.3, 0, 0), mass=2)
->>> a3 = Atom(position=(0, 0, 0), Z=14)  # same is a1
+>>> a3 = Atom(14, position=(0, 0, 0))  # same as a1
 
 .. autoclass:: Atom
 
 The first argument to the constructor of an :class:`Atom` object is
 the chemical symbol, and the second argument is the position in Å
-units (see :mod:`units`).  The position can be any numerical sequence
+units (see :mod:`ase.units`).  The position can be any numerical sequence
 of length three.  The properties of an atom can also be set using
 keywords like it is done in the *a2* and *a3* examples above.
 
@@ -25,8 +25,8 @@ More examples:
 >>> a = Atom('O', charge=-2)
 >>> b = Atom(8, charge=-2)
 >>> c = Atom('H', (1, 2, 3), magmom=1)
->>> print a.charge, a.position
--2 [ 0. 0. 0.]
+>>> print(a.charge, a.position)
+-2 [ 0.  0.  0.]
 >>> c.x = 0.0
 >>> c.position
 array([ 0.,  2.,  3.])
@@ -43,9 +43,10 @@ If the atom object belongs to an Atoms object, then assigning
 values to the atom attributes will change the corresponding
 arrays of the atoms object:
 
+>>> from ase import Atoms
 >>> OH = Atoms('OH')
 >>> OH[0].charge = -1
->>> OH.get_charges()
+>>> OH.get_initial_charges()
 array([-1.,  0.])
 
 Another example:
@@ -61,15 +62,15 @@ attributes (``position``, ``number``, ``tag``, ``momentum``, ``mass``,
 
 >>> a1.position = [1, 0, 0]
 >>> a1.position
-array([ 1.,  0.,  0.])
+[1, 0, 0]
 >>> a1.z = 2.5
 >>> a1.position
-array([ 1. ,  0. ,  2.5])
+[1, 0, 2.5]
 >>> a2.magmom = 1.0
 
 That last line will set the initial magnetic moment that some
 calculators use (similar to the
-:meth:`~ase.atoms.Atoms.set_initial_magnetic_moments` method).
+:meth:`~ase.Atoms.set_initial_magnetic_moments` method).
 
 
 .. note::
@@ -80,15 +81,15 @@ calculators use (similar to the
    ``a1`` by accident.
 
 
-
 Getting an Atom from an Atoms object
 ------------------------------------
 
-Indexing an :class:`Atoms` object returns an :class:`Atom` object
-still remembering that it belongs to the collective :class:`Atoms`:
+Indexing an :class:`~ase.Atoms` object returns an :class:`Atom` object
+still remembering that it belongs to the collective :class:`~ase.Atoms`:
 Modifying it will also change the atoms object:
 
->>> atoms = ase.data.molecules.molecule('CH4')
+>>> from ase.build import molecule
+>>> atoms = molecule('CH4')
 >>> atoms.get_positions()
 array([[ 0.      ,  0.      ,  0.      ],
        [ 0.629118,  0.629118,  0.629118],
@@ -109,11 +110,8 @@ array([[ 0.      ,  0.      ,  0.      ],
 
 .. seealso::
 
-   :epydoc:`atom.Atom`:
-     All the details!
-
-   :mod:`atoms`:
+   :mod:`ase`:
      More information about how to use collections of atoms.
 
-   :mod:`calculators`:
+   :mod:`ase.calculators`:
      Information about how to calculate forces and energies of atoms.

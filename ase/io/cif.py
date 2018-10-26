@@ -13,7 +13,7 @@ import numpy as np
 
 from ase.parallel import paropen
 from ase.spacegroup import crystal
-from ase.spacegroup.spacegroup import spacegroup_from_data
+from ase.spacegroup.spacegroup import spacegroup_from_data, Spacegroup
 from ase.utils import basestring
 
 
@@ -81,9 +81,18 @@ def parse_loop(lines):
     header = []
     line = lines.pop().strip()
     while line.startswith('_'):
-        header.append(line.lower())
-        line = lines.pop().strip()
+        tokens = line.split()
+        header.append(tokens[0].lower())
+        if len(tokens) == 1:
+            line = lines.pop().strip()
+        else:
+            line = ' '.join(tokens[1:])
+            break
     columns = dict([(h, []) for h in header])
+    if len(columns) != len(header):
+        seen = set()
+        dublicates = [h for h in header if h in seen or seen.add(h)]
+        warnings.warn('Duplicated loop tags: {0}'.format(dublicates))
 
     tokens = []
     while True:
@@ -177,7 +186,7 @@ def parse_cif(fileobj):
 
 
 def tags2atoms(tags, store_tags=False, primitive_cell=False,
-               subtrans_included=True):
+               subtrans_included=True, fractional_occupancies=True):
     """Returns an Atoms object from a cif tags dictionary.  See read_cif()
     for a description of the arguments."""
     if primitive_cell and subtrans_included:
@@ -252,10 +261,10 @@ def tags2atoms(tags, store_tags=False, primitive_cell=False,
     else:
         spacegroup = 1
 
+
+    kwargs = {}
     if store_tags:
-        kwargs = {'info': tags.copy()}
-    else:
-        kwargs = {}
+        kwargs['info'].update(tags.copy())
 
     if 'D' in symbols:
         deuterium = [symbol == 'D' for symbol in symbols]
@@ -263,10 +272,55 @@ def tags2atoms(tags, store_tags=False, primitive_cell=False,
     else:
         deuterium = False
 
+    setting = 1
+    setting_name = None
+    if '_space_group_crystal_system' in tags:
+        setting_name = tags['_space_group_crystal_system']
+    elif '_symmetry_cell_setting' in tags:
+        setting_name = tags['_symmetry_cell_setting']
+    if setting_name:
+        no = Spacegroup(spacegroup).no
+        # rhombohedral systems
+        if no in (146, 148, 155, 160, 161, 166, 167):
+            if setting_name == 'hexagonal':
+                setting = 1
+            elif setting_name in ('trigonal', 'rhombohedral'):
+                setting = 2
+            else:
+                warnings.warn(
+                    'unexpected crystal system %r for space group %r' % (
+                        setting_name, spacegroup))
+        # FIXME - check for more crystal systems...
+        else:
+            warnings.warn(
+                'crystal system %r is not interpreated for space group %r. '
+                'This may result in wrong setting!' % (
+                    setting_name, spacegroup))
+
+    occupancies = None
+    if fractional_occupancies:
+        try:
+            occupancies = tags['_atom_site_occupancy']
+            # no warnings in this case
+            kwargs['onduplicates'] = 'keep'
+        except KeyError:
+            pass
+    else:
+        try:
+            if not np.allclose(tags['_atom_site_occupancy'], 1.):
+                warnings.warn('Cif file containes mixed/fractional occupancies. Consider using `fractional_occupancies=True`')
+                kwargs['onduplicates'] = 'keep'
+        except KeyError:
+            pass
+
     atoms = crystal(symbols, basis=scaled_positions,
                     cellpar=[a, b, c, alpha, beta, gamma],
-                    spacegroup=spacegroup, primitive_cell=primitive_cell,
+                    spacegroup=spacegroup,
+                    occupancies=occupancies,
+                    setting=setting,
+                    primitive_cell=primitive_cell,
                     **kwargs)
+
     if deuterium:
         masses = atoms.get_masses()
         masses[atoms.numbers == 1] = 1.00783
@@ -277,7 +331,7 @@ def tags2atoms(tags, store_tags=False, primitive_cell=False,
 
 
 def read_cif(fileobj, index, store_tags=False, primitive_cell=False,
-             subtrans_included=True):
+             subtrans_included=True, fractional_occupancies=True):
     """Read Atoms object from CIF file. *index* specifies the data
     block number or name (if string) to return.
 
@@ -299,6 +353,10 @@ def read_cif(fileobj, index, store_tags=False, primitive_cell=False,
     1 of the extracted space group.  A result of setting this flag to
     true, is that it will not be possible to determine the primitive
     cell.
+
+    If *fractional_occupancies* is true, the resulting atoms object will be tagged
+    equipped with an array `occupancy`. Also, in case of mixed occupancies, the
+    atom's chemical symbol will be that of the most dominant species.
     """
     blocks = parse_cif(fileobj)
     # Find all CIF blocks with valid crystal data
@@ -306,7 +364,8 @@ def read_cif(fileobj, index, store_tags=False, primitive_cell=False,
     for name, tags in blocks:
         try:
             atoms = tags2atoms(tags, store_tags, primitive_cell,
-                               subtrans_included)
+                               subtrans_included,
+                               fractional_occupancies=fractional_occupancies)
             images.append(atoms)
         except KeyError:
             pass
@@ -317,7 +376,7 @@ def read_cif(fileobj, index, store_tags=False, primitive_cell=False,
 def split_chem_form(comp_name):
     """Returns e.g. AB2  as ['A', '1', 'B', '2']"""
     split_form = re.findall(r'[A-Z][a-z]*|\d+',
-                            re.sub('[A-Z][a-z]*(?![\da-z])',
+                            re.sub(r'[A-Z][a-z]*(?![\da-z])',
                                    r'\g<0>1', comp_name))
     return split_form
 
@@ -373,7 +432,7 @@ def write_cif(fileobj, images, format='default'):
         if format == 'mp':
             fileobj.write('  _atom_site_type_symbol\n')
             fileobj.write('  _atom_site_label\n')
-            fileobj.write('   _atom_site_symmetry_multiplicity\n')
+            fileobj.write('  _atom_site_symmetry_multiplicity\n')
             fileobj.write('  _atom_site_fract_x\n')
             fileobj.write('  _atom_site_fract_y\n')
             fileobj.write('  _atom_site_fract_z\n')
@@ -388,10 +447,27 @@ def write_cif(fileobj, images, format='default'):
             fileobj.write('  _atom_site_B_iso_or_equiv\n')
             fileobj.write('  _atom_site_type_symbol\n')
 
-        scaled = atoms.get_scaled_positions()
+        scaled = atoms.get_scaled_positions().tolist()
+        symbols = atoms.get_chemical_symbols()
+        occupancies = [1 for i in range(len(symbols))]
+
+        # try to fetch occupancies // rely on the tag - occupancy mapping
+        try:
+            occ_info = atoms.info['occupancy']
+            for i, tag in enumerate(atoms.get_tags()):
+                occupancies[i] = occ_info[tag][symbols[i]]
+                # extend the positions array in case of mixed occupancy
+                for sym, occ in occ_info[tag].items():
+                    if sym != symbols[i]:
+                        symbols.append(sym)
+                        scaled.append(scaled[i])
+                        occupancies.append(occ)
+        except KeyError:
+            pass
+
         no = {}
-        for i, atom in enumerate(atoms):
-            symbol = atom.symbol
+
+        for symbol, pos, occ in zip(symbols, scaled, occupancies):
             if symbol in no:
                 no[symbol] += 1
             else:
@@ -400,15 +476,15 @@ def write_cif(fileobj, images, format='default'):
                 fileobj.write(
                     '  %-2s  %4s  %4s  %7.5f  %7.5f  %7.5f  %6.1f\n' %
                     (symbol, symbol + str(no[symbol]), 1,
-                     scaled[i][0], scaled[i][1], scaled[i][2], 1.0))
+                     pos[0], pos[1], pos[2], occ))
             else:
                 fileobj.write(
                     '  %-8s %6.4f %7.5f  %7.5f  %7.5f  %4s  %6.3f  %s\n' %
                     ('%s%d' % (symbol, no[symbol]),
-                     1.0,
-                     scaled[i][0],
-                     scaled[i][1],
-                     scaled[i][2],
+                     occ,
+                     pos[0],
+                     pos[1],
+                     pos[2],
                      'Biso',
                      1.0,
                      symbol))

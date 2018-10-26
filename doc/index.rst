@@ -2,87 +2,108 @@
 Atomic Simulation Environment
 =============================
 
-The Atomic Simulation Environment (ASE) is the common part of the
-simulation tools developed at CAMd_.  ASE provides Python_ modules
-for manipulating atoms, analyzing simulations, visualization etc.
+The Atomic Simulation Environment (ASE) is a set of tools and Python_
+modules for setting up, manipulating, running, visualizing and analyzing
+atomistic simulations.  The code is freely available under the :ref:`GNU LGPL
+license <license info>`.
 
-.. note::
-
-  The old ASE-2 webpage has moved to http://wiki.fysik.dtu.dk/ase2.
-
-Supported :mod:`calculators`:
-
-   |abinit| |Asap| |CASTEP| |dftb| |elk| |exciting| |EMT| |fhi-aims| 
-   |fleur| Gaussian_ |gpaw| |hotbit| |jacapo| |jdftx| |lammps| Mopac_ |nwchem|
-   |siesta| |turbomole| |vasp| 
-
-.. |abinit| image:: _static/abinit.png
-   :target: ase/calculators/abinit.html
-   :align: middle
-.. |Asap| image:: _static/asap.png
-   :target: http://wiki.fysik.dtu.dk/asap
-   :align: middle
-.. |CASTEP| image:: _static/castep.png
-   :target: ase/calculators/castep.html
-   :align: middle
-.. |elk| image:: _static/elk.png
-   :target: http://elk.sourceforge.net/
-   :align: middle
-.. |EMT| image:: _static/emt.png
-   :target: ase/calculators/emt.html
-   :align: middle
-.. |exciting| image:: _static/exciting.png
-   :target: ase/calculators/exciting.html
-   :align: middle   
-.. |dftb| image:: _static/dftb.png
-   :target: ase/calculators/dftb.html
-   :align: middle
-.. |fhi-aims| image:: _static/fhi-aims.png
-   :target: ase/calculators/FHI-aims.html
-   :align: middle
-.. |fleur| image:: _static/fleur.png
-   :target: ase/calculators/fleur.html
-   :align: middle
-.. |gpaw| image:: _static/gpaw.png
-   :target: http://wiki.fysik.dtu.dk/gpaw
-   :align: middle
-.. |hotbit| image:: _static/hotbit.png
-   :target: https://trac.cc.jyu.fi/projects/hotbit
-   :align: middle
-.. |jacapo| image:: _static/jacapo.png
-   :target: ase/calculators/jacapo.html
-   :align: middle
-.. |jdftx| image:: _static/jdftx.png
-   :target: http://sourceforge.net/p/jdftx/wiki/ASE%20Interface
-   :align: middle
-.. |lammps| image:: _static/lammps.png
-   :target: ase/calculators/lammps.html
-   :align: middle
-.. |nwchem| image:: _static/nwchem.png
-   :target: http://www.nwchem-sw.org
-   :align: middle
-.. |siesta| image:: _static/siesta.png
-   :target: ase/calculators/siesta.html
-   :align: middle
-.. |turbomole| image:: _static/tm_logo_l.png
-   :target: ase/calculators/turbomole.html
-   :align: middle 
-.. |vasp| image:: _static/vasp.png
-   :target: ase/calculators/vasp.html
-   :align: middle
-
-.. _Asap: http://wiki.fysik.dtu.dk/asap
-.. _Gaussian: http://www.gaussian.com/
-.. _MMTK: http://dirac.cnrs-orleans.fr/MMTK
-.. _Mopac: http://openmopac.net/
 .. _Python: http://www.python.org
-.. _Trac: http://trac.fysik.dtu.dk/projects/ase/report/1
+
+ASE provides interfaces to different codes through :mod:`Calculators
+<ase.calculators>` which are used together with the central
+:mod:`Atoms <ase.atoms>` object and the many available algorithms in
+ASE.
+
+>>> # Example: structure optimization of hydrogen molecule
+>>> from ase import Atoms
+>>> from ase.optimize import BFGS
+>>> from ase.calculators.nwchem import NWChem
+>>> from ase.io import write
+>>> h2 = Atoms('H2',
+...            positions=[[0, 0, 0],
+...                       [0, 0, 0.7]])
+>>> h2.calc = NWChem(xc='PBE')
+>>> opt = BFGS(h2)
+>>> opt.run(fmax=0.02)
+BFGS:   0  19:10:49    -31.435229     2.2691
+BFGS:   1  19:10:50    -31.490773     0.3740
+BFGS:   2  19:10:50    -31.492791     0.0630
+BFGS:   3  19:10:51    -31.492848     0.0023
+>>> write('H2.xyz', h2)
+>>> h2.get_potential_energy()
+-31.492847800329216
+
+Supported :mod:`Calculators <ase.calculators>`:
+
+|abinit| |Asap| |Atomistica| |CASTEP| |CP2K| |CRYSTAL| |deMon| |dftb|
+|elk| |exciting| |EMT|
+|fhi-aims| |fleur| |gpaw| |gromacs|
+|hotbit| |jacapo| |jdftx| |lammps| |nwchem|
+|octopus| |onetep| |openmx| |q_espresso| |siesta| |turbomole| |vasp|
+:mod:`~ase.calculators.amber`
+:mod:`DMol³ <ase.calculators.dmol>`
+Gaussian_
+:mod:`Grimme DFT-D3 <ase.calculators.dftd3>`
+:mod:`~ase.calculators.gulp`
+Mopac_
+:mod:`~ase.calculators.tip3p`
+:mod:`~ase.calculators.qmmm`
+
+
+`Reference publication on ASE <https://doi.org/10.1088/1361-648X/aa680e>`__
+
+
+Please go through this check-list to figure out if you need to convert your
+old ASE trajectory files to the modern file-format:
+
+.. image:: static/oldtraj.png
+    :align: center
+
+See how to identify and convert old trajectory files here: :ref:`convert`.
+
 
 .. _news:
 
-
 News
 ====
+
+* :ref:`ASE version 3.16.2 <releasenotes>` released (5 June 2018).
+
+* :ref:`ASE version 3.16.0 <releasenotes>` released (21 March 2018).
+
+* :ref:`ASE version 3.15.0 <releasenotes>` released (28 September 2017).
+
+* Bugfix release: :ref:`ASE version 3.14.1 <releasenotes>` (28 June 2017).
+
+* :ref:`ASE version 3.14.0 <releasenotes>` released (20 June 2017).
+
+* :ref:`Reference paper <cite>` in
+  J. Phys. Condens. Matter:
+  `The Atomic Simulation Environment | A Python library for working with
+  atoms <https://doi.org/10.1088/1361-648X/aa680e>`__
+  (7 June 2017).
+
+* :ref:`ASE version 3.13.0 <releasenotes>` released (7 February 2017).
+
+* Psi-k *Scientific Highlight Of The Month*:
+  `The Atomic Simulation Environment | A Python library for working with
+  atoms <http://psi-k.net/download/highlights/Highlight_134.pdf>`__
+  (20 January 2017).
+
+* :ref:`ASE version 3.12.0 <releasenotes>` released (24 October 2016).
+
+* :ref:`ASE version 3.11.0 <releasenotes>` released (10 May 2016).
+
+* :ref:`ASE version 3.10.0 <releasenotes>` released (17 March 2016).
+
+* Web-page now uses the `Read the Docs Sphinx Theme
+  <https://github.com/snide/sphinx_rtd_theme>`_ (20 February 2016).
+
+* The source code is now on https://gitlab.com/ase/ase (18 September 2015).
+
+* :ref:`ASE version 3.9.1 <releasenotes>` released (21 Juli 2015).
+
+* :ref:`ASE version 3.9.0 <releasenotes>` released (28 May 2015).
 
 * :ref:`ASE version 3.8.0 <releasenotes>` released (22 October 2013).
 
@@ -102,12 +123,12 @@ News
 
 * :ref:`ASE version 3.2 <download_and_install>` released (4 September 2009).
 
-* ASE has reached `revision 1000`_ (16 July 2009).
+* ASE has reached revision 1000 (16 July 2009).
 
 * :ref:`ASE version 3.1.0 <download_and_install>` released (27 March 2009).
 
-* Improved :mod:`vibrations` module: More accurate and
-  possibility to calculate :mod:`infrared intensities <infrared>` (13
+* Improved :mod:`ase.vibrations` module: More accurate and
+  possibility to calculate :ref:`infrared` (13
   March 2009).
 
 * :ref:`ASE version 3.0.0 <download_and_install>` released (13 November 2008).
@@ -125,7 +146,110 @@ News
   electronic structure course at CAMd_.  (10 Jan 2008)
 
 
-.. _revision 1000: http://www.camd.dtu.dk/Events/Seneste_nyt.aspx?guid={08853DD1-D037-47C8-ACEF-1EA40A88BB6C}
-.. _Sphinx: http://sphinx.pocoo.org
-.. _CAMd: http://www.camd.dtu.dk
+Contents
+========
 
+.. toctree::
+
+    about
+    install
+    tutorials/tutorials
+    ase/ase
+    cmdline
+    tips
+    gallery/gallery
+    releasenotes
+    contact
+    development/development
+    faq
+
+
+.. |abinit| image:: static/abinit.png
+   :target: ase/calculators/abinit.html
+   :align: middle
+.. |Asap| image:: static/asap.png
+   :target: http://wiki.fysik.dtu.dk/asap
+   :align: middle
+.. |Atomistica| image:: static/atomistica.png
+   :target: https://github.com/Atomistica/atomistica
+   :align: middle
+.. |CASTEP| image:: static/castep.png
+   :target: ase/calculators/castep.html
+   :align: middle
+.. |CP2K| image:: static/cp2k.png
+   :target: ase/calculators/cp2k.html
+   :align: middle
+.. |CRYSTAL| image:: static/crystal.png
+   :target: ase/calculators/crystal.html
+   :align: middle
+.. |deMon| image:: static/demon.png
+   :target: ase/calculators/demon.html
+   :align: middle
+.. |elk| image:: static/elk.png
+   :target: http://elk.sourceforge.net/
+   :align: middle
+.. |EMT| image:: static/emt.png
+   :target: ase/calculators/emt.html
+   :align: middle
+.. |exciting| image:: static/exciting.png
+   :target: ase/calculators/exciting.html
+   :align: middle
+.. |dftb| image:: static/dftb.png
+   :target: ase/calculators/dftb.html
+   :align: middle
+.. |fhi-aims| image:: static/fhi-aims.png
+   :target: ase/calculators/FHI-aims.html
+   :align: middle
+.. |fleur| image:: static/fleur.png
+   :target: ase/calculators/fleur.html
+   :align: middle
+.. |gpaw| image:: static/gpaw.png
+   :target: http://wiki.fysik.dtu.dk/gpaw
+   :align: middle
+.. |gromacs| image:: static/gromacs.png
+   :target: ase/calculators/gromacs.html
+   :align: middle
+.. |hotbit| image:: static/hotbit.png
+   :target: https://github.com/pekkosk/hotbit
+   :align: middle
+.. |jacapo| image:: static/jacapo.png
+   :target: ase/calculators/jacapo.html
+   :align: middle
+.. |jdftx| image:: static/jdftx.png
+   :target: http://jdftx.org/ASE.html
+   :align: middle
+.. |lammps| image:: static/lammps.png
+   :target: ase/calculators/lammps.html
+   :align: middle
+.. |nwchem| image:: static/nwchem.png
+   :target: ase/calculators/nwchem.html
+   :align: middle
+.. |octopus| image:: static/octopus.png
+   :target: ase/calculators/octopus.html
+   :align: middle
+.. |onetep| image:: static/onetep.png
+   :target: ase/calculators/onetep.html
+   :align: middle
+.. |openmx| image:: static/openmx.png
+   :target: ase/calculators/openmx.html
+   :align: middle
+.. |q_espresso| image:: static/espresso.png
+   :target: ase/calculators/espresso.html
+   :align: middle
+   :scale: 50
+.. |siesta| image:: static/siesta.png
+   :target: ase/calculators/siesta.html
+   :align: middle
+.. |turbomole| image:: static/tm_logo_l.png
+   :target: ase/calculators/turbomole.html
+   :align: middle
+.. |vasp| image:: static/vasp.png
+   :target: ase/calculators/vasp.html
+   :align: middle
+
+
+.. _Gaussian: http://www.gaussian.com/
+.. _Mopac: ase/calculators/mopac.html
+.. _Sphinx: http://sphinx.pocoo.org
+.. _Asap: http://wiki.fysik.dtu.dk/asap
+.. _CAMd: http://www.camd.dtu.dk

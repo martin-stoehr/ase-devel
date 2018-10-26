@@ -148,25 +148,10 @@ class BundleTrajectory:
         if atoms is None:
             atoms = self.atoms
 
-        if hasattr(atoms, 'interpolate'):
-            # seems to be a NEB
-            self.log('Beginning to write NEB data')
-            neb = atoms
-            assert not neb.parallel
-            try:
-                neb.get_energies_and_forces(all=True)
-            except AttributeError:
-                pass
-            for image in neb.images:
-                self.write(image)
-            self.log('Done writing NEB data')
-            return
+        for image in atoms.iterimages():
+            self._write_atoms(image)
 
-        while hasattr(atoms, 'atoms_for_saving'):
-            # Seems to be a Filter or similar, instructing us to
-            # save the original atoms.
-            atoms = atoms.atoms_for_saving
-
+    def _write_atoms(self, atoms):
         # OK, it is a real atoms object.  Write it.
         self._call_observers(self.pre_observers)
         self.log('Beginning to write frame ' + str(self.nframes))
@@ -220,8 +205,9 @@ class BundleTrajectory:
             else:
                 self.datatypes['momenta'] = False
         if datatypes.get('magmoms'):
-            if atoms.has('magmoms'):
-                self.backend.write(framedir, 'magmoms', atoms.get_magmoms())
+            if atoms.has('initial_magmoms'):
+                self.backend.write(framedir, 'magmoms',
+                                   atoms.get_initial_magnetic_moments())
             else:
                 self.datatypes['magmoms'] = False
         if datatypes.get('forces'):
@@ -452,12 +438,12 @@ class BundleTrajectory:
         self.atoms = atoms
         if os.path.exists(self.filename):
             # The output directory already exists.
-            if not self.is_bundle(self.filename):
+            ase.parallel.barrier()  # all must have time to see it exists
+            if not self.is_bundle(self.filename, allowempty=True):
                 raise IOError(
                     'Filename "' + self.filename +
                     '" already exists, but is not a BundleTrajectory.' +
                     'Cowardly refusing to remove it.')
-            ase.parallel.barrier()  # all must have time to see it exists
             if self.is_empty_bundle(self.filename):
                 ase.parallel.barrier()
                 self.log('Deleting old "%s" as it is empty' % (self.filename,))
@@ -609,10 +595,15 @@ class BundleTrajectory:
         return metadata
 
     @staticmethod
-    def is_bundle(filename):
-        """Check if a filename exists and is a BundleTrajectory."""
+    def is_bundle(filename, allowempty=False):
+        """Check if a filename exists and is a BundleTrajectory.
+
+        If allowempty=True, an empty folder is regarded as an 
+        empty BundleTrajectory."""
         if not os.path.isdir(filename):
             return False
+        if allowempty and not os.listdir(filename):
+            return True   # An empty BundleTrajectory
         metaname = os.path.join(filename, 'metadata.json')
         if os.path.isfile(metaname):
             f = open(metaname, 'r')
@@ -636,6 +627,8 @@ class BundleTrajectory:
         """Check if a filename is an empty bundle.
 
         Assumes that it is a bundle."""
+        if not os.listdir(filename):
+            return True   # Empty folders are empty bundles.
         f = open(os.path.join(filename, 'frames'), 'rb')
         nframes = int(f.read())
         f.close()
@@ -649,7 +642,7 @@ class BundleTrajectory:
         "Deletes a bundle."
         if ase.parallel.rank == 0:
             # Only the master deletes
-            if not cls.is_bundle(filename):
+            if not cls.is_bundle(filename, allowempty=True):
                 raise IOError(
                     'Cannot remove "%s" as it is not a bundle trajectory.'
                     % (filename,))

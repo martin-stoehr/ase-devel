@@ -4,10 +4,10 @@ import numpy as np
 a0 = 3.52 / np.sqrt(2)
 c0 = np.sqrt(8 / 3.0) * a0
 
-from ase.io import PickleTrajectory
-traj = PickleTrajectory('Ni.traj', 'w')
+from ase.io import Trajectory
+traj = Trajectory('Ni.traj', 'w')
 
-from ase.lattice import bulk
+from ase.build import bulk
 from ase.calculators.emt import EMT
 eps = 0.01
 for a in a0 * np.linspace(1 - eps, 1 + eps, 3):
@@ -24,7 +24,7 @@ a = np.array([config.cell[0, 0] for config in configs])
 c = np.array([config.cell[2, 2] for config in configs])
 
 functions = np.array([a**0, a, c, a**2, a * c, c**2])
-p = np.linalg.lstsq(functions.T, energies)[0]
+p = np.linalg.lstsq(functions.T, energies, rcond=-1)[0]
 
 p0 = p[0]
 p1 = p[1:3]

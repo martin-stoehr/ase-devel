@@ -1,52 +1,49 @@
-.. module:: ase
-   :synopsis: ASE module
-
 .. _ase:
 
-================================
-Documentation for modules in ASE
-================================
+=======
+Modules
+=======
 
 Quick links:
 
 .. list-table::
 
-  * - :mod:`~ase.atom`
-    - :mod:`atoms`
-    - :mod:`calculators`
-    - :mod:`constraints`
-  * - :mod:`db`
-    - :mod:`dft`
-    - :mod:`data`
-    - :mod:`gui`
-  * - :mod:`infrared`
-    - :mod:`io`
-    - :mod:`lattice`
-    - :mod:`md`
-  * - :mod:`neb`
-    - :mod:`optimize`
-    - :mod:`parallel`
-    - :mod:`phonons`
-  * - :mod:`~lattice.spacegroup`
-    - :mod:`structure`
-    - :mod:`~ase.lattice.surface`
-    - :mod:`transport`
-  * - :mod:`thermochemistry`
-    - :mod:`units`
-    - :mod:`utils`
-    - :mod:`vibrations`
-  * - :mod:`visualize`
-    - :mod:`vtk`
-    -
-    -
+  * - :mod:`ase (Atom) <ase.atom>`
+    - :mod:`ase (Atoms) <ase.atoms>`
+    - :mod:`~ase.build`
+    - :mod:`~ase.calculators`
+  * - :mod:`~ase.collections`
+    - :mod:`~ase.constraints`
+    - :mod:`~ase.db`
+    - :mod:`~ase.dft`
+  * - :mod:`~ase.data`
+    - :mod:`~ase.ga`
+    - :mod:`~ase.geometry`
+    - :mod:`~ase.gui`
+  * - :mod:`~ase.io`
+    - :mod:`~ase.lattice`
+    - :mod:`~ase.md`
+    - :mod:`~ase.neb`
+  * - :mod:`~ase.neighborlist`
+    - :mod:`~ase.optimize`
+    - :mod:`~ase.parallel`
+    - :mod:`~ase.phasediagram`
+  * - :mod:`~ase.phonons`
+    - :mod:`~ase.spacegroup`
+    - :mod:`~ase.transport`
+    - :mod:`~ase.thermochemistry`
+  * - :mod:`~ase.units`
+    - :mod:`~ase.utils`
+    - :mod:`~ase.vibrations`
+    - :mod:`~ase.visualize`
 
 
 .. seealso::
 
    * :ref:`tutorials`
-   * :epydoc:`Automatically generated documentation <ase>` (:term:`API`)
-   * :trac:`Source code <>`
-
+   * :ref:`cli`
+   * :git:`Source code <>`
+   * Presentation about ASE: :download:`ase-talk.pdf`
 
 
 List of all modules:
@@ -55,29 +52,34 @@ List of all modules:
    :maxdepth: 2
 
    atoms
-   atom
    units
-   io
-   gui/gui
-   cmdline
-   setup-overview
-   optimize
-   parallel
-   visualize
-   visualize/vtk
-   calculators/calculators
-   constraints
-   neb
-   vibrations
-   phonons
-   infrared
-   md
-   dft/dft
-   transport/transport
+   io/io
+   build/build
+   eos
+   collections
    data
-   trajectory
-   utils
-   thermochemistry
-   neighbors
-   io/opls
+   optimize
+   md
+   constraints
+   spacegroup/spacegroup
+   neighborlist
+   geometry
    db/db
+   neb
+   ga
+   gui/gui
+   lattice
+   cluster/cluster
+   visualize/visualize
+   calculators/calculators
+   dft/dft
+   vibrations/vibrations
+   phonons
+   phasediagram/phasediagram
+   thermochemistry/thermochemistry
+   utils
+   parallel
+   dimer
+   atom
+   transport/transport
+   calculators/qmmm

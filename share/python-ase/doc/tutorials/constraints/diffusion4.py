@@ -1,4 +1,4 @@
-from ase.lattice.surface import fcc100, add_adsorbate
+from ase.build import fcc100, add_adsorbate
 from ase.constraints import FixAtoms, FixedPlane
 from ase.calculators.emt import EMT
 from ase.optimize import QuasiNewton
@@ -10,11 +10,12 @@ add_adsorbate(slab, 'Au', 1.7, 'hollow')
 slab.center(axis=2, vacuum=4.0)
 
 # Make sure the structure is correct:
+#from ase.visualize import view
 #view(slab)
 
 # Fix second and third layers:
 mask = [atom.tag > 1 for atom in slab]
-#print mask
+#print(mask)
 fixlayers = FixAtoms(mask=mask)
 
 # Constrain the last atom (Au atom) to move only in the yz-plane:
@@ -25,8 +26,8 @@ slab.set_constraint([fixlayers, plane])
 # Use EMT potential:
 slab.set_calculator(EMT())
 
-# Initial state:
 for i in range(5):
     qn = QuasiNewton(slab, trajectory='mep%d.traj' % i)
     qn.run(fmax=0.05)
+    # Move gold atom along x-axis:
     slab[-1].x += slab.get_cell()[0, 0] / 8

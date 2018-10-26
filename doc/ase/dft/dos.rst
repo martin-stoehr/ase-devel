@@ -1,4 +1,4 @@
-.. module:: dft.dos
+.. module:: ase.dft.dos
    :synopsis: Density of states
 
 =================
@@ -14,7 +14,7 @@ Example::
 
 You can plot the result like this::
 
-  import pylab as plt
+  import matplotlib.pyplot as plt
   plt.plot(e, d)
   plt.xlabel('energy [eV]')
   plt.ylabel('DOS')
@@ -34,8 +34,9 @@ method, as in the following example::
 More details
 ------------
 
-.. autoclass:: ase.dft.dos.DOS
+.. autoclass:: DOS
    :members: get_energies, get_dos
 
-.. automodule:: ase.dft
-   :members: get_distribution_moment
+.. autofunction:: ltidos
+
+.. autofunction:: ase.dft.get_distribution_moment

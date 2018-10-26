@@ -1,3 +1,4 @@
+from __future__ import print_function
 """Function-like object creating hexagonal lattices.
 
 The following lattice creators are defined:
@@ -24,8 +25,6 @@ Example for using Graphene to create atoms object gra::
 """
 
 from ase.lattice.triclinic import TriclinicFactory
-import numpy as np
-from ase.data import reference_states as _refstate
 
 
 class HexagonalFactory(TriclinicFactory):
@@ -36,7 +35,7 @@ class HexagonalFactory(TriclinicFactory):
     def make_crystal_basis(self):
         "Make the basis matrix for the crystal unit cell and the system unit cell."
         # First convert the basis specification to a triclinic one
-        if type(self.latticeconstant) == type({}):
+        if isinstance(self.latticeconstant, type({})):
             self.latticeconstant['alpha'] = 90
             self.latticeconstant['beta'] = 90
             self.latticeconstant['gamma'] = 120
@@ -46,7 +45,7 @@ class HexagonalFactory(TriclinicFactory):
                 a,c = self.latticeconstant
                 self.latticeconstant = (a,a,c,90,90,120)
             else:
-                raise ValueError, "Improper lattice constants for hexagonal crystal."
+                raise ValueError("Improper lattice constants for hexagonal crystal.")
         TriclinicFactory.make_crystal_basis(self)
 
     def find_directions(self, directions, miller):
@@ -57,6 +56,8 @@ class HexagonalFactory(TriclinicFactory):
         """
         directions = list(directions)
         miller = list(miller)
+        if miller != [None, None, None]:
+            raise NotImplementedError("Specifying Miller indices of surfaces currently broken for hexagonal crystals.")
         for obj in (directions,miller):
             for i in range(3):
                 if obj[i] is not None:
@@ -74,10 +75,10 @@ class HexagonalFactory(TriclinicFactory):
         
     def print_directions_and_miller(self, txt=""):
         "Print direction vectors and Miller indices."
-        print "Direction vectors of unit cell%s:" % (txt,)
+        print("Direction vectors of unit cell%s:" % (txt,))
         for i in (0,1,2):
             self.print_four_vector("[]", self.directions[i])
-        print "Miller indices of surfaces%s:" % (txt,)
+        print("Miller indices of surfaces%s:" % (txt,))
         for i in (0,1,2):
             self.print_four_vector("()", self.miller[i])
 
@@ -88,8 +89,8 @@ class HexagonalFactory(TriclinicFactory):
         b = -x + 2*y
         c = -x -y
         d = 2*z
-        print "   %s%d, %d, %d%s  ~  %s%d, %d, %d, %d%s" % \
-              (bra,x,y,z,ket, bra,a,b,c,d,ket)
+        print("   %s%d, %d, %d%s  ~  %s%d, %d, %d, %d%s" % \
+              (bra,x,y,z,ket, bra,a,b,c,d,ket))
         
         
 Hexagonal = HexagonalFactory()

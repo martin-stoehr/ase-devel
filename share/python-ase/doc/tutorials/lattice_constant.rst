@@ -13,7 +13,7 @@ HCP
 ===
 
 Let's try to find the `a` and `c` lattice constants for HCP nickel
-using the :mod:`EMT <emt>` potential.
+using the :mod:`EMT <ase.calculators.emt>` potential.
 
 First, we make a good initial guess for `a` and `c` using the FCC nearest
 neighbor distance and the ideal `c/a` ratio:
@@ -37,12 +37,12 @@ Analysis
 
 Now, we need to extract the data from the trajectory.  Try this:
 
->>> from ase.lattice import bulk
+>>> from ase.build import bulk
 >>> ni = bulk('Ni', 'hcp', a=2.5, c=4.0)
 >>> ni.cell
-array([[ 2.5       ,  0.        ,  0.        ],
-       [-1.25      ,  2.16506351,  0.        ],
-       [ 0.        ,  0.        ,  4.        ]])
+array([[ 2.5  ,  0.   ,  0.   ],
+       [-1.25 ,  2.165,  0.   ],
+       [ 0.   ,  0.   ,  4.   ]])
 
 So, we can get `a` and `c` from ``ni.cell[0, 0]`` and ``ni.cell[2,
 2]``:
@@ -74,10 +74,14 @@ Results:
 Using the stress tensor
 =======================
 
-One can also use the stress tensor to optimize the unit cell::
+One can also use the stress tensor to optimize the unit cell. For this we cannot use the EMT calculator.::
 
     from ase.optimize import BFGS
     from ase.constraints import StrainFilter
+    from gpaw import GPAW, PW
+    ni = bulk('Ni', 'hcp', a=a0,c=c0)
+    calc = GPAW(mode=PW(200),xc='LDA',txt='Ni.out')
+    ni.set_calculator(calc)
     sf = StrainFilter(ni)
     opt = BFGS(sf)
     opt.run(0.005)
@@ -85,5 +89,5 @@ One can also use the stress tensor to optimize the unit cell::
 If you want the optimization path in a trajectory, add these lines
 before calling the ``run()`` method::
 
-    traj = PickleTrajectory('path.traj', 'w', ni)
+    traj = Trajectory('path.traj', 'w', ni)
     opt.attach(traj)

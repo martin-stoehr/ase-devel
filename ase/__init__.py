@@ -11,7 +11,7 @@ from ase.atom import Atom
 from ase.atoms import Atoms
 
 __all__ = ['Atoms', 'Atom']
-__version__ = '3.9/3.15-hybrid-devMS'
+__version__ = '3.16.3b1_devMS'
 
 # import ase.parallel early to avoid circular import problems when
 # ase.parallel does "from gpaw.mpi import world":

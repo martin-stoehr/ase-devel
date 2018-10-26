@@ -3,38 +3,39 @@
 General crystal structures and surfaces
 =======================================
 
-.. module:: lattice
+.. module:: ase.lattice
 
 Modules for creating crystal structures are found in the module
-:mod:`lattice`.  Most Bravais lattices are implemented, as
+:mod:`ase.lattice`.  Most Bravais lattices are implemented, as
 are a few important lattices with a basis.  The modules can create
 lattices with any orientation (see below).  These modules can be used
 to create surfaces with any crystal structure and any orientation by
-later adding a vacuum layer with :func:`lattice.surface.add_vacuum`.
+later adding a vacuum layer with :func:`ase.build.add_vacuum`.
+
 
 Example
 -------
 
 To set up a slab of FCC copper with the [1,-1,0] direction along the
-x-axis, [1,1,-2] along the y-axis and [1,1,1] along the z-axis, use::
+x-axis, [1,1,-2] along the y-axis and [1,1,1] along the z-axis, use:
 
-  from ase.lattice.cubic import FaceCenteredCubic
-  atoms = FaceCenteredCubic(directions=[[1,-1,0], [1,1,-2], [1,1,1]],
-                            size=(2,2,3), symbol='Cu', pbc=(1,1,0))
+>>> from ase.lattice.cubic import FaceCenteredCubic
+>>> atoms = FaceCenteredCubic(directions=[[1,-1,0], [1,1,-2], [1,1,1]],
+...                           size=(2,2,3), symbol='Cu', pbc=(1,1,0))
 
 The minimal unit cell is repeated 2*2*3 times.  The lattice constant
-is taken from the database of lattice constants in :mod:`data` module.
+is taken from the database of lattice constants in :mod:`ase.data` module.
 There are periodic boundary conditions along the *x* and *y* axis, but
 free boundary conditions along the *z* axis. Since the three directions
 are perpendicular, a (111) surface is created.
 
 To set up a slab of BCC copper with [100] along the first axis, [010]
-along the second axis, and [111] along the third axis use::
+along the second axis, and [111] along the third axis use:
 
-  from ase.lattice.cubic import BodyCenteredCubic
-  atoms = BodyCenteredCubic(directions=[[1,0,0], [0,1,0], [1,1,1]],
-                            size=(2,2,3), symbol='Cu', pbc=(1,1,0),
-			    latticeconstant=4.0)
+>>> from ase.lattice.cubic import BodyCenteredCubic
+>>> atoms = BodyCenteredCubic(directions=[[1,0,0], [0,1,0], [1,1,1]],
+...                           size=(2,2,3), symbol='Cu', pbc=(1,1,0),
+...                           latticeconstant=4.0)
 
 Since BCC is not the natural crystal structure for Cu, a lattice
 constant has to be specified.  Note that since the repeat directions
@@ -52,7 +53,7 @@ with a basis):
 
 * ``lattice.cubic``
 
-  - ``SimpleCubic`` 
+  - ``SimpleCubic``
   - ``FaceCenteredCubic``
   - ``BodyCenteredCubic``
   - ``Diamond`` (*)
@@ -86,13 +87,13 @@ with a basis):
 
 * The rhombohedral (or trigonal) lattices are not implemented.  They
   will be implemented when the need arises (and if somebody can tell
-  me_ the precise definition of the 4-number Miller indices - I only
+  us the precise definition of the 4-number Miller indices - we only
   know that they are "almost the same as in hexagonal lattices").
 
 * ``lattice.compounds``
 
   Lattices with more than one element.  These are mainly intended as
-  examples allowing you to define new such lattices.  Currenly, the
+  examples allowing you to define new such lattices.  Currently, the
   following are defined
 
   - ``B1`` = ``NaCl`` = ``Rocksalt``
@@ -101,7 +102,6 @@ with a basis):
   - ``L1_2`` = ``AuCu3``
   - ``L1_0`` = ``AuCu``
 
-.. _me: http://www.fysik.dtu.dk/~schiotz
 
 Usage
 -----
@@ -117,7 +117,7 @@ be specified.
   atomic symbol (i.e. 'Au').  For compounds, a tuple or list of
   elements should be given.  This argument is mandatory.
 
-``directions`` and/or ``miller``: 
+``directions`` and/or ``miller``:
   Specifies the orientation of the
   lattice as the Miller indices of the three basis vectors of the
   supercell (``directions=...``) and/or as the Miller indices of the
@@ -151,7 +151,7 @@ be specified.
   Depending on the crystal structure, there will be more than one
   lattice constant, and they are specified by giving a dictionary or a
   tuple (a scalar for cubic lattices).  Distances are given in
-  Angstrom, angles in degrees. 
+  Angstrom, angles in degrees.
 
   =============  ===================  ========================================
   Structure      Lattice constants    Dictionary-keys
@@ -164,10 +164,10 @@ be specified.
   Monoclinic     (a, b, c, alpha)     'a', 'b' or 'b/a', 'c' or 'c/a', 'alpha'
   Hexagonal      (a, c)               'a', 'c' or 'c/a'
   =============  ===================  ========================================
-  
+
   Example:
 
-  >>> atoms = Monoclinic( ... , latticeconstant={'a': 3.06, 
+  >>> atoms = Monoclinic( ... , latticeconstant={'a': 3.06,
   ...     'b/a': 0.95, 'c/a': 1.07, 'alpha': 74})
 
 
@@ -196,9 +196,8 @@ this::
       """A factory for creating diamond lattices."""
       xtal_name = 'diamond'
       bravais_basis = [[0, 0, 0], [0.25, 0.25, 0.25]]
-    
-  Diamond = DiamondFactory()
 
+  Diamond = DiamondFactory()
 
 
 Lattices with more than one element
@@ -248,11 +247,11 @@ use the simple cubic lattice with a larger basis::
       "A factory for creating NaCl (B1, Rocksalt) lattices."
 
       bravais_basis = [[0, 0, 0], [0, 0, 0.5], [0, 0.5, 0], [0, 0.5, 0.5],
-		       [0.5, 0, 0], [0.5, 0, 0.5], [0.5, 0.5, 0],
-		       [0.5, 0.5, 0.5]]
+                       [0.5, 0, 0], [0.5, 0, 0.5], [0.5, 0.5, 0],
+                       [0.5, 0.5, 0.5]]
       element_basis = (0, 1, 1, 0, 1, 0, 0, 1)
 
 
   B1 = NaCl = Rocksalt = NaClFactory()
 
-More examples can be found in the file :trac:`ase/lattice/compounds.py`.
+More examples can be found in the file :git:`ase/lattice/compounds.py`.

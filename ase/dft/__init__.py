@@ -1,4 +1,5 @@
 import numpy as np
+
 from ase.dft.stm import STM
 from ase.dft.dos import DOS
 from ase.dft.wannier import Wannier
@@ -19,7 +20,7 @@ def get_distribution_moment(x, y, order=0):
     x = np.asarray(x)
     y = np.asarray(y)
         
-    if order==0:
+    if order == 0:
         return np.trapz(y, x)
     elif isinstance(order, int):
         return np.trapz(x**order * y, x) / np.trapz(y, x)
@@ -27,4 +28,3 @@ def get_distribution_moment(x, y, order=0):
         return [get_distribution_moment(x, y, n) for n in order]
     else:
         raise ValueError('Illegal order: %s' % order)
-

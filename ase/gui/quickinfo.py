@@ -1,67 +1,109 @@
-# encoding: utf-8
-
+# -*- encoding: utf-8
 "Module for displaying information about the system."
 
-import gtk
-from gettext import gettext as _
-from ase.gui.widgets import pack
+from __future__ import unicode_literals
 
-singleimage = _("Single image loaded.")
-multiimage = _("Image %d loaded (0 - %d).")
-ucconst = _("Unit cell is fixed.")
-ucvaries = _("Unit cell varies.")
+import numpy as np
+from ase.gui.i18n import _
+import warnings
 
-format = _("""\
-%s
 
-Number of atoms: %d.
+ucellformat = """\
+  {:8.3f}  {:8.3f}  {:8.3f}
+  {:8.3f}  {:8.3f}  {:8.3f}
+  {:8.3f}  {:8.3f}  {:8.3f}
+"""
 
-Unit cell:
-  %8.3f  %8.3f  %8.3f
-  %8.3f  %8.3f  %8.3f
-  %8.3f  %8.3f  %8.3f
-%s
-""")
 
-class QuickInfo(gtk.Window):
-    def __init__(self, gui):
-        gtk.Window.__init__(self)
-        self.set_title(_("Quick Info"))
-        vbox = gtk.VBox()
-        images = gui.images
-        if images.natoms < 1:
-            txt = _("No atoms loaded.")
+def info(gui):
+    images = gui.images
+    nimg = len(images)
+    atoms = gui.atoms
+
+    tokens = []
+    def add(token=''):
+        tokens.append(token)
+
+    if len(atoms) < 1:
+        add(_('This frame has no atoms.'))
+    else:
+        img = gui.frame
+
+        if nimg == 1:
+            add(_('Single image loaded.'))
         else:
-            (nimg, natoms, three) = images.P.shape
-            assert three == 3
-            img = gui.frame
-            uc = images.A[img]
-            if nimg > 1:
-                equal = True
-                for i in range(nimg):
-                    equal = equal and (uc == images.A[i]).all()
-                if equal:
-                    uctxt = ucconst
-                else:
-                    uctxt = ucvaries
-            else:
-                uctxt = ""
-            if nimg == 1:
-                imgtxt = singleimage
-            else:
-                imgtxt = multiimage % (img, nimg-1)
-            txt = format % ((imgtxt, natoms) + tuple(uc.flat) + (uctxt,))
-        label = gtk.Label(txt)
-        pack(vbox, [label])
-        but = gtk.Button(stock=gtk.STOCK_CLOSE)
-        but.connect('clicked', self.close)
-        pack(vbox, [but], end=True)
-        self.add(vbox)
-        vbox.show()
-        self.show()
-        self.gui = gui
+            add(_('Image {} loaded (0–{}).').format(img, nimg - 1))
+        add()
+        add(_('Number of atoms: {}').format(len(atoms)))
 
-    def close(self, *args):
-        self.destroy()
+        # We need to write Å³ further down, so we have no choice but to
+        # use proper subscripts in the chemical formula:
+        formula = atoms.get_chemical_formula()
+        subscripts = dict(zip('0123456789', '₀₁₂₃₄₅₆₇₈₉'))
+        pretty_formula = ''.join(subscripts.get(c, c) for c in formula)
+        add(pretty_formula)
 
-    
+        add()
+        add(_('Unit cell [Å]:'))
+        add(ucellformat.format(*atoms.cell.ravel()))
+        periodic = [[_('no'), _('yes')][periodic] for periodic in atoms.pbc]
+        # TRANSLATORS: This has the form Periodic: no, no, yes
+        add(_('Periodic: {}, {}, {}').format(*periodic))
+
+        if nimg > 1:
+            if all((atoms.cell == img.cell).all() for img in images):
+                add(_('Unit cell is fixed.'))
+            else:
+                add(_('Unit cell varies.'))
+
+        if atoms.number_of_lattice_vectors == 3:
+            add(_('Volume: {:.3f} Å³').format(atoms.get_volume()))
+
+        # Print electronic structure information if we have a calculator
+        if atoms.calc:
+            calc = atoms.calc
+
+            def getresult(name, get_quantity):
+                # ase/io/trajectory.py line 170 does this by using
+                # the get_property(prop, atoms, allow_calculation=False)
+                # so that is an alternative option.
+                try:
+                    if calc.calculation_required(atoms, [name]):
+                        quantity = None
+                    else:
+                        quantity = get_quantity()
+                except Exception as err:
+                    quantity = None
+                    errmsg = ('An error occured while retrieving {} '
+                              'from the calculator: {}'.format(name, err))
+                    warnings.warn(errmsg)
+                return quantity
+
+            # SinglePointCalculators are named after the code which
+            # produced the result, so this will typically list the
+            # name of a code even if they are just cached results.
+            add()
+            from ase.calculators.singlepoint import SinglePointCalculator
+            if isinstance(calc, SinglePointCalculator):
+                add(_('Calculator: {} (cached)').format(calc.name))
+            else:
+                add(_('Calculator: {} (attached)').format(calc.name))
+
+            energy = getresult('energy', atoms.get_potential_energy)
+            forces = getresult('forces', atoms.get_forces)
+            magmom = getresult('magmom', atoms.get_magnetic_moment)
+
+            if energy is not None:
+                energy_str = _('Energy: {:.3f} eV').format(energy)
+                add(energy_str)
+
+            if forces is not None:
+                maxf = np.linalg.norm(forces, axis=1).max()
+                forces_str = _('Max force: {:.3f} eV/Å').format(maxf)
+                add(forces_str)
+
+            if magmom is not None:
+                mag_str = _('Magmom: {:.3f} µ').format(magmom)
+                add(mag_str)
+
+    return '\n'.join(tokens)

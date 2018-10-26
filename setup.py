@@ -1,111 +1,34 @@
+#!/usr/bin/env python
 
-
-# Copyright (C) 2007  CAMP
+# Copyright (C) 2007-2017  CAMd
 # Please see the accompanying LICENSE file for further information.
 
-from distutils.core import setup, Command
+from __future__ import print_function
+import os
+import re
+import sys
+from setuptools import setup, find_packages
 from distutils.command.build_py import build_py as _build_py
 from glob import glob
 from os.path import join
 
-import os
-import sys
 
-import shutil
-
-long_description = """\
-ASE is a python package providing an open source Atomic Simulation
-Environment in the Python language."""
+if sys.version_info < (2, 7, 0, 'final', 0):
+    raise SystemExit('Python 2.7 or later is required!')
 
 
-if sys.version_info < (2, 4, 0, 'final', 0):
-    raise SystemExit, 'Python 2.4 or later is required!'
+with open('README.rst') as fd:
+    long_description = fd.read()
 
-packages = ['ase',
-            'ase.cli',
-            'ase.cluster',
-            'ase.cluster.data',
-            'ase.db',
-            'ase.io',
-            'ase.md',
-            'ase.dft',
-            'ase.gui',
-            'ase.gui.languages',
-            'ase.data',
-            'ase.tasks',
-            'ase.test',
-            'ase.test.abinit',
-            'ase.test.aims',
-            'ase.test.castep',
-            'ase.test.cmr',
-            'ase.test.elk',
-            'ase.test.exciting',
-            'ase.test.fio',
-            'ase.test.fleur',
-            'ase.test.gaussian',
-            'ase.test.gromacs',
-            'ase.test.jacapo',
-            'ase.test.mopac',
-            'ase.test.nwchem',
-            'ase.test.tasks',
-            'ase.test.vasp',
-            'ase.utils',
-            'ase.lattice',
-            'ase.lattice.spacegroup',
-            'ase.examples',
-            'ase.optimize',
-            'ase.optimize.test',
-            'ase.vibrations',
-            'ase.visualize',
-            'ase.visualize.vtk',
-            'ase.transport',
-            'ase.calculators',
-            'ase.calculators.jacapo']
+# Get the current version number:
+with open('ase/__init__.py') as fd:
+    version = re.search("__version__ = '(.*)'", fd.read()).group(1)
 
-package_dir={'ase': 'ase'}
+package_data = {'ase': ['spacegroup/spacegroup.dat',
+                        'collections/*.json',
+                        'db/templates/*',
+                        'db/static/*']}
 
-package_data={'ase': ['lattice/spacegroup/spacegroup.dat']}
-
-class test(Command):
-    description = 'build and run test suite; exit code is number of failures'
-    user_options = [('calculators=', 'c',
-                     'Comma separated list of calculators to test')]
-    
-    def __init__(self, dist):
-        Command.__init__(self, dist)
-        self.sub_commands = ['build']
-
-    def initialize_options(self):
-        self.calculators = None
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        self.run_command('build')
-        buildcmd = self.get_finalized_command('build')
-        sys.path.insert(0, buildcmd.build_lib)
-
-        if self.calculators is not None:
-            calculators = self.calculators.split(',')
-        elif 'ASE_CALCULATORS' in os.environ:
-            calculators = os.environ['ASE_CALCULATORS'].split(',')
-        else:
-            calculators = []
-        from ase.test import test as _test
-        testdir = '%s/testase-tempfiles' % buildcmd.build_base
-        origcwd = os.getcwd()
-        if os.path.isdir(testdir):
-            shutil.rmtree(testdir)  # clean before running tests!
-        os.mkdir(testdir)
-        os.chdir(testdir)
-        try:
-            results = _test(2, calculators, display=False)
-            if results.failures or results.errors:
-                print >> sys.stderr, 'Test suite failed'
-                raise SystemExit(len(results.failures) + len(results.errors))
-        finally:
-            os.chdir(origcwd)
 
 class build_py(_build_py):
     """Custom distutils command to build translations."""
@@ -121,11 +44,13 @@ class build_py(_build_py):
         msgfmt = 'msgfmt'
         status = os.system(msgfmt + ' -V')
         if status == 0:
-            for pofile in glob('ase/gui/po/*/LC_MESSAGES/ag.po'):
+            for pofile in sorted(glob('ase/gui/po/*/LC_MESSAGES/ag.po')):
                 dirname = join(self.build_lib, os.path.dirname(pofile))
                 if not os.path.isdir(dirname):
                     os.makedirs(dirname)
                 mofile = join(dirname, 'ag.mo')
+                print()
+                print('Compile {}'.format(pofile))
                 status = os.system('%s -cv %s --output-file=%s 2>&1' %
                                    (msgfmt, pofile, mofile))
                 assert status == 0, 'msgfmt failed!'
@@ -134,55 +59,50 @@ class build_py(_build_py):
     def get_outputs(self, *args, **kwargs):
         return _build_py.get_outputs(self, *args, **kwargs) + self.mofiles
 
-# Get the current version number:
-execfile('ase/svnversion_io.py')  # write ase/svnversion.py and get svnversion
-execfile('ase/version.py')        # get version_base
-if svnversion and os.name not in ['ce', 'nt']: # MSI accepts only version X.X.X
-    version = version_base + '.' + svnversion
-else:
-    version = version_base
 
-scripts = ['tools/ase-gui', 'tools/ase-db', 'tools/ase-info',
-           'tools/ase-build', 'tools/ase-run']
-# provide bat executables in the tarball and always for Win
-if 'sdist' in sys.argv or os.name in ['ce', 'nt']:
-    for s in scripts[:]:
-        scripts.append(s + '.bat')
-
-# data_files needs (directory, files-in-this-directory) tuples
-data_files = []
-for dirname, dirnames, filenames in os.walk('doc'):
-    if '.svn' not in dirname: # skip .svn dirs
-        fileslist = []
-        for filename in filenames:
-            fullname = os.path.join(dirname, filename)
-            if '.svn' not in fullname:
-                fileslist.append(fullname)
-        data_files.append(('share/python-ase/' + dirname, fileslist))
-
-setup(name='python-ase',
+setup(name='ase',
       version=version,
       description='Atomic Simulation Environment',
       url='https://wiki.fysik.dtu.dk/ase',
-      maintainer='CAMd',
-      maintainer_email='camd@fysik.dtu.dk',
+      maintainer='ASE-community',
+      maintainer_email='ase-users@listserv.fysik.dtu.dk',
       license='LGPLv2.1+',
-      platforms=['linux'],
-      packages=packages,
-      package_dir=package_dir,
+      platforms=['unix'],
+      packages=find_packages(),
+      install_requires=['numpy', 'scipy', 'matplotlib', 'flask'],
+      extras_require={'docs': ['sphinx', 'sphinx_rtd_theme', 'pillow']},
       package_data=package_data,
-      scripts=scripts,
-      data_files=data_files,
+      entry_points={'console_scripts': ['ase=ase.cli.main:main',
+                                        'ase-db=ase.cli.main:old',
+                                        'ase-gui=ase.cli.main:old',
+                                        'ase-run=ase.cli.main:old',
+                                        'ase-info=ase.cli.main:old',
+                                        'ase-build=ase.cli.main:old']},
       long_description=long_description,
-      cmdclass={'build_py': build_py,
-                'test': test})
+      cmdclass={'build_py': build_py},
+      classifiers=[
+          'Development Status :: 6 - Mature',
+          'License :: OSI Approved :: '
+          'GNU Lesser General Public License v2 or later (LGPLv2+)',
+          'Operating System :: OS Independent',
+          'Programming Language :: Python :: 2',
+          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3.4',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'Topic :: Scientific/Engineering :: Physics'])
+
 
 ## This is probably the most unprofessional way of including FORTRAN modules with dependencies
 home = os.getcwd()
+vshort = '%d.%d' %sys.version_info[0:2]
+libcalcs = home+'/lib/python/ase-'+version+'-py'+vshort+'.egg/ase/calculators/'
+os.system('cp -r '+home+'/ase/calculators/alpha_FI_refdata/ '+libcalcs)
 os.system('python '+home+'/ase/calculators/make_HA.py '+home+'/ase/calculators ')
 os.system('python '+home+'/ase/calculators/make_CPA.py '+home+'/ase/calculators ')
 os.system('cd '+home+'/ase/calculators/ && bash build_options_sdc && cd '+home)
 for modname in ['HA_recode.', 'splines_alt.', 'spherical_harmonics.', 'CPA_recode.']:
-    os.system('cp '+home+'/'+modname+'* '+home+'/lib/python/ase/calculators/')
+    os.system('cp '+home+'/'+modname+'* '+libcalcs)
     os.system('mv '+home+'/'+modname+'* '+home+'/ase/calculators/')
 

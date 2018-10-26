@@ -2,27 +2,30 @@
 Molecular dynamics
 ==================
 
-.. module:: md
+.. module:: ase.md
    :synopsis: Molecular Dynamics
 
 Typical computer simulations involve moving the atoms around, either
 to optimize a structure (energy minimization) or to do molecular
 dynamics.  This chapter discusses molecular dynamics, energy
-minimization algorithms will be discussed in the :mod:`optimize`
+minimization algorithms will be discussed in the :mod:`ase.optimize`
 section.
 
 A molecular dynamics object will operate on the atoms by moving them
 according to their forces - it integrates Newton's second law
 numerically.  A typical molecular dynamics simulation will use the
 `Velocity Verlet dynamics`_.  You create the
-:class:`VelocityVerlet` object, giving it the atoms and a time step, and then
-you perform dynamics by calling its :meth:`run` method::
+:class:`ase.md.verlet.VelocityVerlet` object, giving it the atoms and a time
+step, and then you perform dynamics by calling its
+:meth:`~verlet.VelocityVerlet.run` method::
 
-  dyn = VelocityVerlet(atoms, 5.0 * units.fs)
+  dyn = VelocityVerlet(atoms, dt=5.0 * units.fs,
+                       trajectory='md.traj', logfile='md.log')
   dyn.run(1000)  # take 1000 steps
 
 A number of different algorithms can be used to perform molecular
 dynamics, with slightly different results.
+
 
 Choosing the time step
 ======================
@@ -48,12 +51,15 @@ File output
 The time evolution of the system can be saved in a trajectory file,
 by creating a trajectory object, and attaching it to the dynamics
 object.  This is documented in the module :mod:`ase.io.trajectory`.
+You can attach the trajectory explicitly to the dynamics object, and
+you may want to use the optional ``interval`` argument, so every
+time step is not written to the file.
 
-Unlike the geometry optimization classes, the molecular dynamics
-classes do not support giving a trajectory file name in the
-constructor.  Instead the trajectory must be attached explicitly to
-the dynamics, and it is *strongly recommended* to use the optional
-``interval`` argument, so every time step is not written to the file.
+Alternatively, you can just use the ``trajectory`` keyword when
+instantiating the dynamics object as in the example above. In this
+case, a ``loginterval`` keyword may also be supplied to specify the
+frequency of writing to the trajectory. The loginterval keyword will
+apply to both the trajectory and the logfile.
 
 
 Logging
@@ -68,12 +74,12 @@ for each timestep, specifying the ``loginterval`` argument will chance
 this to a more reasonable frequency.
 
 The logging can be customized by explicitly attaching a
-:class:`ase.md.MDLogger` object to the dynamics::
+:class:`MDLogger` object to the dynamics::
 
   from ase.md import MDLogger
   dyn = VelocityVerlet(atoms, dt=2*ase.units.fs)
   dyn.attach(MDLogger(dyn, atoms, 'md.log', header=False, stress=False,
-	     peratom=True, mode="a"), interval=1000)
+             peratom=True, mode="a"), interval=1000)
 
 This example will skip the header line and write energies per atom
 instead of total energies.  The parameters are
@@ -100,6 +106,8 @@ cyclic reference to the dynamics.
    such as Jacapo, to not terminate correctly.)
 
 
+.. autoclass:: MDLogger
+
 
 Constant NVE simulations (the microcanonical ensemble)
 ======================================================
@@ -120,12 +128,13 @@ constant, but if significant structural changes occurs they may result
 in temperature changes.  If external work is done on the system, the
 temperature is likely to rise significantly.
 
+
 Velocity Verlet dynamics
 ------------------------
 
-.. module:: md.verlet
+.. module:: ase.md.verlet
 
-.. class:: VelocityVerlet(atoms, timestep)
+.. autoclass:: VelocityVerlet
 
 
 ``VelocityVerlet`` is the only dynamics implementing the NVE ensemble.
@@ -134,7 +143,6 @@ a too large time step will immediately be obvious, as the energy will
 increase with time, often very rapidly.
 
 Example: See the tutorial :ref:`md_tutorial`.
-
 
 
 Constant NVT simulations (the canonical ensemble)
@@ -152,10 +160,9 @@ introduced into the Hamiltonian.
 Langevin dynamics
 -----------------
 
-.. module:: md.langevin
+.. module:: ase.md.langevin
 
 .. class:: Langevin(atoms, timestep, temperature, friction)
-
 
 The Langevin class implements Langevin dynamics, where a (small)
 friction term and a fluctuating force are added to Newton's second law
@@ -194,7 +201,6 @@ to zero in the part of the system where the phenomenon being studied
 is located.
 
 
-
 Nosé-Hoover dynamics
 --------------------
 
@@ -211,7 +217,7 @@ special case of NPT dynamics.
 
 Berendsen NVT dynamics
 -----------------------
-.. module:: md.nvtberendsen
+.. module:: ase.md.nvtberendsen
 
 .. class:: NVTBerendsen(atoms, timestep, temperature, taut, fixcm)
 
@@ -248,7 +254,7 @@ the gromacs manual at www.gromacs.org.
 Constant NPT simulations (the isothermal-isobaric ensemble)
 ===========================================================
 
-.. module:: md.npt
+.. module:: ase.md.npt
 
 .. class:: NPT(atoms, timestep, temperature, externalstress, ttime, pfactor, mask=None)
 
@@ -332,12 +338,17 @@ It has the following methods:
   Change the mask.  Use with care, as you may "freeze" a
   fluctuation in the strain rate.
 
-.. method:: NPT.set_strainrate(eps):
+.. method:: NPT.set_strain_rate(eps):
 
   Set the strain rate.  ``eps`` must be an upper-triangular matrix.
   If you set a strain rate along a direction that is "masked out"
   (see ``set_mask``), the strain rate along that direction will be
   maintained constantly.
+
+.. method:: NPT.get_strain_rate():
+
+  Set the instantaneous strain rate (due to the fluctuations in the
+  shape of the computational box).
 
 .. method:: NPT.get_gibbs_free_energy():
 
@@ -357,16 +368,12 @@ Physical Review A 41, p. 4552 (1990).
 
 [4] F. D. Di Tolla and M. Ronchetti, Physical Review E 48, p. 1726 (1993).
 
-.. seealso::
-
-   The :term:`API` documentation: :epydoc:`ase.md`
-
 
 Berendsen NPT dynamics
 -----------------------
-.. module:: md.nptberendsen
+.. module:: ase.md.nptberendsen
 
-.. class:: NPTBerendsen(atoms, timestep, temperature, taut, fixcm, pressure, taup,compressibility)
+.. class:: NPTBerendsen(atoms, timestep, temperature, taut, pressure, taup, compressibility, fixcm)
 
 In Berendsen NPT simulations the velocities are scaled to achieve the desired
 temperature. The speed of the scaling is determined by the parameter taut.
@@ -390,10 +397,6 @@ the gromacs manual at www.gromacs.org. or amber at ambermd.org
 *taut*:
     Time constant for Berendsen temperature coupling.
 
-*fixcm*:
-    If True, the position and momentum of the center of mass is
-    kept unperturbed.  Default: True.
-
 *pressure*:
     The desired pressure, in bar (1 bar = 1e5 Pa).
 
@@ -403,10 +406,31 @@ the gromacs manual at www.gromacs.org. or amber at ambermd.org
 *compressibility*:
     The compressibility of the material, water 4.57E-5 bar-1, in bar-1
 
+*fixcm*:
+    If True, the position and momentum of the center of mass is
+    kept unperturbed.  Default: True.
 
 ::
 
   # Room temperature simulation (300K, 0.1 fs time step, atmospheric pressure)
-  dyn = NPTBerendsen(atoms, timestep=0.1*units.fs, temperature=300,
-		   taut=0.1*1000*units.fs, pressure = 1.01325,
-		   taup=1.0*1000*units.fs, compressibility=4.57e-5)
+  dyn = NPTBerendsen(atoms, timestep=0.1 * units.fs, temperature=300,
+                     taut=0.1 * 1000 * units.fs, pressure=1.01325,
+                     taup=1.0 * 1000 * units.fs, compressibility=4.57e-5)
+
+Velocity distributions
+======================
+
+A selection of functions are provided to initialize atomic velocities
+to the correct temperature.
+
+.. module:: ase.md.velocitydistribution
+
+.. autofunction:: MaxwellBoltzmannDistribution
+
+.. autofunction:: Stationary
+
+.. autofunction:: ZeroRotation
+
+.. autofunction:: PhononHarmonics
+
+.. autofunction:: phonon_harmonics

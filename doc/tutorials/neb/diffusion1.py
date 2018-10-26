@@ -1,4 +1,4 @@
-from ase.lattice.surface import fcc100, add_adsorbate
+from ase.build import fcc100, add_adsorbate
 from ase.constraints import FixAtoms
 from ase.calculators.emt import EMT
 from ase.optimize import QuasiNewton
@@ -14,7 +14,7 @@ slab.center(axis=2, vacuum=4.0)
 
 # Fix second and third layers:
 mask = [atom.tag > 1 for atom in slab]
-#print mask
+#print(mask)
 slab.set_constraint(FixAtoms(mask=mask))
 
 # Use EMT potential:

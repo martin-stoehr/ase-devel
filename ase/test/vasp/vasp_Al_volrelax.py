@@ -14,7 +14,7 @@ from ase import io
 # QuasiNewton nowadays is an alias for BFGSLineSearch, which is
 # broken. Use BFGS instead.
 from ase.optimize import BFGS as QuasiNewton
-from ase.lattice import bulk
+from ase.build import bulk
 from ase.calculators.vasp import Vasp
 
 # -- Perform Volume relaxation within Vasp
@@ -27,11 +27,11 @@ def vasp_vol_relax():
     # Explicitly parse atomic position output file from Vasp
     CONTCAR_Al = io.read('CONTCAR', format='vasp')
 
-    print 'Stress after relaxation:\n', calc.read_stress()
+    print('Stress after relaxation:\n', calc.read_stress())
 
-    print 'Al cell post relaxation from calc:\n', calc.get_atoms().get_cell()
-    print 'Al cell post relaxation from atoms:\n', Al.get_cell()
-    print 'Al cell post relaxation from CONTCAR:\n', CONTCAR_Al.get_cell()
+    print('Al cell post relaxation from calc:\n', calc.get_atoms().get_cell())
+    print('Al cell post relaxation from atoms:\n', Al.get_cell())
+    print('Al cell post relaxation from CONTCAR:\n', CONTCAR_Al.get_cell())
 
     # All the cells should be the same.
     assert (calc.get_atoms().get_cell() == CONTCAR_Al.get_cell()).all()
@@ -50,8 +50,8 @@ def ase_vol_relax():
     qn = QuasiNewton(sf, logfile='relaxation.log')
     qn.run(fmax=0.1, steps=5)
 
-    print 'Stress:\n', calc.read_stress()
-    print 'Al post ASE volume relaxation\n', calc.get_atoms().get_cell()
+    print('Stress:\n', calc.read_stress())
+    print('Al post ASE volume relaxation\n', calc.get_atoms().get_cell())
 
     return Al
 
