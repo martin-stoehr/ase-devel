@@ -95,13 +95,14 @@ setup(name='ase',
 
 
 ## This is probably the most unprofessional way of including FORTRAN modules with dependencies
+fcomp = 'intel' if (os.system("ifot -help")==0) else 'foss'
 home = os.getcwd()
 vshort = '%d.%d' %sys.version_info[0:2]
 libcalcs = home+'/lib/python/ase-'+version+'-py'+vshort+'.egg/ase/calculators/'
 os.system('cp -r '+home+'/ase/calculators/alpha_FI_refdata/ '+libcalcs)
 os.system('python '+home+'/ase/calculators/make_HA.py '+home+'/ase/calculators ')
 os.system('python '+home+'/ase/calculators/make_CPA.py '+home+'/ase/calculators ')
-os.system('cd '+home+'/ase/calculators/ && bash build_options_sdc && cd '+home)
+os.system('cd '+home+'/ase/calculators/ && bash build_options_sdc-'+fcomp+' && cd '+home)
 for modname in ['HA_recode.', 'splines_alt.', 'spherical_harmonics.', 'CPA_recode.']:
     os.system('cp '+home+'/'+modname+'* '+libcalcs)
     os.system('mv '+home+'/'+modname+'* '+home+'/ase/calculators/')

@@ -422,12 +422,6 @@ ase/lattice/spacegroup.py
 ase/lattice/surface.py
 ase/lattice/tetragonal.py
 ase/lattice/triclinic.py
-ase/lattice/spacegroup/__init__.py
-ase/lattice/spacegroup/cell.py
-ase/lattice/spacegroup/crystal.py
-ase/lattice/spacegroup/findsym.py
-ase/lattice/spacegroup/spacegroup.dat
-ase/lattice/spacegroup/spacegroup.py
 ase/md/__init__.py
 ase/md/fix.py
 ase/md/langevin.py

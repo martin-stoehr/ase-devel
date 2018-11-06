@@ -33,7 +33,7 @@ if 'HA_recode.so' in curr_files:
     remove(src_loc+'HA_recode.so')
 
 
-if (system('which ifort') == 256):
+if (system('ifort -help') == 256):
     fcomp, f2pycomp = 'gfortran', 'gfortran'
     lib_lapack = '-L/usr/lib/ -llapack'
 else:

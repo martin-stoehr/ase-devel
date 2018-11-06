@@ -17,7 +17,7 @@ if 'cpa.pyf' in curr_files:
 if 'CPA_recode.so' in curr_files:
     remove(src_loc+'CPA_recode.so')
 
-if (system('which ifort') == 256):
+if (system('ifort -help') == 256):
     f2pycomp = 'gfortran'
 else:
     f2pycomp = 'intelem'
