@@ -16,6 +16,7 @@ ase/eos.py
 ase/infrared.py
 ase/molcrys.py
 ase/neb.py
+ase/neighborlist.py
 ase/nomad.py
 ase/old.py
 ase/parallel.py
@@ -992,13 +993,6 @@ doc/ase/vibrations.rst
 doc/ase/visualize.rst
 doc/ase/xrdebye.py
 doc/ase/xrdebye.rst
-doc/ase/build/build.rst
-doc/ase/build/general_surface.py
-doc/ase/build/general_surface.tex
-doc/ase/build/structure.py
-doc/ase/build/surface.py
-doc/ase/build/surface.rst
-doc/ase/build/tools.rst
 doc/ase/calculators/FHI-aims.rst
 doc/ase/calculators/H2O_aims.py
 doc/ase/calculators/INCAR_NaCl

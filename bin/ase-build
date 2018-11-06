@@ -1,4 +1,4 @@
-#!/opt/apps/resif/data/production/v0.1-20170602/default/software/lang/Python/2.7.13-intel-2017a/bin/python
+#!/opt/apps/resif/data/production/v0.3-20170713/default/software/lang/Python/2.7.13-intel-2017a/bin/python
 # EASY-INSTALL-ENTRY-SCRIPT: 'ase===3.16.3b1-devMS','console_scripts','ase-build'
 __requires__ = 'ase===3.16.3b1-devMS'
 import re

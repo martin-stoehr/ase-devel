@@ -1,4 +1,4 @@
-#!/opt/apps/resif/data/production/v0.1-20170602/default/software/lang/Python/2.7.13-intel-2017a/bin/python
-# EASY-INSTALL-SCRIPT: 'numpy==1.14.0.dev0+d93a5dd','f2py'
-__requires__ = 'numpy==1.14.0.dev0+d93a5dd'
-__import__('pkg_resources').run_script('numpy==1.14.0.dev0+d93a5dd', 'f2py')
+#!/opt/apps/resif/data/production/v0.3-20170713/default/software/lang/Python/2.7.13-intel-2017a/bin/python
+# EASY-INSTALL-SCRIPT: 'numpy==1.12.1','f2py'
+__requires__ = 'numpy==1.12.1'
+__import__('pkg_resources').run_script('numpy==1.12.1', 'f2py')
