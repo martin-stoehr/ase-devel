@@ -8,6 +8,7 @@ from ase.calculators.calculator import Calculator
 from sys import stderr
 
 
+Bohr3 = Bohr*Bohr*Bohr
 default_parameters = {
                       'xc':'pbe',
                       'n_omega_SCS':15,
@@ -671,6 +672,8 @@ class MBD(Calculator):
         omega_int = np.asarray(evals)*np.asarray(evals)
         rho = mbd_mod.eval_mbd_int_density_io(grid/Bohr, self.pos, charges, \
                                               m_eff, omega_int, fname_modes)
+        ##! density in a.u. from MBD module
+        rho /= Bohr3
         
         return rho
         
@@ -774,6 +777,8 @@ class MBD(Calculator):
         m_eff = charges/(alphas_0*omega_0*omega_0)
         rho = mbd_mod.eval_mbd_nonint_density(grid/Bohr, self.pos, charges, \
                                               m_eff, omega_0)
+        ##! density in a.u. from MBD module
+        rho /= Bohr3
         
         return rho
         
@@ -878,6 +883,9 @@ class MBD(Calculator):
         drho = mbd_mod.eval_mbd_drho_int_nonint_io(grid/Bohr, self.pos, charges, \
                                                    m_eff, omega_int, omega_0, \
                                                    fname_modes)
+        ##! density in a.u. from MBD module
+        drho /= Bohr3
+        
         return drho
         
     

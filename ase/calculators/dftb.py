@@ -104,8 +104,8 @@ class Dftb(FileIOCalculator):
         self.default_parameters = dict(
             Options_='',
             Options_WriteResultsTag='Yes',
-            Options_WriteEigenvectors='No',
-            Options_WriteCPA='No',
+#            Options_WriteEigenvectors='No',
+#            Options_WriteCPA='No',
 #            Options_CalculateForces='Yes',
             Options_MinimiseMemoryUsage='No',
             Hamiltonian_='DFTB',
