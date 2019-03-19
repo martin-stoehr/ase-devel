@@ -197,7 +197,7 @@ class Runner:
         p('bulk modulus:', B)
         p('eos type:', args.eos_type)
 
-    def get_filename(self, name: str, ext: str = '') -> str:
+    def get_filename(self, name, ext=''):
         if '.' in name:
             name = name.rsplit('.', 1)[0]
         if self.args.tag is not None:
@@ -207,7 +207,7 @@ class Runner:
         return name
 
 
-def str2dict(s: str, namespace={}, sep: str = '='):
+def str2dict(s, namespace={}, sep='='):
     """Convert comma-separated key=value string to dictionary.
 
     Examples:
