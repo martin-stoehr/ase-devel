@@ -53,19 +53,19 @@ class s66x8_class:
         return s66x8_systems[name]
         
     
-    def create_s66x8_monomer1(name):
+    def create_s66x8_monomer1(self, name):
         """ return first monomer for system in S66X8 set named <name>. """
         
-        return s66x8_systems[name][:s66x8_nAtoms_monomers[name]]
+        return s66x8_systems[name][:s66x8_nAtoms_monomers[name][0]]
         
     
-    def create_s66x8_monomer2(name):
+    def create_s66x8_monomer2(self, name):
         """ return second monomer for system in S66X8 set named <name>. """
         
-        return s66x8_systems[name][s66x8_nAtoms_monomers[name]:]
+        return s66x8_systems[name][s66x8_nAtoms_monomers[name][0]:]
         
     
-    def get_interaction_energy_CC(name):
+    def get_interaction_energy_CC(self, name):
         """
         return interaction energy for S66X8 dimer <name>
         in eV as obtained by CCSD(T)/CBS.
@@ -74,7 +74,7 @@ class s66x8_class:
         return s66x8_IAE_CC[name]
         
     
-    def get_interaction_energy_PBE_MBD(name):
+    def get_interaction_energy_PBE_MBD(self, name):
         """
         return interaction energy for S66X8 dimer <name>
         in eV as obtained by PBE-DFT with many-body dispersion.
@@ -83,7 +83,7 @@ class s66x8_class:
         return s66x8_IAE_PBE_MBD[name]
         
     
-    def get_interaction_energy_PBE_TS(name):
+    def get_interaction_energy_PBE_TS(self, name):
         """
         return interaction energy for S66X8 dimer <name>
         in eV as obtained by PBE-DFT with semi-empirical dispersion

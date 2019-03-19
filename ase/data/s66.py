@@ -181,11 +181,7 @@ class s66_class:
         return s66_systems[name][s66_nAtoms_monomers[name][0]:]
         
     
-<<<<<<< HEAD
     def get_interaction_energy_CC(self, name):
-=======
-    def get_interaction_energy_CC(self,name):
->>>>>>> f58947627004113e3a64020f535eefeb2e5b77a9
         """
         return interaction energy for S66 dimer <name>
         in eV as obtained by CCSD(T)/CBS(haTZ) CP.

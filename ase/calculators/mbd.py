@@ -38,6 +38,7 @@ default_parameters = {
                       'use_fractional_ionic_approach':False,
                       'use_RvdW_from_alpha':False,
                       'use_alpha_vs_V_for_QDO':False,
+                      'use_RvdW_SCS':True,
                      }
 
 
@@ -92,7 +93,8 @@ class MBD(Calculator):
                   'custom_damping_TS', \
                   'custom_damping_SCSMBD', \
                   'use_RvdW_from_alpha', \
-                  'use_alpha_vs_V_for_QDO']
+                  'use_alpha_vs_V_for_QDO', \
+                  'use_RvdW_SCS']
     
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
@@ -362,9 +364,14 @@ class MBD(Calculator):
         kgrid = mbd_mod.make_k_grid(mbd_mod.make_g_grid(*self.kgrid), self.UC)
         
         if self.do_SCS:     # do MBD@(rs)SCS?
-            alph, om, rvdwAB = self.alpha_0_SCS, self.omega_SCS, self.RvdW_SCS
+            alph, om = self.alpha_0_SCS, self.omega_SCS
         else:               # do MBD@TS
-            alph, om, rvdwAB = self.alpha_0_TS, self.omega_TS, self.RvdW_TS
+            alph, om = self.alpha_0_TS, self.omega_TS
+        
+        if (self.do_SCS and self.use_RvdW_SCS):
+            rvdwAB = self.RvdW_SCS
+        else:
+            rvdwAB = self.RvdW_TS
         
         if self.use_scalapack:
             self.E_MBD = mbd_mod.get_mbd_energy_s(self.modus, \
