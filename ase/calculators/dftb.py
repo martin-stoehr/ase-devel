@@ -382,11 +382,23 @@ class Dftb(FileIOCalculator):
         ## dispersion energy (MBD/TS): move this out of read_additional_info!!
         try:
             vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
+            oldvdW = True
         except KeyError:
-            vdWmode = 'none'
+            try:
+                vdWmode = self.parameters['Hamiltonian_Dispersion_']
+                olfvdW = False
+            except KeyError:
+                vdWmode = 'none'
         
         if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
-            textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
+            if oldvdW:
+                textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
+            else:
+                if (vdWmode == 'MBD'):
+                    textdisp = textdet.split('Many-body dispersion energy:')[1].split('\n')[0]
+                elif (vdWmode == 'TS'):
+                    textdisp = textdet.split('Dispersion energy:')[1].split('\n')[0]
+            
             self.dispersion_energy = float(textdisp.split()[-2])
 #        else:
 #            print('No dispersion model defined.')
@@ -557,7 +569,10 @@ class Dftb(FileIOCalculator):
         try:
             vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
         except KeyError:
-            vdWmode = 'none'
+            try:
+                vdWmode = self.parameters['Hamiltonian_Dispersion_']
+            except KeyError:
+                vdWmode = 'none'
         
         if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
             return self.dispersion_energy

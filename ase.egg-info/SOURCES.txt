@@ -6,6 +6,7 @@ README.rst
 README.txt
 setup.py
 ase/__init__.py
+ase/__main__.py
 ase/anharmonicity.py
 ase/atom.py
 ase/atoms.py
@@ -165,6 +166,7 @@ ase/cli/nomad.py
 ase/cli/nomadget.py
 ase/cli/reciprocal.py
 ase/cli/run.py
+ase/cli/show.py
 ase/cluster/__init__.py
 ase/cluster/base.py
 ase/cluster/cluster.py
@@ -206,6 +208,7 @@ ase/data/h2o_clusters.py
 ase/data/l7.py
 ase/data/molecules.py
 ase/data/s22.py
+ase/data/s66.py
 ase/data/s66x8.py
 ase/data/s66x8_data.py
 ase/data/smc13.py

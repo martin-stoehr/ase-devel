@@ -40,6 +40,7 @@ Supported :mod:`Calculators <ase.calculators>`:
 |fhi-aims| |fleur| |gpaw| |gromacs|
 |hotbit| |jacapo| |jdftx| |lammps| |nwchem|
 |octopus| |onetep| |openmx| |q_espresso| |siesta| |turbomole| |vasp|
+:mod:`ACE-Molecule <ase.calculators.acemolecule>`
 :mod:`~ase.calculators.amber`
 :mod:`DMol³ <ase.calculators.dmol>`
 Gaussian_
@@ -66,6 +67,10 @@ See how to identify and convert old trajectory files here: :ref:`convert`.
 
 News
 ====
+
+* :ref:`ASE version 3.18.0 <releasenotes>` released (19 July 2019).
+
+* :ref:`ASE version 3.17.0 <releasenotes>` released (12 November 2018).
 
 * :ref:`ASE version 3.16.2 <releasenotes>` released (5 June 2018).
 
@@ -160,9 +165,10 @@ Contents
     gallery/gallery
     releasenotes
     contact
+    otherprojects
     development/development
     faq
-
+    workshop/workshop
 
 .. |abinit| image:: static/abinit.png
    :target: ase/calculators/abinit.html
