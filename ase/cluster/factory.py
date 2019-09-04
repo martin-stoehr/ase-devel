@@ -1,9 +1,12 @@
+from __future__ import print_function
 import numpy as np
 
 from ase.data import atomic_numbers as ref_atomic_numbers
-from ase.lattice.spacegroup import Spacegroup
+from ase.spacegroup import Spacegroup
 from ase.cluster.base import ClusterBase
 from ase.cluster.cluster import Cluster
+from ase.utils import basestring
+
 
 class ClusterFactory(ClusterBase):
     directions = [[1, 0, 0],
@@ -13,6 +16,8 @@ class ClusterFactory(ClusterBase):
     atomic_basis = np.array([[0., 0., 0.]])
 
     element_basis = None
+
+    Cluster = Cluster   # Make it possible to change the class of the object returned.
 
     def __call__(self, symbols, surfaces, layers, latticeconstant=None,
                  center=None, vacuum=0.0, debug=0):
@@ -33,17 +38,17 @@ class ClusterFactory(ClusterBase):
         self.set_basis()
 
         if self.debug:
-            print "Lattice constant(s):", self.lattice_constant
-            print "Lattice basis:\n", self.lattice_basis
-            print "Resiprocal basis:\n", self.resiproc_basis
-            print "Atomic basis:\n", self.atomic_basis
+            print("Lattice constant(s):", self.lattice_constant)
+            print("Lattice basis:\n", self.lattice_basis)
+            print("Resiprocal basis:\n", self.resiproc_basis)
+            print("Atomic basis:\n", self.atomic_basis)
 
         self.set_surfaces_layers(surfaces, layers)
         self.set_lattice_size(center)
 
         if self.debug:
-            print "Center position:", self.center.round(2)
-            print "Base lattice size:", self.size
+            print("Center position:", self.center.round(2))
+            print("Base lattice size:", self.size)
 
         cluster = self.make_cluster(vacuum)
         cluster.symmetry = self.xtal_name
@@ -80,7 +85,7 @@ class ClusterFactory(ClusterBase):
             mask = np.less(r, rmax)
 
             if self.debug > 1:
-                print "Cutting %s at %i layers ~ %.3f A" % (s, l, rmax)
+                print("Cutting %s at %i layers ~ %.3f A" % (s, l, rmax))
 
             positions = positions[mask]
             numbers = numbers[mask]
@@ -98,14 +103,14 @@ class ClusterFactory(ClusterBase):
         positions = positions - min + vacuum / 2.0
         self.center = self.center - min + vacuum / 2.0
 
-        return Cluster(symbols=numbers, positions=positions, cell=cell)
+        return self.Cluster(symbols=numbers, positions=positions, cell=cell)
 
     def set_atomic_numbers(self, symbols):
         "Extract atomic number from element"
         # The types that can be elements: integers and strings
         atomic_numbers = []
         if self.element_basis is None:
-            if isinstance(symbols, str):
+            if isinstance(symbols, basestring):
                 atomic_numbers.append(ref_atomic_numbers[symbols])
             elif isinstance(symbols, int):
                 atomic_numbers.append(symbols)
@@ -126,7 +131,7 @@ class ClusterFactory(ClusterBase):
                                 " (one for each kind of lattice position")
 
             for s in symbols:
-                if isinstance(s, str):
+                if isinstance(s, basestring):
                     atomic_numbers.append(ref_atomic_numbers[s])
                 elif isinstance(s, int):
                     atomic_numbers.append(s)
@@ -160,7 +165,7 @@ class ClusterFactory(ClusterBase):
                     k[i] = np.floor(k[i])
 
             if self.debug > 1:
-                print "Spaning %i layers in %s in lattice basis ~ %s" % (l, s, k)
+                print("Spaning %i layers in %s in lattice basis ~ %s" % (l, s, k))
 
             max[k > max] = k[k > max]
             min[k < min] = k[k < min]
@@ -213,6 +218,7 @@ def cross(a, b):
                      a[2]*b[0] - b[2]*a[0],
                      a[0]*b[1] - b[0]*a[1]])
 
+
 def GCD(a,b):
     """Greatest Common Divisor of a and b."""
     #print "--"
@@ -222,6 +228,7 @@ def GCD(a,b):
         #print a,b
     return b
 
+
 def reduce_miller(hkl):
     """Reduce Miller index to the lowest equivalent integers."""
     hkl = np.array(hkl)
@@ -229,11 +236,10 @@ def reduce_miller(hkl):
 
     d = GCD(GCD(hkl[0], hkl[1]), hkl[2])
     while d != 1:
-        hkl = hkl / d
+        hkl = hkl // d
         d = GCD(GCD(hkl[0], hkl[1]), hkl[2])
 
     if np.dot(old, hkl) > 0:
         return hkl
     else:
         return -hkl
-

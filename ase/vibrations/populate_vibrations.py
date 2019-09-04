@@ -132,7 +132,7 @@ def populate_vibrations(atoms=None, vibdata=None, T=300.0, runmode='stat', seed_
     [positions_md, velocities_md] = populate()
     T_temp = calculate_Temp()
 
-    print 'Final Temperature found!     ', T_temp
+    print('Final Temperature found!     ', T_temp)
 
     atoms_MD.set_positions(atoms.positions+positions_md)
     atoms_MD.set_velocities(velocities_md)

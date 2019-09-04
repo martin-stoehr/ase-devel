@@ -96,6 +96,6 @@ class XrDebye:
                 f += abc[2 * i] * exp(-abc[2 * i + 1] * s2)
             return f
         if self.warn:
-            print '<xrdebye::get_atomic> Element', symbol, 'not available'
+            print('<xrdebye::get_atomic> Element', symbol, 'not available')
         return 0
         

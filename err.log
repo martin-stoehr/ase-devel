@@ -1,0 +1,455 @@
+warning: no files found matching 'ase/lattice/spacegroup/spacegroup.dat'
+Sorry: TabError: inconsistent use of tabs and spaces in indentation (cpmd.py, line 66)
+zip_safe flag not set; analyzing archive contents...
+ase.gui.__pycache__.gtkexcepthook.cpython-36: module MAY be using inspect.getinnerframes
+ase.gui.__pycache__.i18n.cpython-36: module references __file__
+ase.collections.__pycache__.collection.cpython-36: module references __file__
+ase.spacegroup.__pycache__.spacegroup.cpython-36: module references __file__
+ase.utils.__pycache__.__init__.cpython-36: module references __file__
+ase.test.onetep.__pycache__.onetep.cpython-36: module references __file__
+ase.test.__pycache__.eoswoase.cpython-36: module references __file__
+ase.test.__pycache__.testsuite.cpython-36: module references __file__
+ase.calculators.__pycache__.mbd.cpython-36: module references __file__
+ase.calculators.__pycache__.castep.cpython-36: module references __file__
+ase.calculators.__pycache__.castep.cpython-36: module references __path__
+ase.calculators.__pycache__.AlphaModel.cpython-36: module references __file__
+ase.cli.__pycache__.completion.cpython-36: module references __file__
+ase.cli.__pycache__.info.cpython-36: module references __file__
+Sorry: TabError: inconsistent use of tabs and spaces in indentation (cpmd.py, line 66)
+/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/lib/python3.6/distutils/dist.py:261: UserWarning: Unknown distribution option: 'project_urls'
+  warnings.warn(msg)
+no previously-included directories found matching 'docs/_build'
+zip_safe flag not set; analyzing archive contents...
+flask.__pycache__.config.cpython-36: module references __file__
+flask.__pycache__.app.cpython-36: module references __file__
+flask.__pycache__.helpers.cpython-36: module references __file__
+extern/libqhull/poly2.c(3221): warning #111: statement is unreachable
+    return False; /* avoid warnings */
+    ^
+
+/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/lib/python3.6/distutils/dist.py:261: UserWarning: Unknown distribution option: 'project_urls'
+  warnings.warn(msg)
+/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/lib/python3.6/distutils/dist.py:261: UserWarning: Unknown distribution option: 'project_urls'
+  warnings.warn(msg)
+no previously-included directories found matching 'docs/_build'
+warning: no previously-included files matching '*.py[co]' found anywhere in distribution
+warning: no previously-included files matching '.DS_Store' found anywhere in distribution
+zip_safe flag not set; analyzing archive contents...
+click.__pycache__.core.cpython-36: module references __file__
+/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/lib/python3.6/distutils/dist.py:261: UserWarning: Unknown distribution option: 'project_urls'
+  warnings.warn(msg)
+no previously-included directories found matching 'docs/_build'
+no previously-included directories found matching 'tests/.hypothesis'
+warning: no previously-included files matching '*.py[co]' found anywhere in distribution
+zip_safe flag not set; analyzing archive contents...
+warning: no previously-included files matching '*.py[co]' found anywhere in distribution
+no previously-included directories found matching 'docs/_build'
+/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/lib/python3.6/distutils/dist.py:261: UserWarning: Unknown distribution option: 'project_urls'
+  warnings.warn(msg)
+no previously-included directories found matching 'docs/_build'
+warning: no previously-included files matching '*.py[co]' found anywhere in distribution
+zip_safe flag not set; analyzing archive contents...
+werkzeug.__pycache__.utils.cpython-36: module references __file__
+werkzeug.__pycache__.utils.cpython-36: module references __path__
+werkzeug.__pycache__.__init__.cpython-36: module references __file__
+werkzeug.__pycache__.__init__.cpython-36: module references __path__
+werkzeug.__pycache__._reloader.cpython-36: module references __file__
+werkzeug.debug.__pycache__.tbtools.cpython-36: module MAY be using inspect.getsourcefile
+werkzeug.debug.__pycache__.__init__.cpython-36: module references __file__
+warning: no files found matching 'COPYING.txt'
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/kiwisolver.cpp(9):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/kiwisolver.cpp(9):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/kiwisolver.cpp(9):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/kiwisolver.cpp(9):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/kiwisolver.cpp(9):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/kiwisolver.cpp(9):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/kiwisolver.cpp(9):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/constraint.cpp(11):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/constraint.cpp(11):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/constraint.cpp(11):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/constraint.cpp(11):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/constraint.cpp(11):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/constraint.cpp(11):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/constraint.cpp(11):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/expression.cpp(11):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/solver.cpp(9):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/solver.cpp(9):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/solver.cpp(9):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/solver.cpp(9):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/solver.cpp(9):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/solver.cpp(9):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/solver.cpp(9):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/strength.cpp(9):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/strength.cpp(9):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/strength.cpp(9):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/strength.cpp(9):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/strength.cpp(9):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/strength.cpp(9):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/strength.cpp(9):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/types.h(10),
+                 from py/symbolics.h(11),
+                 from py/term.cpp(11):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+In file included from ./kiwi/term.h(10),
+                 from ./kiwi/expression.h(10),
+                 from ./kiwi/constraint.h(11),
+                 from ./kiwi/kiwi.h(9),
+                 from py/variable.cpp(9):
+./kiwi/variable.h(103): warning #1478: class "std::auto_ptr<kiwi::Variable::Context>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Context> m_context;
+  		                       ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/variable.cpp(9):
+./kiwi/solverimpl.h(833): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_objective;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/variable.cpp(9):
+./kiwi/solverimpl.h(834): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  	std::auto_ptr<Row> m_artificial;
+  	                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/variable.cpp(9):
+./kiwi/solverimpl.h(91): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  		std::auto_ptr<Row> rowptr( createRow( constraint, tag ) );
+  		                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/variable.cpp(9):
+./kiwi/solverimpl.h(158): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/variable.cpp(9):
+./kiwi/solverimpl.h(167): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( row_it->second );
+  			                   ^
+
+In file included from ./kiwi/debug.h(13),
+                 from ./kiwi/kiwi.h(10),
+                 from py/variable.cpp(9):
+./kiwi/solverimpl.h(514): warning #1478: class "std::auto_ptr<kiwi::impl::Row>" (declared at line 87 of "/mnt/irisgpfs/apps/resif/data/production/v1.1-20180716/default/software/compiler/GCCcore/6.4.0/bin/../include/c++/6.4.0/backward/auto_ptr.h") was declared deprecated
+  			std::auto_ptr<Row> rowptr( it->second );
+  			                   ^
+
+zip_safe flag not set; analyzing archive contents...
+__pycache__.kiwisolver.cpython-36: module references __file__
+zip_safe flag not set; analyzing archive contents...
+/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/lib/python3.6/distutils/dist.py:261: UserWarning: Unknown distribution option: 'project_urls'
+  warnings.warn(msg)
+no previously-included directories found matching 'docs/_build'
+warning: no previously-included files matching '*.py[co]' found anywhere in distribution
+zip_safe flag not set; analyzing archive contents...
+markupsafe.__pycache__._speedups.cpython-36: module references __file__
+get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '3'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': 'param_label_width'} unhandled.analyzevars: charselector={'len': 'param_label_width'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': 'param_label_width'} unhandled.analyzevars: charselector={'len': 'param_label_width'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': 'param_label_width'} unhandled.analyzevars: charselector={'len': 'param_label_width'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': 'param_label_width'} unhandled.analyzevars: charselector={'len': 'param_label_width'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': 'param_label_width'} unhandled.analyzevars: charselector={'len': 'param_label_width'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '*'} unhandled.analyzevars: charselector={'len': '*'} unhandled.analyzevars: charselector={'len': '10'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '5'} unhandled.analyzevars: charselector={'len': '16'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '12'} unhandled.analyzevars: charselector={'len': '12'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '1'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '6'} unhandled.analyzevars: charselector={'len': '1'} unhandled.analyzevars: charselector={'len': '16'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '*'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '*'} unhandled.analyzevars: charselector={'len': '*'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.analyzevars: charselector={'len': '8'} unhandled.analyzevars: charselector={'len': '5'} unhandled.analyzevars: charselector={'len': '15'} unhandled.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.get_useparameters: mapping for {'only': 1, 'map': {'sedc_rk': 'sedc_rk'}} not impl.appenddecl: "dimension" not implemented.
+appenddecl: "dimension" not implemented.

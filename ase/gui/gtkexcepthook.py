@@ -58,7 +58,7 @@ def analyse (exctyp, value, tb):
 		args, varargs, varkw, lcls = inspect.getargvalues (frame)
 
 		def readline (lno=[lineno], *args):
-			if args: print args
+			if args: print(args)
 			try: return linecache.getline (fname, lno[0])
 			finally: lno[0] += 1
 		all, prev, name, scope = {}, None, '', None

@@ -1,11 +1,11 @@
 import numpy as np
 from scipy.integrate import odeint
-from hb_box_data import data
+from ase.calculators.hb_box_data import data
 from copy import copy
-from hb_box_interpolation import Function, SplineFunction
+from ase.calculators.hb_box_interpolation import Function, SplineFunction
 import sys
 import os
-from hb_box_timing import Timer
+from ase.calculators.hb_box_timing import Timer
 from time import asctime
 import math
 import pickle
@@ -167,7 +167,7 @@ class KSAllElectron:
         for n,l,nl in self.list_states():
             self.bs_energy+=self.occu[nl]*self.enl[nl]
 
-        self.exc=array([self.xcf.exc(self.dens[i]) for i in xrange(self.N)])
+        self.exc=array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
         self.Hartree_energy=self.grid.integrate(self.Hartree*self.dens,use_dV=True)/2
         self.vxc_energy=self.grid.integrate(self.vxc*self.dens,use_dV=True)
         self.exc_energy=self.grid.integrate(self.exc*self.dens,use_dV=True)
@@ -251,7 +251,7 @@ class KSAllElectron:
     def calculate_veff(self):
         """ Calculate effective potential. """
         self.timer.start('veff')
-        self.vxc=array([self.xcf.vxc(self.dens[i]) for i in xrange(self.N)])
+        self.vxc=array([self.xcf.vxc(self.dens[i]) for i in range(self.N)])
         self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
@@ -439,7 +439,7 @@ class KSAllElectron:
                 if it>100:
                     print>>self.txt, 'Epsilon history for %s' %nl
                     for h in hist:
-                        print h
+                        print(h)
                     print>>self.txt, 'nl=%s, eps=%f' %(nl,eps)
                     print>>self.txt, 'max epsilon',epsmax
                     raise RuntimeError('Eigensolver out of iterations. Atom not stable?')
@@ -684,7 +684,7 @@ def shoot(u,dx,c2,c1,c0,N):
     u[-1]=1.0
     u[-2]=u[-1]*f0[-1]/fm[-1]
     all_negative=np.all(c0<0)
-    for i in xrange(N-2,0,-1):
+    for i in range(N-2,0,-1):
         u[i-1]=(-fp[i]*u[i+1]-f0[i]*u[i])/fm[i]
         if abs(u[i-1])>1E10: u[i-1:]*=1E-10 #numerical stability
         if c0[i]>0:
@@ -698,7 +698,7 @@ def shoot(u,dx,c2,c1,c0,N):
     utp1=u[ctp+1]
     dright=(u[ctp+1]-u[ctp-1])/(2*dx)
 
-    for i in xrange(1,ctp+1):
+    for i in range(1,ctp+1):
         u[i+1]=(-f0[i]*u[i]-fm[i]*u[i-1])/fp[i]
 
     dleft=(u[ctp+1]-u[ctp-1])/(2*dx)

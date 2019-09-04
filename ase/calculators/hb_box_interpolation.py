@@ -6,7 +6,7 @@
 ###################################################
 
 import numpy as np
-import hb_box_mix
+from ase.calculators import hb_box_mix as mix
 from scipy.linalg import norm
 from scipy.optimize import fminbound
 from scipy.optimize import brentq
@@ -907,6 +907,6 @@ if __name__=='__main__':
     a[1,1,0]=3
     a[1,1,1]=4
     inte=TrilinearInterpolation(a)
-    print inte(vec([0.999,0.999,0.999]))
-    print inte(vec([1.0,1.0,1.0]))
+    print(inte(vec([0.999,0.999,0.999])))
+    print(inte(vec([1.0,1.0,1.0])))
     inte.write_vtk(gpts=[20,20,20])

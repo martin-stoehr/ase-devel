@@ -60,7 +60,7 @@ if 0:
 neb.interpolate()
 
 for image in images:
-    print image.positions[-1], image.get_potential_energy()
+    print(image.positions[-1], image.get_potential_energy())
 
 traj = PickleTrajectory('mep.traj', 'w')
 
@@ -71,4 +71,4 @@ dyn.attach(neb.writer(traj))
 dyn.run(fmax=0.01,steps=150)
 
 for image in images:
-    print image.positions[-1], image.get_potential_energy()
+    print(image.positions[-1], image.get_potential_energy())

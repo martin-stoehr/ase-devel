@@ -22,7 +22,7 @@ def write_svnversion(svnversion, dir):
     f = open(svnversionfile,'w')
     f.write('svnversion = "%s"\n' % svnversion)
     f.close()
-    print 'svnversion = ' +svnversion+' written to '+svnversionfile
+    print('svnversion = ' +svnversion+' written to '+svnversionfile)
     # assert svn:ignore property if the installation is under svn control
     # because svnversion.py has to be ignored by svn!
     cmd = popen3('svn propset svn:ignore svnversion.py '+dir)[1]

@@ -292,9 +292,9 @@ for key in configurations:
         
 if __name__=='__main__':    
     for symbol in data:
-        print 'X'*40
+        print('X'*40)
         for d in data[symbol]:
-            print d,data[symbol][d]
+            print(d, data[symbol][d])
     
     
    
@@ -561,7 +561,7 @@ conf_parameters['Po']= {'r0':5.5,  's':2.2}
 conf_parameters['Ra']= {'r0':7.0,  's':14.0}
 conf_parameters['Th']= {'r0':6.2,  's':4.4}
 
-for key in conf_parameters.iterkeys():
+for key in conf_parameters.keys():
     conf_parameters[key]['mode'] = 'general'
     
 

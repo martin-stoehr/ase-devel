@@ -183,7 +183,7 @@ class vtkSurfaceSmootherPipeline(vtkPolyDataPipeline):
         relax = self.grid.get_relaxation_factor()
 
         if relax is not None:
-            print 'relax=',relax
+            print('relax=',relax)
             #vtk_subdiv = vtkButterflySubdivisionFilter()
             vtk_subdiv = vtkLinearSubdivisionFilter()
             self.append(vtk_subdiv)

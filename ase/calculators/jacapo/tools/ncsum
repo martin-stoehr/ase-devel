@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from optparse import OptionParser
 from ase.visualize import view
-from ase.calculators.jacapo import *
-from Scientific.IO.NetCDF import NetCDFFile as NetCDF
+from ase.calculators.jacapo import Jacapo
+from Scientific.IO.NetCDF import NetCDFFile as netCDF
 import os
 
 os.environ['DACAPO_READONLY'] = 'On'
@@ -32,12 +32,12 @@ for arg in args:
         nc = netCDF(arg,'r')
         energy = nc.variables.get('TotalEnergy',None)
         if energy is not None:
-            print energy[:][-1]
+            print(energy[:][-1])
         else:
-            print None
+            print(None)
         nc.close()
     else:
-        print calc
+        print(calc)
 
     if options.p is not None:
         if options.r is not None:

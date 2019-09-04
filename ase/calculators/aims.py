@@ -2,16 +2,21 @@
 
 Felix Hanke hanke@liverpool.ac.uk
 Jonas Bjork j.bjork@liverpool.ac.uk
+Simon P. Rittmeyer simon.rittmeyer@tum.de
 """
 
 import os
 
 import numpy as np
+import warnings
+import time
 
+from ase.units import Hartree
 from ase.io.aims import write_aims, read_aims
 from ase.data import atomic_numbers
 from ase.calculators.calculator import FileIOCalculator, Parameters, kpts2mp, \
-    ReadError
+    ReadError, PropertyNotImplementedError
+from ase.utils import basestring
 
 
 float_keys = [
@@ -29,7 +34,6 @@ float_keys = [
     'prec_mix_param',
     'set_vacuum_level',
     'spin_mix_param',
-    'force_occupation_smearing'
 ]
 
 exp_keys = [
@@ -46,13 +50,11 @@ string_keys = [
     'communication_type',
     'density_update_method',
     'KS_method',
-    'RI_method',
     'mixer',
     'output_level',
     'packed_matrix_format',
     'relax_unit_cell',
     'restart',
-    'restart_aims',
     'restart_read_only',
     'restart_write_only',
     'spin',
@@ -60,11 +62,7 @@ string_keys = [
     'qpe_calc',
     'xc',
     'species_dir',
-    'force_occupation_projector',
-    'fo_dft',
-    'fo_options',
-    'fo_orbitals',
-    'fo_embedding',
+    'run_command',
 ]
 
 int_keys = [
@@ -76,7 +74,6 @@ int_keys = [
     'n_max_pulay',
     'sc_iter_limit',
     'walltime',
-    'sbtgrid_N',
 ]
 
 bool_keys = [
@@ -119,107 +116,135 @@ list_keys = [
     'preconditioner',
     'relativistic',
     'relax_geometry',
-    'hirsh_volrat',
 ]
-
-complete_keys = float_keys + \
-    exp_keys + \
-    string_keys + \
-    int_keys + \
-    bool_keys + \
-    list_keys
-
-# logical groups in keys for better input readability
-physical_model = [
-    'xc',
-    'spin',
-    'relativistic',
-    'charge',
-    'default_initial_moment',
-    'multiplicity',
-    'empty_states',
-]
-
-scf_convergence = [
-    'occupation_type',
-    'mixer',
-    'n_max_pulay',
-    'charge_mix_param',
-    'sc_accuracy_rho',
-    'sc_accuracy_eev',
-    'sc_accuracy_etot',
-    'sc_iter_limit',
-    'sc_accuracy_forces',
-    'relax_geometry',
-]
-
-periodic_bound = [
-    'k_grid',
-    'k_offset',
-    'relax_unit_cell',
-]
-
-output_options = [
-    'output',
-]
-
-fodft = [
-    'fo_dft',
-    'fo_options',
-    'fo_orbitals',
-    'fo_embedding',
-]
-
-# Put together all keys which are sorted in some way:
-grouped = physical_model + \
-    scf_convergence + \
-    periodic_bound + \
-    output_options + \
-    fodft
-
-# Get all keys which are not sorted and put them into "ungrouped".
-ungrouped = list(set(complete_keys) - set(grouped))
-grouping = {'0': physical_model,
-            '1': scf_convergence,
-            '2': periodic_bound,
-            '3': output_options,
-            '4': fodft,
-            '5': ungrouped}
 
 valid_hvr_approaches = ['HA', 'CPA', 'const']
 
 
 class Aims(FileIOCalculator):
-    command = 'aims.version.serial.x > aims.out'
-    
-    implemented_properties = ['energy', 'forces', 'stress', 'dipole',
+    # was "command" before the refactoring to dynamical commands
+    __command_default = 'aims.version.serial.x > aims.out'
+    __outfilename_default = 'aims.out'
+
+    implemented_properties = ['energy', 'forces', 'stress', 'dipole', 'magmom',
                               'hirsh_volrat', 'hirsh_volume', 'hirsh_charges',
                               'mull_charges']
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
-                 label=os.curdir, atoms=None, cubes=None, tier=None, **kwargs):
-        """Construct FHI-aims calculator.
+                 label=os.curdir, atoms=None, cubes=None, radmul=None,
+                 tier=None, aims_command=None,
+                 outfilename=None, **kwargs):
+        """Construct the FHI-aims calculator.
 
         The keyword arguments (kwargs) can be one of the ASE standard
         keywords: 'xc', 'kpts' and 'smearing' or any of FHI-aims'
         native keywords.
 
-        Additional arguments:
+        .. note:: The behavior of command/run_command has been refactored ase X.X.X
+          It is now possible to independently specify the command to call
+          FHI-aims and the outputfile into which stdout is directed. In
+          general, we replaced
+
+              <run_command> = <aims_command> + " > " + <outfilename
+
+          That is,what used to be, e.g.,
+
+          >>> calc = Aims(run_command = "mpiexec -np 4 aims.x > aims.out")
+
+          can now be achieved with the two arguments
+
+          >>> calc = Aims(aims_command = "mpiexec -np 4 aims.x"
+          >>>             outfilename = "aims.out")
+
+          Backward compatibility, however, is provided. Also, the command
+          actually used to run FHI-aims is dynamically updated (i.e., the
+          "command" member variable). That is, e.g.,
+
+          >>> calc = Aims()
+          >>> print(calc.command)
+          aims.version.serial.x > aims.out
+          >>> calc.outfilename = "systemX.out"
+          >>> print(calc.command)
+          aims.version.serial.x > systemX.out
+          >>> calc.aims_command = "mpiexec -np 4 aims.version.scalapack.mpi.x"
+          >>> print(calc.command)
+          mpiexec -np 4 aims.version.scalapack.mpi > systemX.out
+
+
+        Arguments:
 
         cubes: AimsCube object
             Cube file specification.
-        tier: Basis set tier
-            Tier specification, if not given AIMS-default
+
+        radmul: int
+            Set radial multiplier for the basis set of all atomic species.
+
+        tier: int or array of ints
+            Set basis set tier for all atomic species.
+
+        aims_command : str
+            The full command as executed to run FHI-aims *without* the
+            redirection to stdout. For instance "mpiexec -np 4 aims.x". Note
+            that this is not the same as "command" or "run_command".
+            .. note:: Added in ase X.X.X
+
+        outfilename : str
+            The file (incl. path) to which stdout is redirected. Defaults to
+            "aims.out"
+            .. note:: Added in ase X.X.X
+
+        run_command : str, optional (default=None)
+            Same as "command", see FileIOCalculator documentation.
+            .. note:: Deprecated in ase X.X.X
+
+        outfilename : str, optional (default=aims.out)
+            File into which the stdout of the FHI aims run is piped into. Note
+            that this will be only of any effect, if the <run_command> does not
+            yet contain a '>' directive.
+
+        kwargs : dict
+            Any of the base class arguments.
+
         """
+        # yes, we pop the key and run it through our legacy filters
+        command = kwargs.pop('command', None)
+
+        # Check for the "run_command" (deprecated keyword)
+        # Consistently, the "command" argument should be used as suggested by the FileIO base class.
+        # For legacy reasons, however,  we here also accept "run_command"
+        run_command = kwargs.pop('run_command', None)
+        if run_command:
+            # this warning is debatable... in my eyes it is more consistent to
+            # use 'command'
+            warnings.warn('Argument "run_command" is deprecated and will be replaced with "command". Alternatively, use "aims_command" and "outfile". See documentation for more details.')
+            if command:
+                warnings.warn('Caution! Argument "command" overwrites "run_command.')
+            else:
+                command=run_command
+
+        # this is the fallback to the default value for empty init
+        if np.all([i is None for i in (command, aims_command, outfilename)]):
+            # we go for the FileIOCalculator default way (env variable) with the former default as fallback
+            command = os.environ.get('ASE_AIMS_COMMAND', Aims.__command_default)
+
+
+        # filter the command and set the member variables "aims_command" and "outfilename"
+        self.__init_command(command=command,
+                            aims_command=aims_command,
+                            outfilename=outfilename)
 
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
-                                  label, atoms, **kwargs)
+                                  label, atoms,
+                                  # well, this is not nice, but cannot work around it...
+                                  command=self.command,
+                                  **kwargs)
+
         self.cubes = cubes
+        self.radmul = radmul
         self.tier = tier
         ## approach to (approximate) Hirshfeld rescaling (M. Stoehr)
         self.hvr_approach = None
-        
-    
+
     def set_hvr_approach(self, approach):
         """
         change approach to rescaling ratios for effective polarizabilities
@@ -231,13 +256,122 @@ class Aims(FileIOCalculator):
             print("Sorry, dude, I don't know about an approach called '"+str(approach)+"'...")
             print('Defaulting to Hirshfeld volume analysis.')
             self.hvr_approach = 'HA'
-        
     
-    def set_label(self, label):
+    # handling the filtering for dynamical commands with properties,
+    @property
+    def command(self):
+        return self.__command
+    @command.setter
+    def command(self, x):
+        self.__update_command(command=x)
+
+    @property
+    def aims_command(self):
+        return self.__aims_command
+
+    @aims_command.setter
+    def aims_command(self, x):
+        self.__update_command(aims_command=x)
+
+    @property
+    def outfilename(self):
+        return self.__outfilename
+
+    @outfilename.setter
+    def outfilename(self, x):
+        self.__update_command(outfilename=x)
+
+    def __init_command(self, command=None, aims_command=None,
+                       outfilename=None):
+        """
+        Create the private variables for which properties are defines and set
+        them accordingly.
+        """
+        # new class variables due to dynamical command handling
+        self.__aims_command = None
+        self.__outfilename = None
+        self.__command = None
+
+        # filter the command and set the member variables "aims_command" and "outfilename"
+        self.__update_command(command=command,
+                             aims_command=aims_command,
+                             outfilename=outfilename)
+
+    # legacy handling of the (run_)command behavior a.k.a. a universal setter routine
+    def __update_command(self, command=None, aims_command=None,
+                         outfilename=None):
+        """
+        Abstracted generic setter routine for a dynamic behavior of "command".
+
+        The command that is actually called on the command line and enters the
+        base class, is <command> = <aims_command> > <outfilename>.
+
+        This new scheme has been introduced in order to conveniently change the
+        outfile name from the outside while automatically updating the
+        <command> member variable.
+
+        Obiously, changing <command> conflicts with changing <aims_command>
+        and/or <outfilename>, which thus raises a <ValueError>. This should,
+        however, not happen if this routine is not used outside the property
+        definitions.
+
+        Parameters
+        ----------
+        command : str
+            The full command as executed to run FHI-aims. This includes
+            any potential mpiexec call, as well as the redirection of stdout.
+            For instance "mpiexec -np 4 aims.x > aims.out".
+
+        aims_command : str
+            The full command as executed to run FHI-aims *without* the
+            redirection to stdout. For instance "mpiexec -np 4 aims.x"
+
+        outfilename : str
+            The file (incl. path) to which stdout is redirected.
+        """
+        # disentangle the command if given
+        if command:
+            if aims_command:
+                raise ValueError('Cannot specify "command" and "aims_command" simultaneously.')
+            if outfilename:
+                raise ValueError('Cannot specify "command" and "outfilename" simultaneously.')
+
+            # check if the redirection of stdout is included
+            command_spl = command.split('>')
+            if len(command_spl) > 1:
+                self.__aims_command = command_spl[0].strip()
+                self.__outfilename = command_spl[-1].strip()
+            else:
+                # this should not happen if used correctly
+                # but just to ensure legacy behavior of how "run_command" was handled
+                self.__aims_command = command.strip()
+                self.__outfilename = Aims.__outfilename_default
+        else:
+            if aims_command is not None:
+                self.__aims_command = aims_command
+            elif outfilename is None:
+                # nothing to do here, empty call with 3x None
+                return
+            if outfilename is not None:
+                self.__outfilename = outfilename
+            else:
+                # default to 'aims.out'
+                if not self.outfilename:
+                    self.__outfilename = Aims.__outfilename_default
+
+        self.__command =  '{0:s} > {1:s}'.format(self.aims_command, self.outfilename)
+
+    def set_atoms(self, atoms):
+        self.atoms = atoms
+
+    def set_label(self, label, update_outfilename=False):
         self.label = label
         self.directory = label
         self.prefix = ''
-        self.out = os.path.join(label, 'aims.out')
+        # change outfile name to "<label.out>"
+        if update_outfilename:
+            self.outfilename="{}.out".format(os.path.basename(label))
+        self.out = os.path.join(label, self.outfilename)
 
     def check_state(self, atoms):
         system_changes = FileIOCalculator.check_state(self, atoms)
@@ -257,7 +391,8 @@ class Aims(FileIOCalculator):
             self.reset()
         return changed_parameters
 
-    def write_input(self, atoms, properties=None, system_changes=None):
+    def write_input(self, atoms, properties=None, system_changes=None,
+                    ghosts=None, scaled=False):
         FileIOCalculator.write_input(self, atoms, properties, system_changes)
 
         have_lattice_vectors = atoms.pbc.any()
@@ -267,20 +402,36 @@ class Aims(FileIOCalculator):
             raise RuntimeError('Found lattice vectors but no k-grid!')
         if not have_lattice_vectors and have_k_grid:
             raise RuntimeError('Found k-grid but no lattice vectors!')
-        write_aims(os.path.join(self.directory, 'geometry.in'), atoms)
+        write_aims(os.path.join(self.directory, 'geometry.in'), atoms, scaled, ghosts)
         self.write_control(atoms, os.path.join(self.directory, 'control.in'))
         self.write_species(atoms, os.path.join(self.directory, 'control.in'))
         self.parameters.write(os.path.join(self.directory, 'parameters.ase'))
 
+    def prepare_input_files(self):
+        """
+        Wrapper function to prepare input filesi, e.g., to a run on a remote
+        machine
+        """
+        if self.atoms is None:
+            raise ValueError('No atoms object attached')
+        self.write_input(self.atoms)
+
     def write_control(self, atoms, filename):
+        lim = '#' + '='*79
         output = open(filename, 'w')
-        for line in ['=====================================================',
-                     'FHI-aims file: ' + filename,
+        output.write(lim + '\n')
+        for line in ['FHI-aims file: ' + filename,
                      'Created using the Atomic Simulation Environment (ASE)',
+                     time.asctime(),
                      '',
                      'List of parameters used to initialize the calculator:',
-                     '=====================================================']:
-            output.write('#' + line + '\n')
+                     ]:
+            output.write('# ' + line + '\n')
+        for p,v in self.parameters.items():
+            s = '#     {} : {}\n'.format(p, v)
+            output.write(s)
+        output.write(lim + '\n')
+
 
         assert not ('kpts' in self.parameters and 'k_grid' in self.parameters)
         assert not ('smearing' in self.parameters and
@@ -293,70 +444,57 @@ class Aims(FileIOCalculator):
             if not any([wra in self.parameters.keys() for wra in write_restart_args]):
                 self.parameters['restart_write_only'] = 'wvfn.dat'
         
-        for i_sort in range(len(grouping)):
-            output.write("#\n")
-            for key, value in self.parameters.items():
-                if key in grouping['{0}'.format(i_sort)]:
-                    if key == 'kpts':
-                        mp = kpts2mp(atoms, self.parameters.kpts)
-                        output.write('%-35s%d %d %d\n' % (('k_grid',) +
-                                                          tuple(mp)))
-                        dk = 0.5 - 0.5 / np.array(mp)
-                        output.write('%-35s%f %f %f\n' % (('k_offset',) +
-                                                          tuple(dk)))
-                    elif key == 'species_dir':
-                        continue
-                    elif key == 'restart_aims':
-                        output.write('%-35s%s\n' % ('restart', value))
-                        continue
-                    elif key == 'smearing':
-                        name = self.parameters.smearing[0].lower()
-                        if name == 'fermi-dirac':
-                            name = 'fermi'
-                        width = self.parameters.smearing[1]
-                        output.write('%-35s%s %f' % ('occupation_type',
-                                                     name,
-                                                     width))
-                        if name == 'methfessel-paxton':
-                            order = self.parameters.smearing[2]
-                            output.write(' %d' % order)
-                        output.write('\n')
-                    elif key == 'output':
-                        if (self.hvr_approach == 'HA') and ('Hirshfeld' not in value):
-                            print("You forgot to add 'Hirshfeld' to output, mate.")
-                            print("Let me fix that for you...")
-                            value.append('Hirshfeld')
-                        elif (self.hvr_approach == 'CPA'):
-                            if ('h_s_matrices' not in value):
-                                print("You forgot to add 'h_s_matrices' to output, mate.")
-                                print("Let me fix that for you...")
-                                value.append('h_s_matrices')
-                            
-                            if np.any(self.atoms.pbc) and ('k_point_list' not in value):
-                                print("You're using PBC and forgot to add 'k_point_list' to output.")
-                                print("Let me fix that for you...")
-                                value.append('k_point_list')
-                            
-                        for output_type in value:     # parses entry if only one given!!
-                            output.write('%-35s%s\n' % (key, output_type))
-                    elif key == 'vdw_correction_hirshfeld' and value:
-                        output.write('%-35s\n' % key)
-                    elif key == 'many_body_dispersion' and value:
-                        output.write('%-35s\n' % key)
-                    elif key in bool_keys:
-                        output.write('%-35s.%s.\n' %
-                                     (key, repr(bool(value)).lower()))
-                    elif isinstance(value, (tuple, list)):
-                        output.write('%-35s%s\n' %
-                                    (key, ' '.join(str(x) for x in value)))
-                    elif isinstance(value, str):
-                        output.write('%-35s%s\n' % (key, value))
-                    else:
-                        output.write('%-35s%r\n' % (key, value))
+        for key, value in self.parameters.items():
+            if key == 'kpts':
+                mp = kpts2mp(atoms, self.parameters.kpts)
+                output.write('%-35s%d %d %d\n' % (('k_grid',) + tuple(mp)))
+                dk = 0.5 - 0.5 / np.array(mp)
+                output.write('%-35s%f %f %f\n' % (('k_offset',) + tuple(dk)))
+            elif key == 'species_dir' or key == 'run_command':
+                continue
+            elif key == 'smearing':
+                name = self.parameters.smearing[0].lower()
+                if name == 'fermi-dirac':
+                    name = 'fermi'
+                width = self.parameters.smearing[1]
+                output.write('%-35s%s %f' % ('occupation_type', name, width))
+                if name == 'methfessel-paxton':
+                    order = self.parameters.smearing[2]
+                    output.write(' %d' % order)
+                output.write('\n' % order)
+            elif key == 'output':
+                if (self.hvr_approach == 'HA') and ('Hirshfeld' not in value):
+                    print("You forgot to add 'Hirshfeld' to output, mate.")
+                    print("Let me fix that for you...")
+                    value.append('Hirshfeld')
+                elif (self.hvr_approach == 'CPA'):
+                    if ('h_s_matrices' not in value):
+                        print("You forgot to add 'h_s_matrices' to output, mate.")
+                        print("Let me fix that for you...")
+                        value.append('h_s_matrices')
+
+                    if np.any(self.atoms.pbc) and ('k_point_list' not in value):
+                        print("You're using PBC and forgot to add 'k_point_list' to output.")
+                        print("Let me fix that for you...")
+                        value.append('k_point_list')
+        
+                for output_type in value: output.write('%-35s%s\n' % (key, output_type))
+            elif key == 'vdw_correction_hirshfeld' and value:
+                output.write('%-35s\n' % key)
+            elif key == 'many_body_dispersion' and value:
+                output.write('%-35s\n' % key)
+            elif key in bool_keys:
+                output.write('%-35s.%s.\n' % (key, repr(bool(value)).lower()))
+            elif isinstance(value, (tuple, list)):
+                output.write('%-35s%s\n' %
+                             (key, ' '.join(str(x) for x in value)))
+            elif isinstance(value, basestring):
+                output.write('%-35s%s\n' % (key, value))
+            else:
+                output.write('%-35s%r\n' % (key, value))
         if self.cubes:
             self.cubes.write(output)
-        output.write(
-            '#=======================================================\n\n')
+        output.write(lim + '\n\n')
         output.close()
 
     def read(self, label):
@@ -388,16 +526,17 @@ class Aims(FileIOCalculator):
             if ('mulliken') in self.parameters['output']:
                 self.read_mull_charges()
         if ('compute_forces' in self.parameters or
-           'sc_accuracy_forces' in self.parameters):
+            'sc_accuracy_forces' in self.parameters):
             self.read_forces()
         if ('compute_numerical_stress' in self.parameters or
-           'compute_analytical_stress' in self.parameters):
+            'compute_analytical_stress' in self.parameters):
             self.read_stress()
         if ('dipole' in self.parameters.get('output', []) and
-           not self.atoms.pbc.any()):
+            not self.atoms.pbc.any()):
             self.read_dipole()
 
     def write_species(self, atoms, filename='control.in'):
+        self.ctrlname = filename
         species_path = self.parameters.get('species_dir')
         if species_path is None:
             species_path = os.environ.get('AIMS_SPECIES_DIR')
@@ -405,147 +544,108 @@ class Aims(FileIOCalculator):
             raise RuntimeError(
                 'Missing species directory!  Use species_dir ' +
                 'parameter or set $AIMS_SPECIES_DIR environment variable.')
-        if self.tier > 3:
-            print('\n  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+\n' +
-                  '  | WARNING: There is a chance the tier selection   |\n' +
-                  '  | will fail for tier > 3 due to inconsistencies   |\n' +
-                  '  | in the species_defaults tables. Check manually. |\n' +
-                  '  +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+\n')
-
         control = open(filename, 'a')
         symbols = atoms.get_chemical_symbols()
         symbols2 = []
         for n, symbol in enumerate(symbols):
             if symbol not in symbols2:
                 symbols2.append(symbol)
-        for symbol in symbols2:
+        if self.tier is not None:
+            if isinstance(self.tier, int):
+                self.tierlist = np.ones(len(symbols2), 'int') * self.tier
+            elif isinstance(self.tier, list):
+                assert len(self.tier) == len(symbols2)
+                self.tierlist = self.tier
+
+        for i, symbol in enumerate(symbols2):
             fd = os.path.join(species_path, '%02i_%s_default' %
                               (atomic_numbers[symbol], symbol))
-            # Allows to choose a specific tier
-            origblock = open(fd, 'r').readlines()
-            if self.tier is not None:
-                lineblock = []
-                tier = self.tier
-                for line in origblock:
-                    if 'improvements' in line:
-                        tier -= 1
-                    if tier >= 0:
-                        if '#     hydro' in line or \
-                           '#     ionic' in line:
-                            line = line.replace('#', ' ')
-                    elif '     hydro' in line or \
-                         '     ionic' in line:
-                        line = line.replace('     ', '#     ')
-                    lineblock.append(line)
-                control.writelines(lineblock)
-            else:
-                control.writelines(origblock)
+            reached_tiers = False
+            for line in open(fd, 'r'):
+                if self.tier is not None:
+                    if 'First tier' in line:
+                        reached_tiers = True
+                        self.targettier = self.tierlist[i]
+                        self.foundtarget = False
+                        self.do_uncomment = True
+                    if reached_tiers:
+                        line = self.format_tiers(line)
+                control.write(line)
+            if self.tier is not None and not self.foundtarget:
+                raise RuntimeError(
+                    "Basis tier %i not found for element %s" %
+                    (self.targettier, symbol))
         control.close()
+
+        if self.radmul is not None:
+            self.set_radial_multiplier()
+
+    def format_tiers(self, line):
+        if 'meV' in line:
+            assert line[0] == '#'
+            if 'tier' in line and 'Further' not in line:
+                tier = line.split(" tier")[0]
+                tier = tier.split('"')[-1]
+                current_tier = self.translate_tier(tier)
+                if current_tier == self.targettier:
+                    self.foundtarget = True
+                elif current_tier > self.targettier:
+                    self.do_uncomment = False
+            else:
+                self.do_uncomment = False
+            return line
+        elif self.do_uncomment and line[0] == '#':
+            return line[1:]
+        elif not self.do_uncomment and line[0] != '#':
+            return '#' + line
+        else:
+            return line
+
+    def translate_tier(self, tier):
+        if tier.lower() == 'first':
+            return 1
+        elif tier.lower() == 'second':
+            return 2
+        elif tier.lower() == 'third':
+            return 3
+        elif tier.lower() == 'fourth':
+            return 4
+        else:
+            return -1
+
+    def set_radial_multiplier(self):
+        assert isinstance(self.radmul, int)
+        newctrl = self.ctrlname +'.new'
+        fin = open(self.ctrlname, 'r')
+        fout = open(newctrl, 'w')
+        newline = "    radial_multiplier   %i\n" % self.radmul
+        for line in fin:
+            if '    radial_multiplier' in line:
+                fout.write(newline)
+            else:
+                fout.write(line)
+        fin.close()
+        fout.close()
+        os.rename(newctrl, self.ctrlname)
 
     def get_dipole_moment(self, atoms):
         if ('dipole' not in self.parameters.get('output', []) or
-           atoms.pbc.any()):
-            raise NotImplementedError
+            atoms.pbc.any()):
+            raise PropertyNotImplementedError
         return FileIOCalculator.get_dipole_moment(self, atoms)
 
     def get_stress(self, atoms):
         if ('compute_numerical_stress' not in self.parameters and
-           'compute_analytical_stress' not in self.parameters):
-            raise NotImplementedError
+            'compute_analytical_stress' not in self.parameters):
+            raise PropertyNotImplementedError
         return FileIOCalculator.get_stress(self, atoms)
 
     def get_forces(self, atoms):
         if ('compute_forces' not in self.parameters and
-           'sc_accuracy_forces' not in self.parameters):
-            raise NotImplementedError
+            'sc_accuracy_forces' not in self.parameters):
+            raise PropertyNotImplementedError
         return FileIOCalculator.get_forces(self, atoms)
 
-    def get_hirsh_volrat(self, approach_tmp=None):
-        atoms = self.atoms
-        if ((not approach_tmp is None) and \
-            (approach_tmp in valid_hvr_approaches)):
-            hvr_model = approach_tmp
-        else:
-            hvr_model = self.hvr_approach
-        
-        if (hvr_model == 'const'):
-            return np.array([1.,]*len(atoms))
-        elif (hvr_model == 'CPA'):
-            write_restart_args = ['restart_aims', 'restart_write_only']
-            correct_settings, restart_set_correct = False, False
-            for keystr in write_restart_args:
-                if keystr in self.parameters.keys():
-                    if (self.parameters[keystr] == 'wvfn.dat'):
-                        restart_set_correct = True
-                        break
-            
-            if ('output' in self.parameters.keys()):
-                basis_present = ('h_s_matrices' in self.parameters['output'])
-                correct_settings = basis_present
-                if np.any(self.atoms.pbc):
-                    k_list_present = ('k_point_list' in self.parameters['output'])
-                    correct_settings = correct_settings and k_list_present
-            
-            if ( correct_settings and restart_set_correct ):
-                return self.get_hvr_CPA()
-            else:
-                raise ValueError("Set either 'restart_aims' or 'restart_write_only' to 'wvfn.dat' in order to perform external charge population analysis!")
-        elif (hvr_model == 'HA'):
-            if ('output' in self.parameters and
-                'hirshfeld' not in self.parameters['output']):
-                    raise ValueError("Set output 'hirshfeld' in order to use results from Hirshfeld analysis!")
-            return FileIOCalculator.get_property(self, 'hirsh_volrat', atoms)
-    
-    
-    def get_hvr_CPA(self):
-        """
-        return rescaling ratios for atomic polarizabilities
-        as obtained from charge population approach
-        (see module ext_CPA_AIMS.py and CPA_recode.f90 for further details).
-        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
-        """
-        from ext_CPA_AIMS import ext_CPA_wrapper
-        
-        atoms = self.atoms
-        ext_CPA = ext_CPA_wrapper(atoms, basisfile="basis-indices.out")#, eigvfile='wvfn.dat')
-        self.hvr_CPA = ext_CPA.get_a_div_a0()
-        
-        return self.hvr_CPA
-        
-        
-    def get_hirsh_volume(self):
-        """
-        return effective volumes as obtained by Hirshfeld analysis
-        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
-        """
-        atoms = self.atoms
-        if ('output' in self.parameters and
-           'hirshfeld' not in self.parameters['output']):
-                raise NotImplementedError
-        return FileIOCalculator.get_property(self, 'hirsh_volume', atoms)
-    
-    def get_hirsh_charges(self):
-        """
-        return atomic charges as obtained by Hirshfeld analysis
-        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
-        """
-        atoms = self.atoms
-        if ('output' in self.parameters and
-           'hirshfeld' not in self.parameters['output']):
-                raise NotImplementedError
-        return FileIOCalculator.get_property(self, 'hirsh_charges', atoms)
-    
-    def get_mull_charges(self):
-        """
-        return atomic charges as obtained by Mulliken analysis
-        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
-        """
-        atoms = self.atoms
-        if ('output' in self.parameters and
-           'mulliken' not in self.parameters['output']):
-                raise NotImplementedError('Tell AIMS to do Mulliken analysis!')
-        return FileIOCalculator.get_property(self, 'mull_charges', atoms)
-    
     def read_dipole(self):
         "Method that reads the electric dipole moment from the output file."
         for line in open(self.out, 'r'):
@@ -581,10 +681,10 @@ class Aims(FileIOCalculator):
 
     def read_stress(self):
         lines = open(self.out, 'r').readlines()
-        stress = np.empty(9)
+        stress = None
         for n, line in enumerate(lines):
             if (line.rfind('|              Analytical stress tensor') > -1 or
-               line.rfind('Numerical stress tensor') > -1):
+                line.rfind('Numerical stress tensor') > -1):
                 stress = []
                 for i in [n + 5, n + 6, n + 7]:
                     data = lines[i].split()
@@ -601,6 +701,283 @@ class Aims(FileIOCalculator):
                 converged = True
         return converged
 
+    def get_number_of_iterations(self):
+        return self.read_number_of_iterations()
+
+    def read_number_of_iterations(self):
+        niter = None
+        lines = open(self.out, 'r').readlines()
+        for n, line in enumerate(lines):
+            if line.rfind('| Number of self-consistency cycles') > -1:
+                niter = int(line.split(':')[-1].strip())
+        return niter
+
+    def get_electronic_temperature(self):
+        return self.read_electronic_temperature()
+
+    def read_electronic_temperature(self):
+        width = None
+        lines = open(self.out, 'r').readlines()
+        for n, line in enumerate(lines):
+            if line.rfind('Occupation type:') > -1:
+                width = float(line.split('=')[-1].strip().split()[0])
+        return width
+
+    def get_number_of_electrons(self):
+        return self.read_number_of_electrons()
+
+    def read_number_of_electrons(self):
+        nelect = None
+        lines = open(self.out, 'r').readlines()
+        for n, line in enumerate(lines):
+            if line.rfind('The structure contains') > -1:
+                nelect = float(line.split()[-2].strip())
+        return nelect
+
+    def get_number_of_bands(self):
+        return self.read_number_of_bands()
+
+    def read_number_of_bands(self):
+        nband = None
+        lines = open(self.out, 'r').readlines()
+        for n, line in enumerate(lines):
+            if line.rfind('Number of Kohn-Sham states') > -1:
+                nband = int(line.split(':')[-1].strip())
+        return nband
+
+    def get_k_point_weights(self):
+        return self.read_kpts(mode='k_point_weights')
+
+    def get_bz_k_points(self):
+        raise NotImplementedError
+
+    def get_ibz_k_points(self):
+        return self.read_kpts(mode='ibz_k_points')
+
+    def get_spin_polarized(self):
+        return self.read_number_of_spins()
+
+    def get_number_of_spins(self):
+        return 1 + self.get_spin_polarized()
+
+    def get_magnetic_moment(self, atoms=None):
+        return self.read_magnetic_moment()
+
+    def read_number_of_spins(self):
+        spinpol = None
+        lines = open(self.out, 'r').readlines()
+        for n, line in enumerate(lines):
+            if line.rfind('| Number of spin channels') > -1:
+                spinpol = int(line.split(':')[-1].strip()) - 1
+        return spinpol
+
+    def read_magnetic_moment(self):
+        magmom = None
+        if not self.get_spin_polarized():
+            magmom = 0.0
+        else:  # only for spinpolarized system Magnetisation is printed
+            for line in open(self.out, 'r').readlines():
+                if line.find('N_up - N_down') != -1:  # last one
+                    magmom = float(line.split(':')[-1].strip())
+        return magmom
+
+    def get_fermi_level(self):
+        return self.read_fermi()
+
+    def get_eigenvalues(self, kpt=0, spin=0):
+        return self.read_eigenvalues(kpt, spin, 'eigenvalues')
+
+    def get_occupations(self, kpt=0, spin=0):
+        return self.read_eigenvalues(kpt, spin, 'occupations')
+
+    def read_fermi(self):
+        E_f = None
+        lines = open(self.out, 'r').readlines()
+        for n, line in enumerate(lines):
+            if line.rfind('| Chemical potential (Fermi level) in eV') > -1:
+                E_f = float(line.split(':')[-1].strip())
+        return E_f
+
+    def read_kpts(self, mode='ibz_k_points'):
+        """ Returns list of kpts weights or kpts coordinates.  """
+        values = []
+        assert mode in ['ibz_k_points', 'k_point_weights']
+        lines = open(self.out, 'r').readlines()
+        kpts = None
+        kptsstart = None
+        for n, line in enumerate(lines):
+            if line.rfind('| Number of k-points') > -1:
+                kpts = int(line.split(':')[-1].strip())
+        for n, line in enumerate(lines):
+            if line.rfind('K-points in task') > -1:
+                kptsstart = n  # last occurrence of (
+        assert not kpts is None
+        assert not kptsstart is None
+        text = lines[kptsstart + 1:]
+        values = []
+        for line in text[:kpts]:
+            if mode == 'ibz_k_points':
+                b = [float(c.strip()) for c in line.split()[4:7]]
+            else:
+                b = float(line.split()[-1])
+            values.append(b)
+        if len(values) == 0:
+            values = None
+        return np.array(values)
+
+    def read_eigenvalues(self, kpt=0, spin=0, mode='eigenvalues'):
+        """ Returns list of last eigenvalues, occupations
+        for given kpt and spin.  """
+        values = []
+        assert mode in ['eigenvalues', 'occupations']
+        lines = open(self.out, 'r').readlines()
+        # number of kpts
+        kpts = None
+        for n, line in enumerate(lines):
+            if line.rfind('| Number of k-points') > -1:
+                kpts = int(line.split(':')[-1].strip())
+                break
+        assert not kpts is None
+        assert kpt + 1 <= kpts
+        # find last (eigenvalues)
+        eigvalstart = None
+        for n, line in enumerate(lines):
+            # eigenvalues come after Preliminary charge convergence reached
+            if line.rfind('Preliminary charge convergence reached') > -1:
+                eigvalstart = n
+                break
+        assert not eigvalstart is None
+        lines = lines[eigvalstart:]
+        for n, line in enumerate(lines):
+            if line.rfind('Writing Kohn-Sham eigenvalues') > -1:
+                eigvalstart = n
+                break
+        assert not eigvalstart is None
+        text = lines[eigvalstart + 1:]  # remove first 1 line
+        # find the requested k-point
+        nbands = self.read_number_of_bands()
+        sppol = self.get_spin_polarized()
+        beg = ((nbands + 4 + int(sppol) * 1) * kpt * (sppol + 1) +
+               3 + sppol * 2 + kpt * sppol)
+        if self.get_spin_polarized():
+            if spin == 0:
+                beg = beg
+                end = beg + nbands
+            else:
+                beg = beg + nbands + 5
+                end = beg + nbands
+        else:
+            end = beg + nbands
+        values = []
+        for line in text[beg:end]:
+            # aims prints stars for large values ...
+            line = line.replace('**************', '         10000')
+            line = line.replace('***************', '          10000')
+            line = line.replace('****************', '           10000')
+            b = [float(c.strip()) for c in line.split()[1:]]
+            values.append(b)
+        if mode == 'eigenvalues':
+            values = [Hartree * v[1] for v in values]
+        else:
+            values = [v[0] for v in values]
+        if len(values) == 0:
+            values = None
+        return np.array(values)
+        
+    
+    def get_hirsh_volrat(self, approach_tmp=None):
+        atoms = self.atoms
+        if ((not approach_tmp is None) and \
+            (approach_tmp in valid_hvr_approaches)):
+            hvr_model = approach_tmp
+        else:
+            hvr_model = self.hvr_approach
+
+        if (hvr_model == 'const'):
+            return np.array([1.,]*len(atoms))
+        elif (hvr_model == 'CPA'):
+            write_restart_args = ['restart_aims', 'restart_write_only']
+            correct_settings, restart_set_correct = False, False
+            for keystr in write_restart_args:
+                if keystr in self.parameters.keys():
+                    if (self.parameters[keystr] == 'wvfn.dat'):
+                        restart_set_correct = True
+                        break
+
+            if ('output' in self.parameters.keys()):
+                basis_present = ('h_s_matrices' in self.parameters['output'])
+                correct_settings = basis_present
+                if np.any(self.atoms.pbc):
+                    k_list_present = ('k_point_list' in self.parameters['output'])
+                    correct_settings = correct_settings and k_list_present
+
+            if ( correct_settings and restart_set_correct ):
+                return self.get_hvr_CPA()
+            else:
+                my_err_str  = "Set either 'restart_aims' or 'restart_write_only' to 'wvfn.dat' "
+                my_err_str += "in order to perform external charge population analysis!"
+                raise ValueError(my_err_str)
+        elif (hvr_model == 'HA'):
+            if ('output' in self.parameters and
+                'hirshfeld' not in self.parameters['output']):
+                    my_err_str  = "Set output 'hirshfeld' in order to use results from "
+                    my_err_str += "Hirshfeld analysis!"
+                    raise ValueError(my_err_str)
+            return FileIOCalculator.get_property(self, 'hirsh_volrat', atoms)
+
+
+    def get_hvr_CPA(self):
+        """
+        return rescaling ratios for atomic polarizabilities
+        as obtained from charge population approach
+        (see module ext_CPA_AIMS.py and CPA_recode.f90 for further details).
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
+        from ext_CPA_AIMS import ext_CPA_wrapper
+
+        atoms = self.atoms
+        ext_CPA = ext_CPA_wrapper(atoms, basisfile="basis-indices.out")#, eigvfile='wvfn.dat')
+        self.hvr_CPA = ext_CPA.get_a_div_a0()
+
+        return self.hvr_CPA
+        
+    
+    def get_hirsh_volume(self):
+        """
+        return effective volumes as obtained by Hirshfeld analysis
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
+        atoms = self.atoms
+        if ('output' in self.parameters and
+           'hirshfeld' not in self.parameters['output']):
+                raise NotImplementedError
+        return FileIOCalculator.get_property(self, 'hirsh_volume', atoms)
+        
+    
+    def get_hirsh_charges(self):
+        """
+        return atomic charges as obtained by Hirshfeld analysis
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
+        atoms = self.atoms
+        if ('output' in self.parameters and
+           'hirshfeld' not in self.parameters['output']):
+                raise NotImplementedError
+        return FileIOCalculator.get_property(self, 'hirsh_charges', atoms)
+        
+    
+    def get_mull_charges(self):
+        """
+        return atomic charges as obtained by Mulliken analysis
+        by Martin Stoehr (martin.stoehr@tum.de) Oct 2015
+        """
+        atoms = self.atoms
+        if ('output' in self.parameters and
+           'mulliken' not in self.parameters['output']):
+                raise NotImplementedError('Tell AIMS to do Mulliken analysis!')
+        return FileIOCalculator.get_property(self, 'mull_charges', atoms)
+        
+    
     def read_hirsh_volrat(self):
         infile = open(self.out, 'r')
         lines = infile.readlines()
@@ -614,10 +991,11 @@ class Aims(FileIOCalculator):
                 v_hirsh_tmp = float(line.split()[4])
                 hirsh_volrat.append(v_hirsh_tmp / v_free_tmp)
                 hirsh_volume.append(v_hirsh_tmp)
-
+        
         # Save in internal variable
         self.results['hirsh_volrat'] = hirsh_volrat
         self.results['hirsh_volume'] = hirsh_volume
+        
     
     def read_hirsh_charges(self):
         hirsh_q = []
@@ -628,12 +1006,13 @@ class Aims(FileIOCalculator):
         
         self.results['hirsh_charges'] = hirsh_q
         
+    
     def read_mull_charges(self):
         mulliken_q = []
         lines = open(self.out, 'r').readlines()
         for i, line in enumerate(lines):
             if ('atom' in line) and ('electrons' in line) and('charge' in line):
-                for j in xrange(i, i+len(self.atoms)):
+                for j in range(i, i+len(self.atoms)):
                     mulliken_q.append(float(lines[j+1].split()[3]))
         
         self.results['mull_charges'] = mulliken_q
@@ -646,8 +1025,11 @@ class AimsCube:
                  edges=[(0.1, 0.0, 0.0), (0.0, 0.1, 0.0), (0.0, 0.0, 0.1)],
                  points=(50, 50, 50), plots=None):
         """parameters:
-        origin, edges, points = same as in the FHI-aims output
-        plots: what to print, same names as in FHI-aims """
+
+        origin, edges, points:
+            Same as in the FHI-aims output
+        plots:
+            what to print, same names as in FHI-aims """
 
         self.name = 'AimsCube'
         self.origin = origin
@@ -675,8 +1057,8 @@ class AimsCube:
             found = False
             cube = plot.split()
             if (cube[0] == 'total_density' or
-               cube[0] == 'spin_density' or
-               cube[0] == 'delta_density'):
+                cube[0] == 'spin_density' or
+                cube[0] == 'delta_density'):
                 found = True
                 old_name = cube[0] + '.cube'
                 new_name = basename + '.' + old_name

@@ -33,7 +33,7 @@ try:
     has_matplotlib = True
 except ImportError:
     has_matplotlib = False
-    print "! matplotlib is not available"
+    print("! matplotlib is not available")
 def fit_Morse(A_values, V_values, freq=None, enforce_freq=False, out=None, plot=None):
     R0 = 0.0
 
@@ -74,7 +74,7 @@ def fit_Morse(A_values, V_values, freq=None, enforce_freq=False, out=None, plot=
         txt += "# |   ier : %d \n" % plsq[-1]
         txt += "# |   mesg : %s \n" % plsq[-2]
         open(out,'w').write(txt)
-        print "Fit results written to %s." % out
+        print("Fit results written to %s." %out)
 
     if plot is not None and has_matplotlib:
         plt.clf()
@@ -141,7 +141,7 @@ def determine_average_displacement(trajectory_file, a=1.0, search_periods=True, 
     Aavg = sign(a) * RBavg[0]
     if out is not None:
         open(out,'w').write("%e   # average displacement amplitude in A*\sqrt(u) \n" % Aavg )
-        print "Average displacement amplitude written to %s." % out
+        print("Average displacement amplitude written to %s." % out)
     return Aavg
 
 from math import ceil
@@ -185,13 +185,13 @@ def plot_traj(T,D,a, plotfile="plot.pdf"):
     for i,m in enumerate(Morse_values):
       if i%1000==0:
         ll.append(m)
-    print ll 
-    print len(ll)
+    print(ll)
+    print(len(ll))
     dist_sum=0.0
     for i in ll:
       dist_sum=dist_sum+i
-    print dist_sum/len(ll)
-    print Morse_values.sum()/4000000
+    print(dist_sum/len(ll))
+    print(Morse_values.sum()/4000000)
     harmonic_values = traj_harmonic(t_values,E,D,a)
     plt.plot(t_values, Morse_values, 'b-', label='Morse')
     plt.plot(t_values, harmonic_values, 'g--', label='harmonic')
@@ -220,7 +220,7 @@ def determine_average_displacement_analytic(T, D, a, out=None):
         outfile = open(out,'w')
         outfile.write("%e   # average displacement amplitude (from trajectory equation) in A*\sqrt(u) \n" % Aavg)
         outfile.write("%e   # integration error\n" % error)
-        print "Average displacement amplitude written to %s." % out
+        print("Average displacement amplitude written to %s." % out)
     return Aavg
 
 

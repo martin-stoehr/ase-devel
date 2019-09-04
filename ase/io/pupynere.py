@@ -248,7 +248,7 @@ class netcdf_file(object):
                 keys.reverse()
                 variables = [k for isrec, k in keys]
             else: # Python version must be >= 2.4
-                variables.sort(key=lambda (k, v): v._shape and not v.isrec)
+                variables.sort(key=lambda k, v: v._shape and not v.isrec)
                 variables.reverse()
                 variables = [k for (k, v) in variables]
 

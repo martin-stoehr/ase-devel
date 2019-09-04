@@ -2,12 +2,12 @@ from ase.units import Bohr
 import numpy as np
 from copy import copy
 from ase.calculators.DFT_free_atom import KSAllElectron
-from hb_box_data import data, ValOccs_lm_free
+from ase.calculators.hb_box_data import data, ValOccs_lm_free
 import random
 from string import digits
 from os import listdir,system
 from scipy.io import FortranFile
-from HA_recode import ha_recode as HA
+from ase.calculators.HA_recode import ha_recode as HA
 
 
 class HirshfeldWrapper:
@@ -59,8 +59,8 @@ class HirshfeldWrapper:
         self.nOrbs = len(self.Orb2Atom)
         
         if cutoff == 0.:
-            print '\033[91m'+'WARNING: input cutoff 0. \
-Defaulting to 3 Angstroms.'+'\033[0m'
+            print('\033[91m'+'WARNING: input cutoff 0. \
+Defaulting to 3 Angstroms.'+'\033[0m')
             cutoff = 3.
         self.nr = int( round(cutoff/dr) )
         self.dr = dr/Bohr
@@ -68,10 +68,10 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         self.nPhis = int(nPhis)
         
         ## create random ID for Rnl data
-        Rnl_dump_id = ''.join(random.choice(digits) for _ in xrange(16))
+        Rnl_dump_id = ''.join(random.choice(digits) for _ in range(16))
         ## if ID exists (minimal chance though) create new random ID
         while Rnl_dump_id+'_' in listdir('./'):
-            Rnl_dump_id = ''.join(random.choice(digits) for _ in xrange(16))
+            Rnl_dump_id = ''.join(random.choice(digits) for _ in range(16))
         
         f = open(Rnl_dump_id+'_','w')
         f.close()
@@ -90,14 +90,14 @@ Defaulting to 3 Angstroms.'+'\033[0m'
                 print('Occupation for {0: 2s} not available. Update "ValOccs_lm_free" in "hb_box_data"!'.format(sym))
                 raise
         
-        for iAtom in xrange(self.nAtoms):
+        for iAtom in range(self.nAtoms):
             atom = KSAllElectron(self.species[iAtom])
             self.len_r.append( atom.grid.get_N() )
             self.rmins.append( atom.rmin )
         
         self.otypes_num = np.zeros(self.nOrbs)
         orb2nr = ['s','px','py','pz','dxy','dyz','dzx','dx2-y2','d3z2-r2','f3yx2-y3','fxyz','fyz2','fxz2','fzx2-zy2','fx3-3xy2','fz3']
-        for iOrb in xrange(self.nOrbs):
+        for iOrb in range(self.nOrbs):
             sym = self.species[self.Orb2Atom[iOrb]]
             self.otypes_num[iOrb] = orb2nr.index(self.otypes[iOrb])
             self.occ_free.append(self.free_occs[sym][self.otypes[iOrb][0]])
@@ -131,7 +131,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             for iOrb in atom.get_valence_orbitals():
                 Rnl_free[sym][iOrb[1]] = atom.Rnl_fct[iOrb]
         
-        for iAtom in xrange(self.nAtoms):
+        for iAtom in range(self.nAtoms):
             sym = self.species[iAtom]
             self.Rnls_free[str(iAtom)] = Rnl_free[sym]
         
@@ -147,7 +147,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             Rnls_free = self.Rnls_conf
         else:
             Rnls_free = self.Rnls_free
-        for iOrb in xrange(self.nOrbs):
+        for iOrb in range(self.nOrbs):
             iAtom = self.Orb2Atom[iOrb]
             sym = self.species[iAtom]
             f = FortranFile(self.Rnl_id+"_Ofree_{0:d}.unf".format(iOrb+1), 'w')
@@ -161,7 +161,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
         for all atoms in additional harmonic confinement potential.
         """
         self.Rnls_conf = {}
-        for iAtom in xrange(self.nAtoms):
+        for iAtom in range(self.nAtoms):
             sym = self.species[iAtom]
             self.Rnls_conf[str(iAtom)] = {}
             if (conf == 'Both'):
@@ -187,7 +187,7 @@ Defaulting to 3 Angstroms.'+'\033[0m'
             Rnls_conf = self.Rnls_free
         else:
             Rnls_conf = self.Rnls_conf
-        for iOrb in xrange(self.nOrbs):
+        for iOrb in range(self.nOrbs):
             iAtom = self.Orb2Atom[iOrb]
             sym = self.species[iAtom]
             f = FortranFile(self.Rnl_id+"_Oconf_{0:d}.unf".format(iOrb+1), 'w')

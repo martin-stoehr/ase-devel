@@ -9,7 +9,13 @@ Git master branch
 
 :git:`master <>`.
 
-* No changes yet
+* :func:`ase.build.bulk` now supports elements with tetrahedral,
+  rhombohedral, and orthorhombic lattices.
+
+* Read and write support for RMCProfile (rmc6f) file format.
+
+* Gulp calculator now provides stress tensor.
+
 
 
 Version 3.18.0
@@ -654,7 +660,7 @@ Version 3.11.0
 
 10 May 2016: :git:`3.11.0 <../3.11.0>`.
 
-* Special `\mathbf{k}`-points from the [Setyawana-Curtarolo]_ paper was added:
+* Special `\mathbf{k}`-points from the [Setyawan-Curtarolo]_ paper was added:
   :data:`ase.dft.kpoints.special_points`.
 
 * New :mod:`ase.collections` module added.  Currently contains the G2 database

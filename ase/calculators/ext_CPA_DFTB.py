@@ -58,10 +58,10 @@ class ChargePopulationAnalysis:
         """
         
         APT = np.zeros(self.nAtoms)
-        for ik in xrange(self.nk):
-            for a in xrange(self.nOrbs):
+        for ik in range(self.nk):
+            for a in range(self.nOrbs):
                 wkfka = self.wk[ik]*self.f[ik,a]
-                for iOrb in xrange(self.nOrbs):
+                for iOrb in range(self.nOrbs):
                     APT[self.Orb2Atom[iOrb]] += wkfka*abs( self.coeff[ik,a,iOrb] )**2
             
         self.a_div_a0 = 1. + (APT - self.n_el_neutral)/self.ZAtoms

@@ -62,8 +62,7 @@ dft_keys = [
 pbs_keys = [
     'nodes',
     'memory',
-    'walltime',
-    ]
+    'walltime']
 
 # Names of parameter sections for functions like self.write_params(). For this reason
 # only names of sections written to the file are in the variable

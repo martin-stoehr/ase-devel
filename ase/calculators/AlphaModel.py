@@ -116,11 +116,11 @@ class AlphaModel:
 
 
 if __name__ == "__main__":
-    print "A=AlphaModel()"
-    A=AlphaModel()
-    print "A.GetModel((4,4))          =",(A.GetModel((4,4)))
-    print "A.GetAlpha((4,4),omega=0.) =",(A.GetAlpha((4,4), omega=0.0))
-    print "A.GetC6((4,4))             =",(A.GetC6((4,4)))
-    print "A.GetC6(((2,2),(11,11)))   =",(A.GetC6(((2,2),(11,11))))
-    print "A.GetC6Str(((2,2),(11,11)))=",(A.GetC6Str(((2,2),(11,11))))
+    print("A = AlphaModel()")
+    A = AlphaModel()
+    print("A.GetModel((4,4))           = ",(A.GetModel((4,4))))
+    print("A.GetAlpha((4,4),omega=0.)  = ",(A.GetAlpha((4,4), omega=0.0)))
+    print("A.GetC6((4,4))              = ",(A.GetC6((4,4))))
+    print("A.GetC6(((2,2),(11,11)))    = ",(A.GetC6(((2,2),(11,11)))))
+    print("A.GetC6Str(((2,2),(11,11))) = ",(A.GetC6Str(((2,2),(11,11)))))
 

@@ -39,7 +39,7 @@ from ase.calculators.calculator import FileIOCalculator, kpts2mp
 
 ## analysis of atomic polarizabilities via Hirshfeld volume ratios (M.S. 19/Oct/15)
 from ase.io import read
-from hb_box_data import data
+from ase.calculators.hb_box_data import data
 from ase.calculators.ext_CPA_DFTB import ChargePopulationAnalysis
 from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
 
@@ -345,11 +345,11 @@ class Dftb(FileIOCalculator):
         ## net atomic charges and basis orbital types
         for iline, line in enumerate(linesdet):
             if 'Net atomic charges (e)' in line:
-                for iAtom in xrange(self.nAtoms):
+                for iAtom in range(self.nAtoms):
                     self.charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
                 iline = iline+2+self.nAtoms
             if 'Orbital populations (up)' in line:
-                for iOrb in xrange(self.nOrbs):
+                for iOrb in range(self.nOrbs):
                     self.Orb2Atom[iOrb] = int( linesdet[iline+2+iOrb].split()[0] ) - 1
                     l = int(linesdet[iline+2+iOrb].split()[2])
                     m = int(linesdet[iline+2+iOrb].split()[3])
@@ -357,7 +357,7 @@ class Dftb(FileIOCalculator):
             
         self.results['charges'] = self.charges
         self.Atom2Orbs = np.zeros((self.nAtoms, 2))
-        for iAtom in xrange(self.nAtoms):
+        for iAtom in range(self.nAtoms):
             startOrb = list(self.Orb2Atom).index(iAtom) + 1
             nOrbsiAtom = len(self.Orb2Atom) - np.count_nonzero(self.Orb2Atom - iAtom) - 1
             self.Atom2Orbs[iAtom] = np.array([startOrb, startOrb + nOrbsiAtom])
@@ -411,7 +411,7 @@ class Dftb(FileIOCalculator):
         self.kpts = np.zeros((self.nk,3))
         for iline, line in enumerate(linesin):
             if 'KPointsAndWeights =' in line:
-                for ik in xrange(self.nk):
+                for ik in range(self.nk):
                     self.wk[ik] = float(linesin[iline+1+ik].split()[3])
                     self.kpts[ik,:] = np.array(linesin[iline+1+ik].split()[:3], dtype=float)
                 break
@@ -451,7 +451,7 @@ class Dftb(FileIOCalculator):
             lines = fCPA.readlines()[1:]
             fCPA.close()
             self.hvr_CPA = np.zeros(self.nAtoms)
-            for iAtom in xrange(self.nAtoms):
+            for iAtom in range(self.nAtoms):
                 self.hvr_CPA[iAtom] = float(lines[iAtom].split()[-1])
             
         except IOError:

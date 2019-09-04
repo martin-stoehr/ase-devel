@@ -9,7 +9,9 @@ variable to point to a configuration file like this::
 
     ASE_DB_NAMES = ['/path/to/db-file/project1.db',
                     'postgresql://user:pw@localhost:5432/project2']
-    ASE_DB_HOMEPAGE = '<a href="https://home.page.dk">HOME</a> ::'
+    ASE_DB_TEMPLATES = '...'
+    ASE_DB_TMPDIR = '...'
+    ASE_DB_DOWNLOAD = False  # or True
 
 Start with something like::
 
@@ -17,7 +19,6 @@ Start with something like::
 
 """
 
-from __future__ import print_function
 import collections
 import functools
 import io
@@ -60,17 +61,23 @@ app = Flask(__name__)
 
 app.secret_key = 'asdf'
 
-databases = {}
-home = ''  # link to homepage
-ase_db_footer = ''  # footer (for a license)
+databases = {}  # Dict[str, Database]
 open_ase_gui = True  # click image to open ASE's GUI
 download_button = True
 
 # List of (project-name, title, nrows) tuples (will be filled in at run-time):
-projects = []  # type: List[str, str, int]
+projects = []  # List[Tuple[str, str, int]]
+
+# Find numbers in formulas so that we can convert H2O to H<sub>2</sub>O:
+SUBSCRIPT = re.compile(r'(\d+)')
+
+next_con_id = 1
+connections = {}
 
 
 def connect_databases(uris):
+    # (List[str]) -> None
+    """Fill in databases dict."""
     python_configs = []
     dbs = []
     for uri in uris:
@@ -90,46 +97,28 @@ def connect_databases(uris):
         db.python = py
 
 
-next_con_id = 1
-connections = {}
+def initialize_databases():
+    """Initialize databases and fill in projects list."""
+    for proj, db in sorted(databases.items()):
+        meta = ase.db.web.process_metadata(db)
+        db.meta = meta
+        nrows = len(db)
+        projects.append((proj, db.meta.get('title', proj), nrows))
+        print('Initialized {proj}: (rows: {nrows})'
+              .format(proj=proj, nrows=nrows))
+
 
 if 'ASE_DB_APP_CONFIG' in os.environ:
     app.config.from_envvar('ASE_DB_APP_CONFIG')
+    path = app.config['ASE_DB_TEMPLATES']
+    app.jinja_loader.searchpath.insert(0, str(path))
     connect_databases(str(name) for name in app.config['ASE_DB_NAMES'])
-    home = app.config['ASE_DB_HOMEPAGE']
-    ase_db_footer = app.config['ASE_DB_FOOTER']
+    initialize_databases()
     tmpdir = str(app.config['ASE_DB_TMPDIR'])
     download_button = app.config['ASE_DB_DOWNLOAD']
     open_ase_gui = False
 else:
     tmpdir = tempfile.mkdtemp(prefix='ase-db-app-')  # used to cache png-files
-
-# Find numbers in formulas so that we can convert H2O to H<sub>2</sub>O:
-SUBSCRIPT = re.compile(r'(\d+)')
-
-
-errors = 0
-
-
-def error(e):
-    """Write traceback and other stuff to 00-99.error files."""
-    global errors
-    import traceback
-    x = request.args.get('x', '0')
-    try:
-        cid = int(x)
-    except ValueError:
-        cid = 0
-    con = connections.get(cid)
-    with open(op.join(tmpdir, '{:02}.err'.format(errors % 100)), 'w') as fd:
-        print(repr((errors, con, e, request)), file=fd)
-        if hasattr(e, '__traceback__'):
-            traceback.print_tb(e.__traceback__, file=fd)
-    errors += 1
-    raise e
-
-
-# app.register_error_handler(Exception, error)
 
 
 @app.route('/', defaults={'project': None})
@@ -141,22 +130,10 @@ def index(project):
     # Backwards compatibility:
     project = request.args.get('project') or project
 
-    if not projects:
-        # First time: initialize list of projects
-        for proj, db in sorted(databases.items()):
-            meta = ase.db.web.process_metadata(db)
-            db.meta = meta
-            nrows = len(db)
-            projects.append((proj, db.meta.get('title', proj), nrows))
-            print('Initialized {proj}: {nrows} rows'
-                  .format(proj=proj, nrows=nrows))
-
     if project is None and len(projects) > 1:
         return render_template('projects.html',
                                projects=projects,
-                               home=home,
-                               md=None,
-                               ase_db_footer=ase_db_footer)
+                               md=None)
 
     if project is None:
         project = list(databases)[0]
@@ -210,17 +187,24 @@ def index(project):
                 dct[key] = convert_str_to_int_float_or_str(value)
                 if value:
                     q += ',{}={}'.format(key, value)
-            else:
+            elif kind == 'RANGE':
                 v1 = request.args['from_' + key]
                 v2 = request.args['to_' + key]
                 var = request.args['range_' + key]
                 dct[key] = (v1, v2, var)
-                if v1 or v2:
-                    var = request.args['range_' + key]
-                    if v1:
-                        q += ',{}>={}'.format(var, v1)
-                    if v2:
-                        q += ',{}<={}'.format(var, v2)
+                if v1:
+                    q += ',{}>={}'.format(var, v1)
+                if v2:
+                    q += ',{}<={}'.format(var, v2)
+            else:  # SRANGE
+                v1 = request.args['from_' + key]
+                v2 = request.args['to_' + key]
+                dct[key] = (int(v1) if v1 else v1,
+                            int(v2) if v2 else v2)
+                if v1:
+                    q += ',{}>={}'.format(key, v1)
+                if v2:
+                    q += ',{}<={}'.format(key, v2)
         q = q.lstrip(',')
         query += [dct, q]
         sort = 'id'
@@ -268,8 +252,8 @@ def index(project):
 
     table.format(SUBSCRIPT)
 
-    addcolumns = [column for column in all_columns + table.keys
-                  if column not in table.columns]
+    addcolumns = sorted(column for column in all_columns + table.keys
+                        if column not in table.columns)
 
     return render_template('table.html',
                            project=project,
@@ -277,8 +261,6 @@ def index(project):
                            md=meta,
                            con=con,
                            x=con_id,
-                           home=home,
-                           ase_db_footer=ase_db_footer,
                            pages=pages(page, nrows, limit),
                            nrows=nrows,
                            addcolumns=addcolumns,
@@ -351,9 +333,7 @@ def row(project, uid):
                            n1=n1,
                            n2=n2,
                            n3=n3,
-                           home=home,
                            back=True,
-                           ase_db_footer=ase_db_footer,
                            md=db.meta,
                            open_ase_gui=open_ase_gui)
 

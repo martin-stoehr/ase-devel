@@ -555,7 +555,7 @@ class SurfaceHoppingVelocityVerlet(SurfaceHoppingASEVerlet):
                     d2U_dt2 = (self.U[i,j,0] - 2.0*self.U[i,j,-1] + self.U[i,j,-2]) / (self.dt**2)
                     switch_prob[i,j] = np.exp((-4.0/(3.*hbar))*self.U[i,j,0]*np.sqrt((2.*self.U[i,j,0])/d2U_dt2))
 
-        print switch_prob
+        print(switch_prob)
 
         rand=np.random.random()
 

@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import string
 
 from ase.units import Bohr
 from ase.io.fortranfile import FortranFile
@@ -22,27 +21,27 @@ def xv_to_atoms(filename):
         # Read cell vectors (lines 1-3)
         vectors = []
         for i in range(3):
-            data = string.split(f.readline())
-            vectors.append([string.atof(data[j]) * Bohr for j in range(3)])
+            data = f.readline().split()
+            vectors.append([float(data[j]) * Bohr for j in range(3)])
 
         # Read number of atoms (line 4)
-        string.atoi(string.split(f.readline())[0])
+        natoms = int(f.readline().split()[0])
 
         # Read remaining lines
         speciesnumber, atomnumbers, xyz, V = [], [], [], []
         for line in f.readlines():
             if len(line) > 5:  # Ignore blank lines
-                data = string.split(line)
-                speciesnumber.append(string.atoi(data[0]))
-                atomnumbers.append(string.atoi(data[1]))
-                xyz.append([string.atof(data[2 + j]) * Bohr for j in range(3)])
-                V.append([string.atof(data[5 + j]) * Bohr for j in range(3)])
+                data = line.split()
+                speciesnumber.append(int(data[0]))
+                atomnumbers.append(int(data[1]))
+                xyz.append([float(data[2 + j]) * Bohr for j in range(3)])
+                V.append([float(data[5 + j]) * Bohr for j in range(3)])
 
     vectors = np.array(vectors)
     atomnumbers = np.array(atomnumbers)
     xyz = np.array(xyz)
     atoms = Atoms(numbers=atomnumbers, positions=xyz, cell=vectors)
-
+    assert natoms == len(atoms)
     return atoms
 
 
@@ -296,7 +295,7 @@ def readWFSX(fname):
 
     WFSX_tuple = collections.namedtuple('WFSX',
                                         ['nkpoints', 'nspin', 'norbitals',
-                                         'gamma', 'orb2atm', 'orb2strspecie',
+                                         'gamma', 'orb2atm', 'orb2strspecies',
                                          'orb2ao', 'orb2n', 'orb2strsym',
                                          'kpoints', 'DFT_E', 'DFT_X',
                                          'mo_spin_kpoint_2_is_read'])
@@ -308,7 +307,7 @@ def readWFSX(fname):
     norbitals = fh.readInts('i')[0]
 
     orb2atm = np.zeros((norbitals), dtype=int)
-    orb2strspecie = []
+    orb2strspecies = []
     orb2ao = np.zeros((norbitals), dtype=int)
     orb2n = np.zeros((norbitals), dtype=int)
     orb2strsym = []
@@ -322,13 +321,13 @@ def readWFSX(fname):
     for iorb in range(norbitals):
         val_list = struct.unpack('i20sii20s', dat[ind_st:ind_fn])
         orb2atm[iorb] = val_list[0]
-        orb2strspecie.append(val_list[1])
+        orb2strspecies.append(val_list[1])
         orb2ao[iorb] = val_list[2]
         orb2n[iorb] = val_list[3]
         orb2strsym.append(val_list[4])
         ind_st = ind_st + dat_size
         ind_fn = ind_fn + dat_size
-    orb2strspecie = np.array(orb2strspecie)
+    orb2strspecies = np.array(orb2strspecies)
     orb2strsym = np.array(orb2strsym)
 
     kpoints = np.zeros((3, nkpoints), dtype=np.float64)
@@ -400,5 +399,5 @@ def readWFSX(fname):
  
     fh.close()
     return WFSX_tuple(nkpoints, nspin, norbitals, gamma, orb2atm,
-                      orb2strspecie, orb2ao, orb2n, orb2strsym,
+                      orb2strspecies, orb2ao, orb2n, orb2strsym,
                       kpoints, DFT_E, DFT_X, mo_spin_kpoint_2_is_read)

@@ -1,6 +1,13 @@
+import unittest
+from matplotlib.animation import writers
+import warnings
+
 from ase.build import bulk, molecule, fcc111
 from ase.io.animation import write_animation
-import warnings
+
+if 'html' not in writers.list():
+    raise unittest.SkipTest('matplotlib html writer not present')
+
 
 images = [molecule('H2O'), bulk('Cu'), fcc111('Au', size=(1, 1, 1))]
 

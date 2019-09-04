@@ -17,7 +17,7 @@ from ase.units import kcal, mol, Debye
 
 
 class MOPAC(FileIOCalculator):
-    implemented_properties = ['energy', 'forces', 'charges', 'dipole', 'magmom']
+    implemented_properties = ['energy', 'forces', 'dipole', 'magmom']
     command = 'mopac PREFIX.mop 2> /dev/null'
 
     default_parameters = dict(
@@ -33,15 +33,15 @@ class MOPAC(FileIOCalculator):
                  label='mopac', atoms=None, **kwargs):
         """Construct MOPAC-calculator object.
 
-        Parameters
-        ==========
+        Parameters:
+
         label: str
             Prefix for filenames (label.mop, label.out, ...)
 
-        Examples
-        ========
+        Examples:
+
         Use default values to do a single SCF calculation and print
-        the forces (task='1SCF GRADIENTS')
+        the forces (task='1SCF GRADIENTS'):
 
         >>> from ase.build import molecule
         >>> from ase.calculators.mopac import MOPAC
@@ -52,12 +52,14 @@ class MOPAC(FileIOCalculator):
         >>> somos = atoms.calc.get_somo_levels()
         >>> homo, lumo = atoms.calc.get_homo_lumo_levels()
 
-        Use the internal geometry optimization of Mopac
+        Use the internal geometry optimization of Mopac:
+
         >>> atoms = molecule('H2')
         >>> atoms.calc = MOPAC(label='H2', task='GRADIENTS')
         >>> atoms.get_potential_energy()
 
-        Read in and start from output file
+        Read in and start from output file:
+
         >>> atoms = MOPAC.read_atoms('H2')
         >>> atoms.calc.get_homo_lumo_levels()
 
@@ -90,7 +92,7 @@ class MOPAC(FileIOCalculator):
             s += (['DOUBLET', 'TRIPLET', 'QUARTET', 'QUINTET'][magmom - 1] +
                   ' UHF ')
 
-        s += '\nTitle: ASE calculation "'+self.label+'"\n\n'
+        s += '\nTitle: ASE calculation\n\n'
 
         # Write coordinates:
         for xyz, symbol in zip(atoms.positions, atoms.get_chemical_symbols()):
@@ -185,16 +187,7 @@ class MOPAC(FileIOCalculator):
             lines = f.readlines()
 
         for i, line in enumerate(lines):
-            if line.find('Error and normal termination messages') != -1:
-                err_message = lines[i-2:i]
-                j = i
-                while lines[j].find('***************************') == -1:
-                    err_message.append(lines[j])
-                    j += 1
-                err_message.append(lines[j])
-                raise RuntimeError("MOPAC says\n\n"+''.join(err_message)+"\n")
-            
-            elif line.find('TOTAL ENERGY') != -1:
+            if line.find('TOTAL ENERGY') != -1:
                 self.results['energy'] = float(line.split()[3])
             elif line.find('FINAL HEAT OF FORMATION') != -1:
                 self.final_hof = float(line.split()[5]) * kcal / mol
@@ -234,11 +227,6 @@ class MOPAC(FileIOCalculator):
                         eigs += [float(e) for e in lines[j].split()]
                         j += 1
                     self.eigenvalues = np.array(eigs).reshape(1, 1, -1)
-            elif line.find('   CHARGE   ') != -1:
-                ## NOTE: this returns net atomic charges per default
-                ##       but will use Mulliken charges if task "MULLIK" is added
-                self.results['charges'] = [float(line1.split()[2]) for line1 in
-                                                lines[i+1:i+1+len(self.atoms)]]
             elif line.find('DIPOLE   ') != -1:
                 self.results['dipole'] = np.array(
                     lines[i + 3].split()[1:1 + 3], float) * Debye

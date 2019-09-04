@@ -242,18 +242,16 @@ def main():
     test1 = BatchTest(EMTEnergyTest(name1, vacuum=3.0))
     test2 = BatchTest(EMTBondLengthTest(name2, vacuum=3.0))
 
-    print 'Energy test'
-    print '-----------'
+    print('Energy test')
+    print('-----------')
     test1.run(formulas + atoms)
 
-    print
-    print 'Bond length test'
-    print '----------------'
+    print('Bond length test')
+    print('----------------')
     test2.run(dimers)
 
-    print
-    print 'Atomization energies'
-    print '--------------------'
+    print('Atomization energies')
+    print('--------------------')
     atomic_energies = dict(test1.collect(atoms))
     molecular_energies = dict(test1.collect(formulas))
     atomization_energies = {}
@@ -262,15 +260,14 @@ def main():
         atomic = [atomic_energies[s] for s in system.get_chemical_symbols()]
         atomization_energy = energy - sum(atomic)
         atomization_energies[formula] = atomization_energy
-        print formula.rjust(10), '%.02f' % atomization_energy
+        print(formula.rjust(10), '%.02f' % atomization_energy)
 
-    print
-    print 'Bond lengths'
-    print '------------'
+    print('Bond lengths')
+    print('------------')
     for formula, (d_i, e_i, d0, e0, poly) in test2.collect(dimers):
         system = molecule(formula)
         bref = np.linalg.norm(system.positions[1] - system.positions[0])
-        print formula.rjust(10), '%6.3f' % d0, '  g2ref =', '%2.3f' % bref
+        print(formula.rjust(10), '%6.3f' % d0, '  g2ref =', '%2.3f' %bref)
 
         
 if __name__ == '__main__':

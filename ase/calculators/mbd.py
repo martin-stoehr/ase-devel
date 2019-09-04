@@ -110,7 +110,7 @@ class MBD(Calculator):
                 del kwargs['alpha_model']
         
         ## set default arguments
-        for arg, val in default_parameters.iteritems():
+        for arg, val in default_parameters.items():
             setattr(self, arg, val)
         
         ## set or overwrite any additional keyword arguments provided
@@ -122,7 +122,7 @@ class MBD(Calculator):
                                    % (arg, self.valid_args))
         
         if ( self.do_supercell and self.do_reciprocal ):
-            if ( 'do_reciprocal' in kwargs.iterkeys() ):
+            if ( 'do_reciprocal' in kwargs.keys() ):
                 print("You specified 'do_supercell'=True and 'do_reciprocal'=True.")
                 print("This is not available at the moment. Please chose ONE of the above.")
                 print("Defaulting to 'do_supercell'=False and 'do_reciprocal'=True.")
@@ -306,7 +306,7 @@ class MBD(Calculator):
             f_FI = Z - q - Npop_l
             a_FI = AlphaModel(filename=dir_ref+'Model'+self.alpha_model+'.dat')
             a_dyn = np.zeros((self.n_omega_SCS+1, self.n_atoms))
-            for i in xrange(self.n_atoms):
+            for i in range(self.n_atoms):
                 fi = f_FI[i]
                 ZNu, ZNl = (Z[i],Npop_l[i]+1), (Z[i],Npop_l[i])
                 ZNul = [ZNu, ZNl]
@@ -657,7 +657,7 @@ class MBD(Calculator):
         if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
-            if (self.myid == 0): print errstr
+            if (self.myid == 0): print(errstr)
             exit()
         
         if self.do_SCS:
@@ -718,15 +718,15 @@ class MBD(Calculator):
         if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
-            if (self.myid == 0): print errstr
+            if (self.myid == 0): print(errstr)
             exit()
         
         if not any([return_density, write_cube]):
             if self.myid == 0:
-                print " "
-                print " You did not specify any way to output the density (on return or .CUBE output file)."
-                print " I will write the data to a .CUBE file named "+cube_name+"for you..."
-                print " "
+                print(" ")
+                print(" You did not specify any way to output the density (on return or .CUBE output file).")
+                print(" I will write the data to a .CUBE file named "+cube_name+"for you...")
+                print(" ")
                 write_cube = True
         
         if ( not hasattr(self, 'grid') ):
@@ -815,10 +815,10 @@ class MBD(Calculator):
         
         if not any([return_density, write_cube]):
             if self.myid == 0:
-                print " "
-                print " You did not specify any way to output the density (on return or .CUBE output file)."
-                print " I will write the data to a .CUBE file named "+cube_name+"for you..."
-                print " "
+                print(" ")
+                print(" You did not specify any way to output the density (on return or .CUBE output file).")
+                print(" I will write the data to a .CUBE file named "+cube_name+"for you...")
+                print(" ")
                 write_cube = True
             
         if ( not hasattr(self, 'grid') ):
@@ -867,7 +867,7 @@ class MBD(Calculator):
         if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
-            if (self.myid == 0): print errstr
+            if (self.myid == 0): print(errstr)
             exit()
         
         if self.do_SCS:
@@ -933,15 +933,15 @@ class MBD(Calculator):
         if (np.size(evals) != 3*nAtoms):
             errstr = "\n ValueError: The number of MBD eigenvalues does not match the specified system.\n"
             errstr += " Please provide appropriate eigenvalues.\n"
-            if (self.myid == 0): print errstr
+            if (self.myid == 0): print(errstr)
             exit()
         
         if not any([return_drho, write_cube]):
             if self.myid == 0:
-                print " "
-                print " No specification of how to output density difference (return or .CUBE file)."
-                print " I will write the data to a .CUBE file named "+cube_name_drho+"for you..."
-                print " "
+                print(" ")
+                print(" No specification of how to output density difference (return or .CUBE file).")
+                print(" I will write the data to a .CUBE file named "+cube_name_drho+"for you...")
+                print(" ")
                 write_cube_drho = True
         
         if ( not hasattr(self, 'grid') ):
@@ -981,9 +981,9 @@ class MBD(Calculator):
         n_gridpts = np.asarray(n_gridpts, dtype=int)
         duc = ( np.asarray(cell).T/(n_gridpts-1) ).T
         self.grid, i = np.zeros((np.prod(n_gridpts),3)), 0
-        for fx_i in xrange(n_gridpts[0]):
-            for fy_i in xrange(n_gridpts[1]):
-                for fz_i in xrange(n_gridpts[2]):
+        for fx_i in range(n_gridpts[0]):
+            for fy_i in range(n_gridpts[1]):
+                for fz_i in range(n_gridpts[2]):
                     lattpt = np.asarray([fx_i,fy_i,fz_i]).dot(duc)
                     self.grid[i] = np.asarray(origin) + lattpt
                     i += 1

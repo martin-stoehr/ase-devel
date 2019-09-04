@@ -62,8 +62,7 @@ def read_atom_line(line_full):
             bfactor = 0.0  # The PDB use a default of zero if the data is missing
 
         # segid = line[72:76] # not used
-#        symbol = line[76:78].strip().upper()
-        symbol = line.split()[-1]
+        symbol = line[76:78].strip().upper()
 
     else:
         raise ValueError("Only ATOM and HETATM supported")

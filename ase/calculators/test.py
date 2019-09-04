@@ -1,11 +1,11 @@
+from __future__ import division
 from math import pi
-import pickle
 
 import numpy as np
 
 from ase.atoms import Atoms
-from ase.parallel import world, rank, distribute_cpus
-from ase.utils import opencew
+from ase.calculators.calculator import Calculator, kpts2ndarray
+from ase.units import Bohr, Ha
 
 
 def make_test_dft_calculation():
@@ -87,9 +87,25 @@ class TestCalculator:
     def get_fermi_level(self):
         return 0.0
 
+    def get_pseudo_density(self):
+        n = 0.0
+        for w, eps, psi in zip(self.weights, self.eps[:, 0], self.psi):
+            if eps >= 0.0:
+                continue
+            n += w * (psi * psi.conj()).real
 
-class TestPotential:
-    def get_forces(self, atoms):
+        n[1:] += n[:0:-1].copy()
+        n[:, 1:] += n[:, :0:-1].copy()
+        n += n.transpose((1, 0, 2)).copy()
+        n /= 8
+        return n
+
+
+class TestPotential(Calculator):
+    implemented_properties = ['energy', 'forces']
+
+    def calculate(self, atoms, properties, system_changes):
+        Calculator.calculate(self, atoms, properties, system_changes)
         E = 0.0
         R = atoms.positions
         F = np.zeros_like(R)
@@ -100,27 +116,88 @@ class TestPotential:
             E += np.vdot(x, x)
             d[a] = 1
             F -= (x / d)[:, None] * D
-        self.energy = 0.25 * E
-        return F
+        energy = 0.25 * E
+        self.results = {'energy': energy, 'forces': F}
 
-    def get_potential_energy(self, atoms):
-        self.get_forces(atoms)
-        return self.energy
 
-    def get_stress(self, atoms):
-        raise NotImplementedError
+class FreeElectrons(Calculator):
+    """Free-electron band calculator.
+
+    Parameters:
+
+    nvalence: int
+        Number of electrons
+    kpts: dict
+        K-point specification.
+
+    Example:
+
+    >>> calc = FreeElectrons(nvalence=1, kpts={'path': 'GXL'})
+    """
+
+    implemented_properties = ['energy']
+    default_parameters = {'kpts': np.zeros((1, 3)),
+                          'nvalence': 0.0,
+                          'nbands': 20,
+                          'gridsize': 7}
+
+    def calculate(self, atoms, properties, system_changes):
+        Calculator.calculate(self, atoms)
+        self.kpts = kpts2ndarray(self.parameters.kpts, atoms)
+        icell = atoms.get_reciprocal_cell() * 2 * np.pi * Bohr
+        n = self.parameters.gridsize
+        offsets = np.indices((n, n, n)).T.reshape((n**3, 1, 3)) - n // 2
+        eps = 0.5 * (np.dot(self.kpts + offsets, icell)**2).sum(2).T
+        eps.sort()
+        self.eigenvalues = eps[:, :self.parameters.nbands] * Ha
+        self.results = {'energy': 0.0}
+
+    def get_eigenvalues(self, kpt, spin=0):
+        assert spin == 0
+        return self.eigenvalues[kpt].copy()
+
+    def get_fermi_level(self):
+        v = self.atoms.get_volume() / Bohr**3
+        kF = (self.parameters.nvalence / v * 3 * np.pi**2)**(1 / 3)
+        return 0.5 * kF**2 * Ha
+
+    def get_ibz_k_points(self):
+        return self.kpts.copy()
+
+    def get_number_of_spins(self):
+        return 1
 
 
 def numeric_force(atoms, a, i, d=0.001):
-    """Evaluate force along i'th axis on a'th atom using finite difference.
-
-    This will trigger two calls to get_potential_energy(), with atom a moved
-    plus/minus d in the i'th axial direction, respectively.
+    """Compute numeric force on atom with index a, Cartesian component i,
+    with finite step of size d
     """
-    p0 = atoms.positions[a, i]
-    atoms.positions[a, i] += d
+    p0 = atoms.get_positions()
+    p = p0.copy()
+    p[a, i] += d
+    atoms.set_positions(p, apply_constraint=False)
     eplus = atoms.get_potential_energy()
-    atoms.positions[a, i] -= 2 * d
+    p[a, i] -= 2 * d
+    atoms.set_positions(p, apply_constraint=False)
     eminus = atoms.get_potential_energy()
-    atoms.positions[a, i] = p0
+    atoms.set_positions(p0, apply_constraint=False)
     return (eminus - eplus) / (2 * d)
+
+
+def gradient_test(atoms, indices=None):
+    """
+    Use numeric_force to compare analytical and numerical forces on atoms
+
+    If indices is None, test is done on all atoms.
+    """
+    if indices is None:
+        indices = range(len(atoms))
+    f = atoms.get_forces()[indices]
+    print('{0:>16} {1:>20}'.format('eps', 'max(abs(df))'))
+    for eps in np.logspace(-1, -8, 8):
+        fn = np.zeros((len(indices), 3))
+        for idx, i in enumerate(indices):
+            for j in range(3):
+                fn[idx, j] = numeric_force(atoms, i, j, eps)
+        print('{0:16.12f} {1:20.12f}'.format(eps, abs(fn - f).max()))
+    return f, fn

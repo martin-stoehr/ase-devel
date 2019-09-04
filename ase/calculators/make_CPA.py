@@ -6,7 +6,7 @@ from sys import argv
 try:
     src_loc = str(argv[1])+'/'
 except IndexError:
-    print 'No source location specified. Using current location.'
+    print('No source location specified. Using current location.')
     src_loc = './'
 
 curr_files = listdir(src_loc)
@@ -17,7 +17,7 @@ if 'cpa.pyf' in curr_files:
 if 'CPA_recode.so' in curr_files:
     remove(src_loc+'CPA_recode.so')
 
-if (system('ifort -help') == 256):
+if (system('ifort -help > /dev/null') == 256):
     f2pycomp = 'gfortran'
 else:
     f2pycomp = 'intelem'

@@ -11,9 +11,9 @@
 #######################################################
 
 import numpy as np
-from CPA_recode import cpa_recode as CPA
+from ase.calculators.CPA_recode import cpa_recode as CPA
 from os import listdir
-from hb_box_data import data
+from ase.calculators.hb_box_data import data
 
 
 class ext_CPA_wrapper:
