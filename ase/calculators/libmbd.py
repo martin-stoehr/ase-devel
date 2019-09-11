@@ -1,23 +1,30 @@
 import numpy as np
 import os
-from warnings import warn
+import warnings
 from pymbd import mbd_energy as MBDcalc_Py, from_volumes
 from ase import atoms
 from ase.units import Bohr, Hartree
 from ase.calculators.calculator import Calculator
+
+
+def _warnonlywarning(message, category=UserWarning, filename = '', lineno = -1):
+    print(message)
+
+warnings.showwarning = _warnonlywarning
+
 
 modes_avail = ['python']
 try:
     from pymbd.fortran import MBDGeom as MBDcalc_F
     modes_avail.append('fortran')
 except ImportError:
-    warn("Failed to import FORTRAN module.")
+    warnings.warn("Failed to import FORTRAN module.")
 
 try:
     from pymbd.tensorflow import MBDEvaluator as MBDcalc_TF
     modes_avail.append('tensorflow')
 except ImportError:
-    warn("Failed to import TensorFlow module.")
+    warnings.warn("Failed to import TensorFlow module.")
 
 
 beta_parameters = {"pbe":0.83,   "pbe0":0.85, "hse":0.85}
@@ -29,7 +36,7 @@ def beta_from_xc(xcf):
     try:
         return beta_parameters[xcf.lower()]
     except KeyError:
-        warn("beta-parameter for "+xc+" functional not known. Using 1.0")
+        warnings.warn("beta-parameter for "+xc+" functional not known. Using 1.0")
         return 1.0
 
 
@@ -37,7 +44,7 @@ def sR_from_xc(xcf):
     try:
         return sR_parameters[xcf.lower()]
     except KeyError:
-        warn("s_R-parameter for "+xc+" functional not known. Using 1.0")
+        warnings.warn("s_R-parameter for "+xc+" functional not known. Using 1.0")
         return 1.0
 
 
@@ -195,7 +202,7 @@ class MBD(Calculator):
         if any(atoms.pbc):
             [a, b, c] = atoms.get_cell()
             V = abs( np.dot(np.cross(a, b), c) )
-            if V < 1e-2: warn("Cell volume < 0.01 A^3")
+            if V < 1e-2: warnings.warn("Cell volume < 0.01 A^3")
             self.UC = atoms.get_cell()/Bohr
             self.periodic = True
         else:
