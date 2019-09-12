@@ -193,18 +193,14 @@ class harmonic_potential(Calculator):
         pos = atoms.positions
         distances = np.zeros((self.nAtoms,self.nAtoms))
         bond_vec = np.zeros((self.nAtoms,self.nAtoms,3))
-        bond_uvec = np.zeros((self.nAtoms,self.nAtoms,3))
         for ipos, pos_i in enumerate(pos):
             for jpos in range(ipos+1, self.nAtoms):
                 bond = pos_i-pos[jpos]
                 bond_vec[ipos,jpos] = bond
-                bond_vec[jpos,ipos] = bond
+                bond_vec[jpos,ipos] = -bond
                 d = np.linalg.norm(bond)
                 distances[ipos,jpos] = d
                 distances[jpos,ipos] = d
-                uvec = bond / d
-                bond_uvec[ipos,jpos] = uvec
-                bond_uvec[jpos,ipos] = -uvec
         
         ## harmonic potential for neighbors
         E = 0.
@@ -213,10 +209,9 @@ class harmonic_potential(Calculator):
             dR = distances[iAtom,jAtom] - self.R0[iAtom,jAtom]
             dR2 = dR * dR
             E += self.k[iAtom,jAtom] * dR2 / 2. + self.shift[iAtom,jAtom]
-        
-            Fij = self.R0[iAtom,jAtom] * bond_uvec[iAtom,jAtom]
-            Fij = Fij - bond_vec[ipos,jpos]
-            Fij = self.k[iAtom,jAtom] * Fij
+            
+            Fij = self.R0[iAtom,jAtom] / distances[iAtom,jAtom] - 1.
+            Fij = Fij * self.k[iAtom,jAtom] * bond_vec[iAtom,jAtom]
             F[iAtom] += Fij
             F[jAtom] -= Fij
         
@@ -234,7 +229,8 @@ class harmonic_potential(Calculator):
                 AexpgR = self.Arep[iAtom,jAtom] * np.exp(-gR)
                 E += AexpgR
                 
-                Fij = self.gamma[iAtom,jAtom] * AexpgR * bond_uvec[iAtom,jAtom]
+                eij = bond_vec[iAtom,jAtom] / distances[iAtom,jAtom]
+                Fij = self.gamma[iAtom,jAtom] * AexpgR * eij
                 F[iAtom] += Fij
                 F[jAtom] -= Fij
         
