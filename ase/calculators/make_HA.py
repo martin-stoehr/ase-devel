@@ -33,12 +33,12 @@ if 'HA_recode.so' in curr_files:
     remove(src_loc+'HA_recode.so')
 
 
-if (system('ifort -help > /dev/null') == 256):
-    fcomp, f2pycomp = 'gfortran', 'gfortran'
-    lib_lapack = '-L/usr/lib/ -llapack'
-else:
+if (system('ifort -help > /dev/null') == 0):
     fcomp, f2pycomp = 'ifort', 'intelem'
     lib_lapack = '-L${MKLROOT}/lib/intel64/ -lmkl_rt'
+else:
+    fcomp, f2pycomp = 'gfortran', 'gfortran'
+    lib_lapack = '-L/usr/lib/ -llapack'
 
 
 system(fcomp+' -c -fPIC -O3 '+src_loc+'spherical_harmonics.f90')
