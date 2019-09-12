@@ -75,7 +75,7 @@ default_avg_a_div_a0 = {   #TODO: adapt values
 
 
 default_parameters = {
-                      'mode':'chain',
+                      'mode':'chain',           # treat atoms as chain
                       'k':39.57,                # all Carbon
                       'R0':1.52,                # all Carbon
                       'shift':-1035.2,          # all Carbon
@@ -87,22 +87,27 @@ default_parameters = {
 
 class harmonic_potential(Calculator):
     """
-    Class of simple harmonic potential for homonuclear chains and rings of atoms.
+    Calculator for model systems with a simple harmonic potential for covalent bonds and
+    and optional exponential repulsion as non-covalent interaction.
     
     Arguments:
     ==========
-        . mode            treat 'chain' (default) or 'ring' of atoms
+        . mode            treat 'chain' (default) or 'ring' of atoms or custom definition
+                          of bonded neighbors that interact via harmonic potential
         . k               force constant of harmonic potential ( Vij = k/2 |xi - xj|^2 )
                           float: value for all bonds,
                           ndarray: individual k per bond (between atoms i and i+1: k[i])
+                          if using custom bonds, dimension: (nAtom, nAtoms)
         . R0              equilibrium distance of harmonic potential between atoms
                           float: value for all bonds,
                           ndarray: individual R0 per bond
                           (between atoms i and i+1: R0[i])
+                          if using custom bonds, dimension: (nAtom, nAtoms)
         . shift           binding energy at equilibrium distance
                           float: value for all bonds
                           ndarray: individual shift per bond
                           (between atoms i and i+1: shift[i])
+                          if using custom bonds, dimension: (nAtom, nAtoms)
         . with_repulsion  add exponential repulsion between non-nearest neighbors
                           bool, default: True
                           V = Arep * exp(-gamma * |Ri - Rj|)
@@ -114,13 +119,28 @@ class harmonic_potential(Calculator):
                           float: value for all pairs,
                           ndarray: individual gamma per pair of atoms
                           (between atoms i and j: gamma[i,j])
-
+        . neighborlist    list of nearest neighbors to interact via harmonic potential.
+                          ndarray, dimension (n,2) [OPTIONAL IF USING 'RING' OR 'CHAIN']
     
     """
     
     implemented_properties = ['energy', 'forces']
 
-    valid_args = ['mode', 'k', 'R0', 'shift', 'with_repulsion', 'Arep', 'gamma']
+    valid_args = ['mode', 'k', 'R0', 'shift', \
+                  'with_repulsion', 'Arep', 'gamma', \
+                  'neighborlist']
+    valid_modes = ['ring', 'chain', 'custom']
+    
+    # classify kwargs
+    bool_args = ['with_repulsion']
+    string_args = ['mode']
+    tensor_args = ['k', 'R0', 'shift', 'Arep', 'gamma']
+    
+    # documentation-type specification for kwargs
+    par2arg = {'k':'force constant', 'R0':'equilibrium distance', \
+               'shift':'potential minimum', 'Arep':'repulsion prefactor', \
+               'gamma':'repulsion scaling'}
+    
     
     def __init__(self, restart=None, ignore_bad_restart_file=False, \
                  label=os.curdir, atoms=None, **kwargs):
@@ -130,14 +150,19 @@ class harmonic_potential(Calculator):
         
         ## set or overwrite any additional keyword arguments provided
         for arg, val in kwargs.items():
-            if arg == 'mode' and val not in ['ring', 'chain']:
-                raise ValueError("Available values of 'mode' are 'chain' and 'ring'")
+            if arg == 'mode' and val not in self.valid_modes:
+                errtxt  = "Available values of 'mode' are '"
+                errtxt += "', '".join(self.valid_modes)+"'"
+                raise ValueError(errtxt)
             
             if arg in self.valid_args:
                 setattr(self, arg, val)
             else:
                 raise RuntimeError('unknown keyword arg "%s": not in %s'
                                    %(arg, self.valid_args))
+        
+        if self.mode == 'custom' and not hasattr(self, 'neighborlist'):
+            raise RuntimeError("Please, provide 'neighborlist' for mode='custom'.")
         
         Calculator.__init__(self, restart, ignore_bad_restart_file,
                             label, atoms, **kwargs)
@@ -155,48 +180,45 @@ class harmonic_potential(Calculator):
     
     def update_properties(self, atoms):
         if not hasattr(self, 'atoms') or self.atoms != atoms:
-            self.symbols = atoms.get_chemical_symbols()
-            for par in ["k", "R0", "shift"]:
-                self.check_vector_params(atoms, to_check=par)
-            if self.with_repulsion:
-                for par in ["Arep", "gamma"]:
-                    self.check_tensor_params(atoms, to_check=par)
-            
+            self.nAtoms = len(atoms)
+            self.symbols = atoms.get_chemical_symbols()   # needed in dummy "hirshfeld" routine
+            self.build_interaction_lists()
+            for par in self.tensor_args:
+                self.check_interaction_params(atoms, to_check=par)
+    
             self.calculate(atoms)
         
     
     def calculate(self, atoms):
-        nAtoms = len(atoms)
         pos = atoms.positions
+        distances = np.zeros((self.nAtoms,self.nAtoms))
+        bond_vec = np.zeros((self.nAtoms,self.nAtoms,3))
+        bond_uvec = np.zeros((self.nAtoms,self.nAtoms,3))
+        for ipos, pos_i in enumerate(pos):
+            for jpos in range(ipos+1, self.nAtoms):
+                bond = pos_i-pos[jpos]
+                bond_vec[ipos,jpos] = bond
+                bond_vec[jpos,ipos] = bond
+                d = np.linalg.norm(bond)
+                distances[ipos,jpos] = d
+                distances[jpos,ipos] = d
+                uvec = bond / d
+                bond_uvec[ipos,jpos] = uvec
+                bond_uvec[jpos,ipos] = -uvec
         
-        ## harmonic potential
+        ## harmonic potential for neighbors
         E = 0.
-        for iAtom in range(nAtoms-1):
-            R = np.linalg.norm(pos[iAtom]-pos[iAtom+1])
-            dR = R - self.R0[iAtom]
+        F = np.zeros((self.nAtoms, 3))
+        for [iAtom, jAtom] in self.neighborlist:
+            dR = distances[iAtom,jAtom] - self.R0[iAtom,jAtom]
             dR2 = dR * dR
-            E += self.k[iAtom] * dR2 / 2. + self.shift[iAtom]
-
-        if (self.mode == 'ring'):   # add end to end interaction in ring
-            dR = np.linalg.norm(pos[-1]-pos[0]) - self.R0[-1]
-            dR2 = dR * dR
-            E += self.k[-1] * dR2 / 2. + self.shift[-1]
+            E += self.k[iAtom,jAtom] * dR2 / 2. + self.shift[iAtom,jAtom]
         
-        F = np.zeros((nAtoms, 3))
-        for iAtom in range(nAtoms-1):
-            Rij = pos[iAtom] - pos[iAtom+1]
-            Nij = np.linalg.norm(Rij)
-            Fij = self.k[iAtom] * Rij * (self.R0[iAtom] / Nij - 1.)
+            Fij = self.R0[iAtom,jAtom] * bond_uvec[iAtom,jAtom]
+            Fij = Fij - bond_vec[ipos,jpos]
+            Fij = self.k[iAtom,jAtom] * Fij
             F[iAtom] += Fij
-            F[iAtom+1] -= Fij
-        
-        if (self.mode == 'ring'):   # add end to end interaction in ring
-            Rij = pos[-1] - pos[0]
-            Nij = np.linalg.norm(Rij)
-            Fij = self.k[-1] * Rij * (self.R0[-1] / Nij - 1.)
-            F[-1] += Fij
-            F[0] -= Fij
-        
+            F[jAtom] -= Fij
         
         ## add exponential repulsion between non-nearest neighbors
         if not self.with_repulsion:
@@ -204,62 +226,69 @@ class harmonic_potential(Calculator):
             self.forces = F
             return
         
-        ## first and last atom in a ring are nearest neighbors => no repulsion
-        idx_end = nAtoms if (self.mode == 'chain') else nAtoms-1
-        for iAtom in range(nAtoms-2):
-            for jAtom in range(iAtom+2,idx_end):
-                Rij = pos[iAtom]-pos[jAtom]
-                R = np.linalg.norm(Rij)
-                eij = Rij / R
-                gR = self.gamma[iAtom,jAtom] * R
+        ## add exponential repulsion between non-nearest neighbors
+        for iAtom in range(self.nAtoms-1):
+            for jAtom in range(iAtom+1,self.nAtoms):
+                if not self.repulsion_pair[iAtom,jAtom]: continue
+                gR = self.gamma[iAtom,jAtom] * distances[iAtom,jAtom]
                 AexpgR = self.Arep[iAtom,jAtom] * np.exp(-gR)
-                AgexpgReij = self.gamma[iAtom,jAtom] * AexpgR * eij
                 E += AexpgR
-                F[iAtom] += AgexpgReij
-                F[jAtom] -= AgexpgReij
+                
+                Fij = self.gamma[iAtom,jAtom] * AexpgR * bond_uvec[iAtom,jAtom]
+                F[iAtom] += Fij
+                F[jAtom] -= Fij
         
         self.energy = E
         self.forces = F
         
     
-    def check_vector_params(self, atoms, to_check="k"):
-        nAtoms = len(atoms)
+    def check_interaction_params(self, atoms, to_check="k"):
         try:
             shape_par = eval("np.shape(np.asarray(self."+to_check+", dtype=float))")
+            ndim_par = eval("np.ndim(np.asarray(self."+to_check+", dtype=float))")
         except ValueError:
-            errtxt  = "Parameter '"+to_check+"' (force constants) should be of type "
-            errtxt += "float or list/array of floats"
+            errtxt  = "Parameter '"+to_check+"' should be of type "
+            errtxt += "float or list/ndarray of floats"
             raise ValueError(errtxt)
         
-        nbpar_req = nAtoms if (self.mode == 'ring') else nAtoms-1
-        if shape_par == ():
-            exec("self."+to_check+" *= np.ones(nbpar_req, dtype=float)")
-        elif ( shape_par != (nbpar_req,) ):
-            errtxt  = "Incorrect number of force constants.\n"
-            errtxt += "Parameter '"+to_check+"' should be float or list/array with "
-            errtxt += "length "+str(nbpar_req)+" for a "+self.mode+" of atoms!"
+        shape_req = (self.nAtoms,self.nAtoms)
+        wrong_dim = False
+        if ndim_par == 0:
+            exec("self."+to_check+" *= np.ones(shape_req, dtype=float)")
+        elif ndim_par == 1:
+            if shape_par[0] == self.nAtoms:
+                cmdtxt  = "np.diag(self."+to_check+"[:-1], k=1) + "
+                cmdtxt += "np.diag(self."+to_check+"[:-1], k=-1)"
+                tensorfromlist = eval(cmdtxt)
+                exec("tensorfromlist[0,-1] = self."+to_check+"[-1]")
+                exec("tensorfromlist[-1,0] = self."+to_check+"[-1]")
+                exec("self."+to_check+" = tensorfromlist")
+            else:
+                wrong_dim = True
+        elif ( shape_par != shape_req ):
+            wrong_dim = True
+        
+        if wrong_dim:
+            errtxt  = "\nIncorrect number of parameters defined in '"+to_check+"'.\n"
+            errtxt += "Should be: float -> same "+self.par2arg[to_check]+" for all or\n"
+            errtxt += "           list of length "+str(self.nAtoms)+" -> "
+            errtxt += self.par2arg[to_check]+" for all pairs of subsequent atoms or\n"
+            errtxt += "           ndarray shape "+repr(shape_req)+" -> individual "
+            errtxt += self.par2arg[to_check]+" for each pair of atoms."
             raise ValueError(errtxt)
         
     
-    def check_tensor_params(self, atoms, to_check="k"):
-        nAtoms = len(atoms)
-        try:
-            shape_par = eval("np.shape(np.asarray(self."+to_check+", dtype=float))")
-        except ValueError:
-            errtxt  = "Parameter '"+to_check+"' (force constants) should be of type "
-            errtxt += "float or list/array of floats"
-            raise ValueError(errtxt)
-
-        shape_req = (nAtoms,Atoms) if (self.mode == 'chain') else (nAtoms-1,nAtoms-1)
-        if shape_par == ():
-            exec("self."+to_check+" *= np.ones(shape_req, dtype=float)")
-        elif ( shape_par != shape_req ):
-            errtxt  = "Incorrect number of force constants.\n"
-            errtxt += "Parameter '"+to_check+"' should be float or list/array with "
-            errtxt += "shape "+repr(shape_req)+" for a "+self.mode+" of atoms!"
-            raise ValueError(errtxt)
-
-
+    def build_interaction_lists(self):
+        if self.mode != 'custom':
+            self.neighborlist = []
+            for iAtom in range(self.nAtoms-1): self.neighborlist.append([iAtom,iAtom+1])
+            if self.mode == 'ring': self.neighborlist.append([0,self.nAtoms-1])
+        
+        self.repulsion_pair = np.ones((self.nAtoms,self.nAtoms), dtype=bool)
+        self.repulsion_pair[np.diag_indices(self.nAtoms)] = False
+        for [iAtom, jAtom] in self.neighborlist: self.repulsion_pair[iAtom, jAtom] = False
+        
+    
     def get_hirsh_volrat(self):
         return [default_avg_a_div_a0[sym] for sym in self.symbols]
         
