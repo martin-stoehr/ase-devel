@@ -128,7 +128,7 @@ class harmonic_potential(Calculator):
                           Default: no restrain
         . restrain_level  strength (force constant) of restraining potential
                           V_r = restrain_level/2 * <restrain_axis>^2.
-                          Default: 2
+                          Can also be per atom restraint, default: 2 for all atoms.
     
     """
     
@@ -268,9 +268,10 @@ class harmonic_potential(Calculator):
         
         ## add any restraint along axes
         for ax in self.restrain_axis:
-            dax = np.dot(pos[:,ax], pos[:,ax])
+            kax = self.restrain_level * pos[:,ax]
+            kdax = np.dot(kax, pos[:,ax])
             F[:,ax] += -self.restrain_level * pos[:,ax]
-            E += self.restrain_level * dax / 2.
+            E += kdax / 2.
         
         self.energy = E
         self.forces = F
