@@ -74,19 +74,6 @@ default_avg_a_div_a0 = {   #TODO: adapt values
 
 
 
-default_parameters = {
-                      'mode':'chain',           # treat atoms as chain
-                      'k':39.57,                # all Carbon
-                      'R0':1.52,                # all Carbon
-                      'shift':-1035.2,          # all Carbon
-                      'with_repulsion':True,    # add exponential repulsion for non-NN
-                      'Arep':1878.38,           # all Carbon
-                      'gamma':5.49,             # all Carbon
-                      'restrain_axis':[],       # restrain atoms along axis by k_r/2*<axis>^2
-                      'restrain_level':2.,      # restrain atoms with k_r = 2
-                     }
-
-
 class harmonic_potential(Calculator):
     """
     Calculator for model systems with a simple harmonic potential for covalent bonds and
@@ -95,7 +82,10 @@ class harmonic_potential(Calculator):
     Arguments:
     ==========
         . mode            treat 'chain' (default) or 'ring' of atoms or custom definition
-                          of bonded neighbors that interact via harmonic potential
+                          of bonded neighbors that interact via harmonic potential.
+                          If using mode='lattice', no bonds and repulsion between atoms
+                          will be added. Only the (harmonic) restraint from reference_geom.
+                          In 'lattice' mode, reference_geom is a required argument.
         . k               force constant of harmonic potential ( Vij = k/2 |xi - xj|^2 )
                           float: value for all bonds,
                           ndarray: individual k per bond (between atoms i and i+1: k[i])
@@ -129,22 +119,38 @@ class harmonic_potential(Calculator):
         . restrain_level  strength (force constant) of restraining potential
                           V_r = restrain_level/2 * <restrain_axis>^2.
                           Can also be per atom restraint, default: 2 for all atoms.
+        . reference_geom  Reference structure to which to restrain system to.
+                          If none is given, the code will use 0. as reference along the specified
+                          restrain_axis. This argument is is required when mode='lattice'
     
     """
+    
+    default_parameters = {
+                          'mode':'chain',           # treat atoms as chain
+                          'k':39.57,                # all Carbon
+                          'R0':1.52,                # all Carbon
+                          'shift':-1035.2,          # all Carbon
+                          'with_repulsion':True,    # add exponential repulsion for non-NN
+                          'Arep':1878.38,           # all Carbon
+                          'gamma':5.49,             # all Carbon
+                          'restrain_axis':[],       # restrain atoms along axis by k_r/2*<axis>^2
+                          'restrain_level':2.,      # restrain atoms with k_r = 2
+                         }
     
     implemented_properties = ['energy', 'forces']
 
     valid_args = ['mode', 'k', 'R0', 'shift', \
                   'with_repulsion', 'Arep', 'gamma', \
                   'neighborlist', \
-                  'restrain_axis', 'restrain_level']
-    valid_modes = ['ring', 'chain', 'custom']
+                  'restrain_axis', 'restrain_level', 'reference_geom']
+    valid_modes = ['ring', 'chain', 'custom', 'lattice']
     
     # classify kwargs
     bool_args = ['with_repulsion']
     string_args = ['mode']
     list_args = ['restrain_axis', 'restrain_level']
     tensor_args = ['k', 'R0', 'shift', 'Arep', 'gamma']
+    N3tensor_args = ['reference_geom']
     
     # documentation-type specification for kwargs
     par2arg = {'k':'force constant', 'R0':'equilibrium distance', \
@@ -157,7 +163,7 @@ class harmonic_potential(Calculator):
                  label=os.curdir, atoms=None, **kwargs):
         
         ## set default arguments
-        for arg, val in default_parameters.items(): setattr(self, arg, val)
+        for arg, val in self.default_parameters.items(): setattr(self, arg, val)
         
         ## set or overwrite any additional keyword arguments provided
         for arg, val in kwargs.items():
@@ -175,24 +181,27 @@ class harmonic_potential(Calculator):
         if self.mode == 'custom' and not hasattr(self, 'neighborlist'):
             raise RuntimeError("Please, provide 'neighborlist' for mode='custom'.")
         
-        restraint_OK  = all([axis in ['x','y','z'] for axis in self.restrain_axis])
-        restraint_OK += all([axis in [0, 1, 2] for axis in self.restrain_axis])
-        if not restraint_OK:
+        restraint_OK1 = all([axis in ['x','y','z'] for axis in self.restrain_axis])
+        restraint_OK2 = all([axis in [0, 1, 2] for axis in self.restrain_axis])
+        if restraint_OK1:
+            self.restrain_axis = [self.ax2dim[ax] for ax in self.restrain_axis]
+        elif restraint_OK2:
+            pass
+        else:
             errtxt  = "Elements of 'restrain_axis' have to be from "
             errtxt += "['x', 'y', 'z'] or [0, 1, 2]"
             raise RuntimeError(errtxt)
         
-        if len(self.restrain_axis) == 0:
-            self.with_restraint = False
-        else:
-            self.restrain_axis = [self.ax2dim[ax] for ax in self.restrain_axis]
-            self.with_restraint = True
-        
-        if len(self.restrain_axis) == 3:
-            errtxt  = " Restraining 'x', 'y', and 'z' would push all atoms to zero.\n"
-            errtxt += " If you want to restrain positions with respect to a reference"
-            errtxt += " structure choose the calculator 'harmonic_lattice'"
-            raise RuntimeError(errtxt)
+        if self.mode == 'lattice':
+            if not hasattr(self, 'reference_geom'):
+                errtxt  = "When choosing mode='lattice', you have to specify a reference geometry "
+                errtxt += "via the argument 'reference_geom'."
+                raise RuntimeError(errtxt)
+            else:
+                self.k, self.with_repulsion = 0., False
+                self.restrain_axis = [0, 1, 2]
+            
+        self.with_restraint = (len(self.restrain_axis) > 0)
         
         Calculator.__init__(self, restart, ignore_bad_restart_file,
                             label, atoms, **kwargs)
@@ -221,13 +230,14 @@ class harmonic_potential(Calculator):
     
     def calculate(self, atoms):
         pos = atoms.positions
-        distances = atoms.get_all_distances()
-        bond_vec = np.zeros((self.nAtoms,self.nAtoms,3))
-        for ipos, pos_i in enumerate(pos):
-            for jpos in range(ipos+1, self.nAtoms):
-                bond = pos_i-pos[jpos]
-                bond_vec[ipos,jpos] = bond
-                bond_vec[jpos,ipos] = -bond
+        if self.mode != 'lattice':
+            distances = atoms.get_all_distances()
+            bond_vec = np.zeros((self.nAtoms,self.nAtoms,3))
+            for ipos, pos_i in enumerate(pos):
+                for jpos in range(ipos+1, self.nAtoms):
+                    bond = pos_i-pos[jpos]
+                    bond_vec[ipos,jpos] = bond
+                    bond_vec[jpos,ipos] = -bond
         
         ## harmonic potential for neighbors
         E = 0.
@@ -241,6 +251,15 @@ class harmonic_potential(Calculator):
             Fij = Fij * self.k[iAtom,jAtom] * bond_vec[iAtom,jAtom]
             F[iAtom] += Fij
             F[jAtom] -= Fij
+        
+        ## add any restraint along axes
+        if self.with_restraint:
+            for ax in self.restrain_axis:
+                dpos = pos[:,ax] - self.reference_geom[:,ax]
+                krax = self.restrain_level * dpos
+                krdax = np.dot(krax, dpos)
+                F[:,ax] += -self.restrain_level * dpos
+                E += krdax / 2.
         
         ## add exponential repulsion between non-nearest neighbors
         if not self.with_repulsion:
@@ -260,18 +279,6 @@ class harmonic_potential(Calculator):
                 Fij = self.gamma[iAtom,jAtom] * AexpgR * eij
                 F[iAtom] += Fij
                 F[jAtom] -= Fij
-        
-        if not self.with_restraint:
-            self.energy = E
-            self.forces = F
-            return
-        
-        ## add any restraint along axes
-        for ax in self.restrain_axis:
-            kax = self.restrain_level * pos[:,ax]
-            kdax = np.dot(kax, pos[:,ax])
-            F[:,ax] += -self.restrain_level * pos[:,ax]
-            E += kdax / 2.
         
         self.energy = E
         self.forces = F
@@ -314,19 +321,25 @@ class harmonic_potential(Calculator):
         
     
     def build_interaction_lists(self):
-        if self.mode != 'custom':
+        if self.mode in ['ring', 'chain']:
             self.neighborlist = []
             for iAtom in range(self.nAtoms-1): self.neighborlist.append([iAtom,iAtom+1])
             if self.mode == 'ring': self.neighborlist.append([0,self.nAtoms-1])
+        elif self.mode == 'lattice':
+            self.neighborlist = []
+            return
         
         self.repulsion_pair = np.ones((self.nAtoms,self.nAtoms), dtype=bool)
         self.repulsion_pair[np.diag_indices(self.nAtoms)] = False
         for [iAtom, jAtom] in self.neighborlist: self.repulsion_pair[iAtom, jAtom] = False
+        if not hasattr(self, 'reference_geom') and self.with_restraint:
+            self.reference_geom = np.zeros((self.nAtoms, 3))
         
     
     def get_hirsh_volrat(self):
         return [default_avg_a_div_a0[sym] for sym in self.symbols]
         
     
+
 
 #--EOF--#
