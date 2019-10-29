@@ -7,7 +7,7 @@ from ase.units import Bohr, Hartree
 from ase.calculators.calculator import Calculator
 
 
-def _warnonlywarning(message, category=UserWarning, filename = '', lineno = -1):
+def _warnonlywarning(message, category=UserWarning, filename='', lineno=-1, file=None, line=None):
     print(message)
 
 warnings.showwarning = _warnonlywarning

@@ -172,6 +172,9 @@ class harmonic_potential(Calculator):
                 errtxt += "', '".join(self.valid_modes)+"'"
                 raise ValueError(errtxt)
             
+            if (arg == 'reference_geometry' and (type(val) != np.ndarray)):
+                val = np.asarray(val)
+            
             if arg in self.valid_args:
                 setattr(self, arg, val)
             else:
