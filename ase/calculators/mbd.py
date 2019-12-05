@@ -104,7 +104,7 @@ class MBD(Calculator):
         if use_FI:
             default_parameters['alpha_model'] = 'PGG_Scaled'
             valid_models = ['Mixed_Scaled', 'PGG', 'PGG_Scaled', 'RXH_Scaled']
-            if ( kwargs.has_key('alpha_model') and \
+            if ( 'alpha_model' in kwargs.keys() and \
                  kwargs['alpha_model'] not in valid_models ):
                 print("WARNING: alpha_model '"+kwargs['alpha_model']+"' not known. Using 'PGG_Scaled'")
                 del kwargs['alpha_model']

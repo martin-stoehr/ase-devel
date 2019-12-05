@@ -40,8 +40,11 @@ from ase.calculators.calculator import FileIOCalculator, kpts2mp
 ## analysis of atomic polarizabilities via Hirshfeld volume ratios (M.S. 19/Oct/15)
 from ase.io import read
 from ase.calculators.hb_box_data import data
-from ase.calculators.ext_CPA_DFTB import ChargePopulationAnalysis
-from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
+#try:
+#    from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
+#    ext_analysis_avail = True
+#except ImportError:
+#    ext_analysis_avail = False
 
 
 ## default value of maximal angular momentum to be included in DFTB calculation (ease calculator init, MS)
@@ -74,7 +77,7 @@ class Dftb(FileIOCalculator):
     else:
         command = 'dftb+ > PREFIX.out'
     
-    implemented_properties = ['energy', 'forces', 'charges']
+    implemented_properties = ['energy', 'forces']#, 'charges']
     
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label='dftb', atoms=None, kpts=None, **kwargs):
@@ -85,14 +88,11 @@ class Dftb(FileIOCalculator):
         
         
         do_3rd_o = kwargs.get('Hamiltonian_ThirdOrder', 'No')
-        if (do_3rd_o.lower() == 'yes'):
-            print("REMARK: You chose ThirdOrder = 'Yes'. This only corrects on-site terms.")
-            print("        For full 3rd order DFTB, please use ThirdOrderFull = 'Yes'.")
-        
         do_3rd_f = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
         do_3rd_order = any(np.asarray([do_3rd_o.lower(), do_3rd_f.lower()]) =='yes' )
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
+            if not slako_dir.endswith('/'): slako_dir += '/'
             if ( do_3rd_order and (not pexists(slako_dir+'3rd_order/')) ):
                 print("WARNING: You chose ThirdOrder(Full), but I didn't find the default directory")
                 print("         '"+slako_dir+"3rd_order/' for .skf files")
@@ -106,10 +106,11 @@ class Dftb(FileIOCalculator):
             Options_WriteResultsTag='Yes',
 #            Options_WriteEigenvectors='No',
 #            Options_WriteCPA='No',
-#            Options_CalculateForces='Yes',
+            Options_CalculateForces='Yes',
             Options_MinimiseMemoryUsage='No',
             Hamiltonian_='DFTB',
-#            Hamiltonian_SCCTolerance = 1.0E-005,
+            Hamiltonian_Scc='Yes',
+            Hamiltonian_SccTolerance = 1.0E-005,
             Hamiltonian_SlaterKosterFiles_='Type2FileNames',
             Hamiltonian_SlaterKosterFiles_Prefix=slako_dir,
             Hamiltonian_SlaterKosterFiles_Separator='"-"',
@@ -123,29 +124,14 @@ class Dftb(FileIOCalculator):
         
         self.pbc = np.any(atoms.pbc)
         ## control whether DFTB+ should calculate forces or enable singe-point calculations (large systems!)
-        calc_forces = kwargs.get('Options_CalculateForces', 'Yes')
-        self.calculate_forces = ( calc_forces.lower()=='yes' )
-        if self.calculate_forces:
-            self.default_parameters['Driver_']='ConjugateGradient'
-            self.default_parameters['Driver_MaxForceComponent']='1E-4'
-            self.default_parameters['Driver_MaxSteps']=0
-        else:
-            self.default_parameters['Driver']='{}'
-        
-        minmem = kwargs.get('Options_MinimiseMemoryUsage', 'No')
-        if minmem.lower() == 'yes':
-            defaultsolver = 'Standard{}'
-        else:
-            defaultsolver = 'DivideAndConquer{}'
-        
-        dftbsolver = kwargs.get('Hamiltonian_Eigensolver', defaultsolver)
-        if not dftbsolver.endswith('{}'): dftbsolver += '{}'
-        if (dftbsolver in ['QR{}','qr{}']): dftbsolver = 'Standard{}'
-        if not dftbsolver in ['Standard{}', 'DivideAndConquer{}']:
-            print("Eigensolver '"+dftbsolver+"' not known. Defaulting to '"+defaultsolver+"'.")
-            dftbsolver = defaultsolver
-        
-        kwargs['Hamiltonian_Eigensolver'] = dftbsolver
+#        calc_forces = kwargs.get('Options_CalculateForces', 'Yes')
+#        self.calculate_forces = ( calc_forces.lower()=='yes' )
+#        if self.calculate_forces:
+#            self.default_parameters['Driver_']='ConjugateGradient'
+#            self.default_parameters['Driver_MaxForceComponent']='1E-4'
+#            self.default_parameters['Driver_MaxSteps']=0
+#        else:
+        self.default_parameters['Driver']='{}'
         
         if do_3rd_order:
             self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
@@ -211,8 +197,8 @@ class Dftb(FileIOCalculator):
         #--------MAIN KEYWORDS-------
         previous_key = 'dummy_'
         myspace = ' '
-        if (self.hvr_approach == 'HA'):
-            self.parameters['Options_WriteEigenvectors'] = 'Yes'
+#        if (self.hvr_approach == 'HA'):
+#            self.parameters['Analysis_WriteEigenvectors'] = 'Yes'
 
         for key, value in sorted(self.parameters.items()):
             current_depth = key.rstrip('_').count('_')
@@ -280,32 +266,33 @@ class Dftb(FileIOCalculator):
                     self.index_force_end = iline + 1 + int(line1.split(',')[-1])
                     break
                 
-            ## get number of orbitals and k-points (Martin Stoehr)
-            for line in self.lines:
-                if 'eigenvalues  ' in line:
-                    line1 = line.replace(':',',')
-                    self.nk = int(line1.split(',')[-2])
-                    self.nOrbs = int(line1.split(',')[-3])
-                    break
+#            ## get number of orbitals and k-points (Martin Stoehr)
+#            for line in self.lines:
+#                if 'eigenvalues  ' in line:
+#                    line1 = line.replace(':',',')
+#                    self.nk = int(line1.split(',')[-2])
+#                    self.nOrbs = int(line1.split(',')[-3])
+#                    break
             
             ## read further information for SCC calculations (Martin Stoehr)
             ## where is this information for non-SCC calculations
-            hSCC = 'Hamiltonian_SCC'
-            if self.parameters.has_key(hSCC):
-                if (self.parameters[hSCC].lower() == 'yes'):
-                    self.read_additional_info()
-                else:
-                    print('You started a non-SCC calculation. No additional Information available.')
+#            hSCC = 'Hamiltonian_SCC'
+#            if hSCC in self.parameters.keys():
+#                if (self.parameters[hSCC].lower() == 'yes'):
+#                    self.read_additional_info()
+#                else:
+#                    print('You started a non-SCC calculation. No additional Information available.')
             
-            try:
-                myfile = open('eigenvec.out','r')
-                self.evlines = myfile.readlines()
-                myfile.close()
-                ## read-in LCAO-coefficients (Martin Stoehr)
-                self.read_eigenvectors()
-                self.eigenvectors_missing = False
-            except IOError:
-                self.eigenvectors_missing = True
+#            if self.hvr_approach == 'HA':
+#                try:
+#                    myfile = open('eigenvec.out','r')
+#                    self.evlines = myfile.readlines()
+#                    myfile.close()
+#                    ## read-in LCAO-coefficients (Martin Stoehr)
+#                    self.read_eigenvectors()
+#                    self.eigenvectors_missing = False
+#                except IOError:
+#                    self.eigenvectors_missing = True
             
         self.read_energy()
         # read geometry from file in case dftb+ has done steps
@@ -315,130 +302,129 @@ class Dftb(FileIOCalculator):
             #self.results['forces'] = np.zeros([len(self.atoms), 3])
         #else:
             #self.read_forces()
-        if self.calculate_forces:
-            self.read_forces()
+        if self.calculate_forces: self.read_forces()
         
         os.remove('results.tag')
         
     
-    def read_additional_info(self):
-        """
-        Read additional info, i.e. nAtoms, positions, fillings, etc.
-        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
-        """
-        orbitalslist = {0:['s'], 1:['py','pz','px'], 2:['dxy','dyz','dz2','dxz','dx2-y2'], \
-                       3:['f3yx2-y3','fxyz','fyz2','fz3','fxz2','fzx2-zy2','fx3-3xy2']}
-        try:
-            atoms_end = read('geo_end.xyz')
-        except IOError:
-            atoms_end = self.atoms
-        
-        self.atoms = atoms_end
-        self.nAtoms = len(self.atoms)
-        self.charges = np.zeros(self.nAtoms)
-        self.Orb2Atom = np.zeros(self.nOrbs)
-        self.otypes = []
-        ## read 'detailed.out' in lines
-        myfile = open('detailed.out', 'r')
-        linesdet = myfile.readlines()
-        myfile.close()
-        ## net atomic charges and basis orbital types
-        for iline, line in enumerate(linesdet):
-            if 'Net atomic charges (e)' in line:
-                for iAtom in range(self.nAtoms):
-                    self.charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
-                iline = iline+2+self.nAtoms
-            if 'Orbital populations (up)' in line:
-                for iOrb in range(self.nOrbs):
-                    self.Orb2Atom[iOrb] = int( linesdet[iline+2+iOrb].split()[0] ) - 1
-                    l = int(linesdet[iline+2+iOrb].split()[2])
-                    m = int(linesdet[iline+2+iOrb].split()[3])
-                    self.otypes.append(orbitalslist[l][l+m])
-            
-        self.results['charges'] = self.charges
-        self.Atom2Orbs = np.zeros((self.nAtoms, 2))
-        for iAtom in range(self.nAtoms):
-            startOrb = list(self.Orb2Atom).index(iAtom) + 1
-            nOrbsiAtom = len(self.Orb2Atom) - np.count_nonzero(self.Orb2Atom - iAtom) - 1
-            self.Atom2Orbs[iAtom] = np.array([startOrb, startOrb + nOrbsiAtom])
-            
-        ## Fillings 
-        myfile = open('detailed.out','r')
-        textdet = myfile.read()   ## read 'detailed.out' as string
-        myfile.close()
-        textoccs = (textdet.split('Fillings')[1]).split('\n \n')[0]
-        textoccs = np.array(textoccs.split(), dtype=float)  ## 1D array of occupations
-        if len(textoccs) != (self.nOrbs*self.nk):
-            print('Error in reading occupations (~> length). Skipping.')
-            pass
-        else:
-            ## reshape array into shape = (n_kpoints, n_Orbitals)
-            self.f = textoccs.reshape((self.nOrbs, self.nk)).T
-        
-        ## electronic energy: move this out of read_additional_info!!
-        textelec = textdet.split('Total Electronic energy:')[1].split('\n')[0]
-        self.electronic_energy = float(textelec.split()[-2])
-        
-        ## dispersion energy (MBD/TS): move this out of read_additional_info!!
-        try:
-            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
-            oldvdW = True
-        except KeyError:
-            try:
-                vdWmode = self.parameters['Hamiltonian_Dispersion_']
-                olfvdW = False
-            except KeyError:
-                vdWmode = 'none'
-        
-        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
-            if oldvdW:
-                textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
-            else:
-                if (vdWmode == 'MBD'):
-                    textdisp = textdet.split('Many-body dispersion energy:')[1].split('\n')[0]
-                elif (vdWmode == 'TS'):
-                    textdisp = textdet.split('Dispersion energy:')[1].split('\n')[0]
-            
-            self.dispersion_energy = float(textdisp.split()[-2])
+#    def read_additional_info(self):
+#        """
+#        Read additional info, i.e. nAtoms, positions, fillings, etc.
+#        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
+#        """
+#        orbitalslist = {0:['s'], 1:['py','pz','px'], 2:['dxy','dyz','dz2','dxz','dx2-y2'], \
+#                       3:['f3yx2-y3','fxyz','fyz2','fz3','fxz2','fzx2-zy2','fx3-3xy2']}
+#        try:
+#            atoms_end = read('geo_end.xyz')
+#        except IOError:
+#            atoms_end = self.atoms
+#        
+#        self.atoms = atoms_end
+#        self.nAtoms = len(self.atoms)
+#        self.charges = np.zeros(self.nAtoms)
+#        self.Orb2Atom = np.zeros(self.nOrbs)
+#        self.otypes = []
+#        ## read 'detailed.out' in lines
+#        myfile = open('detailed.out', 'r')
+#        linesdet = myfile.readlines()
+#        myfile.close()
+#        ## net atomic charges and basis orbital types
+#        for iline, line in enumerate(linesdet):
+#            if 'Net atomic charges (e)' in line:
+#                for iAtom in range(self.nAtoms):
+#                    self.charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
+#                iline = iline+2+self.nAtoms
+#            if 'Orbital populations (up)' in line:
+#                for iOrb in range(self.nOrbs):
+#                    self.Orb2Atom[iOrb] = int( linesdet[iline+2+iOrb].split()[0] ) - 1
+#                    l = int(linesdet[iline+2+iOrb].split()[2])
+#                    m = int(linesdet[iline+2+iOrb].split()[3])
+#                    self.otypes.append(orbitalslist[l][l+m])
+#            
+#        self.results['charges'] = self.charges
+#        self.Atom2Orbs = np.zeros((self.nAtoms, 2))
+#        for iAtom in range(self.nAtoms):
+#            startOrb = list(self.Orb2Atom).index(iAtom) + 1
+#            nOrbsiAtom = len(self.Orb2Atom) - np.count_nonzero(self.Orb2Atom - iAtom) - 1
+#            self.Atom2Orbs[iAtom] = np.array([startOrb, startOrb + nOrbsiAtom])
+#            
+#        ## Fillings 
+#        myfile = open('detailed.out','r')
+#        textdet = myfile.read()   ## read 'detailed.out' as string
+#        myfile.close()
+#        textoccs = (textdet.split('Fillings')[1]).split('\n \n')[0]
+#        textoccs = np.array(textoccs.split(), dtype=float)  ## 1D array of occupations
+#        if len(textoccs) != (self.nOrbs*self.nk):
+#            print('Error in reading occupations (~> length). Skipping.')
+#            pass
 #        else:
-#            print('No dispersion model defined.')
-        
-        ## k-point weighting
-        myfile = open('dftb_in.hsd','r')
-        linesin = myfile.readlines()
-        myfile.close()
-        self.wk = np.ones(self.nk)
-        self.kpts = np.zeros((self.nk,3))
-        for iline, line in enumerate(linesin):
-            if 'KPointsAndWeights =' in line:
-                for ik in range(self.nk):
-                    self.wk[ik] = float(linesin[iline+1+ik].split()[3])
-                    self.kpts[ik,:] = np.array(linesin[iline+1+ik].split()[:3], dtype=float)
-                break
-        ## normalize k-point weighting factors (sum_k wk = 1)
-        ## In principle, this should not be neccessary. Anyway, ...
-        self.wk /= np.sum(self.wk)
-        
-    
-    def read_eigenvectors(self):
-        """
-        Read LCAO-coefficients to self.wf, shape = (n_kpoints, n_States, n_Orbitals)
-        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
-        """
-        ## LCAO-coefficients
-        self.wf = np.zeros((self.nk, self.nOrbs, self.nOrbs))
-        c = []
-        if self.pbc:
-            for line in self.evlines[1:]:
-                if (line.split() != []) and ('Eigenvector: ' not in line):
-                    line1 = line.replace(',','').replace(')','')
-                    c.append(float(line1.split()[-3]) + float(line1.split()[-2])*1.j)
-            self.wf = np.array(c, dtype=complex).reshape((self.nk, self.nOrbs, self.nOrbs))
-        else:
-            for line in self.evlines[1:]:
-                if (line.split() != []) and ('Eigenvector: ' not in line):
-                    c.append(float(line.split()[1]))
-            self.wf[0] = np.array(c).reshape((self.nk, self.nOrbs, self.nOrbs))
+#            ## reshape array into shape = (n_kpoints, n_Orbitals)
+#            self.f = textoccs.reshape((self.nOrbs, self.nk)).T
+#        
+#        ## electronic energy: move this out of read_additional_info!!
+#        textelec = textdet.split('Total Electronic energy:')[1].split('\n')[0]
+#        self.electronic_energy = float(textelec.split()[-2])
+#        
+#        ## dispersion energy (MBD/TS): move this out of read_additional_info!!
+#        try:
+#            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
+#            oldvdW = True
+#        except KeyError:
+#            try:
+#                vdWmode = self.parameters['Hamiltonian_Dispersion_']
+#                olfvdW = False
+#            except KeyError:
+#                vdWmode = 'none'
+#        
+#        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
+#            if oldvdW:
+#                textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
+#            else:
+#                if (vdWmode == 'MBD'):
+#                    textdisp = textdet.split('Many-body dispersion energy:')[1].split('\n')[0]
+#                elif (vdWmode == 'TS'):
+#                    textdisp = textdet.split('Dispersion energy:')[1].split('\n')[0]
+#            
+#            self.dispersion_energy = float(textdisp.split()[-2])
+##        else:
+##            print('No dispersion model defined.')
+#        
+#        ## k-point weighting
+#        myfile = open('dftb_in.hsd','r')
+#        linesin = myfile.readlines()
+#        myfile.close()
+#        self.wk = np.ones(self.nk)
+#        self.kpts = np.zeros((self.nk,3))
+#        for iline, line in enumerate(linesin):
+#            if 'KPointsAndWeights =' in line:
+#                for ik in range(self.nk):
+#                    self.wk[ik] = float(linesin[iline+1+ik].split()[3])
+#                    self.kpts[ik,:] = np.array(linesin[iline+1+ik].split()[:3], dtype=float)
+#                break
+#        ## normalize k-point weighting factors (sum_k wk = 1)
+#        ## In principle, this should not be neccessary. Anyway, ...
+#        self.wk /= np.sum(self.wk)
+#        
+#    
+#    def read_eigenvectors(self):
+#        """
+#        Read LCAO-coefficients to self.wf, shape = (n_kpoints, n_States, n_Orbitals)
+#        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
+#        """
+#        ## LCAO-coefficients
+#        self.wf = np.zeros((self.nk, self.nOrbs, self.nOrbs))
+#        c = []
+#        if self.pbc:
+#            for line in self.evlines[1:]:
+#                if (line.split() != []) and ('Eigenvector: ' not in line):
+#                    line1 = line.replace(',','').replace(')','')
+#                    c.append(float(line1.split()[-3]) + float(line1.split()[-2])*1.j)
+#            self.wf = np.array(c, dtype=complex).reshape((self.nk, self.nOrbs, self.nOrbs))
+#        else:
+#            for line in self.evlines[1:]:
+#                if (line.split() != []) and ('Eigenvector: ' not in line):
+#                    c.append(float(line.split()[1]))
+#            self.wf[0] = np.array(c).reshape((self.nk, self.nOrbs, self.nOrbs))
         
     
     def read_CPA(self):
@@ -492,7 +478,7 @@ class Dftb(FileIOCalculator):
     
     def set_hvr_approach(self, approach):
         """ set approach for obtaining (approximate) Hirshfeld ratios """
-        valid_approaches = ['const', 'CPA', 'HA']
+        valid_approaches = ['const', 'CPA']#, 'HA']
         
         if approach in valid_approaches:
             self.hvr_approach = approach
@@ -508,8 +494,8 @@ class Dftb(FileIOCalculator):
         """
         if self.hvr_approach == 'const':
             self.rescaling = self.get_hvr_const()
-        elif self.hvr_approach == 'HA':
-            self.rescaling = self.get_hvr_HA()
+#        elif self.hvr_approach == 'HA':
+#            self.rescaling = self.get_hvr_HA()
         elif self.hvr_approach == 'CPA':
             self.rescaling = self.get_hvr_CPA()
         else:
@@ -523,38 +509,39 @@ class Dftb(FileIOCalculator):
         return np.ones(self.nAtoms)
         
     
-    def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='Both'):
-        """
-        Return Hirsfeld volume ratios as obtained by density partitioning
-        
-        parameters:
-        ===========
-            dr(opt):       radial step width in Angstroms, default: 0.2 Angstroms
-            nThetas(opt):  number of discrete azemuthal angles, default: 36
-            nPhis(opt):    number of discrete polar angles, default: 72
-            cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
-            conf(opt):     confinement for basis functions in density construction in Angstroms,
-                             . 'None':     use free radial wave functions throughout,
-                             . 'Both':     use confined radial wave functions throughout (DEFAULT),
-                             . list of confinement radii in Angstroms to use per atom.
-        """
-        if self.eigenvectors_missing:
-            raise ValueError('No eigenvectors available. Please set WriteEigenvectors = True for DFTB calculation.')
-        
-        Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
-        HA = HirshfeldWrapper(self.atoms, self.wk, self.wf, self.f, self.otypes, Atom2OrbsF, self.Orb2Atom, \
-                              dr=dr, nThetas=nThetas, nPhis=nPhis, cutoff=cutoff,conf=conf)
-        
-        self.hvr_HA = HA.get_hvr()
-        
-        return self.hvr_HA
+#    def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='Both'):
+#        """
+#        Return Hirsfeld volume ratios as obtained by density partitioning
+#        
+#        parameters:
+#        ===========
+#            dr(opt):       radial step width in Angstroms, default: 0.2 Angstroms
+#            nThetas(opt):  number of discrete azemuthal angles, default: 36
+#            nPhis(opt):    number of discrete polar angles, default: 72
+#            cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
+#            conf(opt):     confinement for basis functions in density construction in Angstroms,
+#                             . 'None':     use free radial wave functions throughout,
+#                             . 'Both':     use confined radial wave functions throughout (DEFAULT),
+#                             . list of confinement radii in Angstroms to use per atom.
+#        """
+#        if self.eigenvectors_missing:
+#            raise ValueError('No eigenvectors available. Please set WriteEigenvectors = True for DFTB calculation.')
+#        
+#        if not ext_analysis_avail:
+#            raise ImportError("External Hirshfeld analysis not available.")
+#        
+#        Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
+#        HA = HirshfeldWrapper(self.atoms, self.wk, self.wf, self.f, self.otypes, Atom2OrbsF, self.Orb2Atom, \
+#                              dr=dr, nThetas=nThetas, nPhis=nPhis, cutoff=cutoff,conf=conf)
+#        
+#        self.hvr_HA = HA.get_hvr()
+#        
+#        return self.hvr_HA
         
     
     def get_hvr_CPA(self):
         """  Return rescaling ratios as obtained by charge population approach.  """
-        doCPA1 = (self.parameters['Options_WriteCPA'].lower() == 'yes')
-        doCPA2 = (self.parameters['Options_WriteCPA'].lower() == 'true')
-        if (doCPA1 or doCPA2):
+        if (self.parameters['Options_WriteCPA'].lower() == 'yes'):
             self.read_CPA()
         else:
             raise ValueError("Sorry, you need to set Options_WriteCPA = 'Yes' for this feature.")
@@ -562,29 +549,29 @@ class Dftb(FileIOCalculator):
         return self.hvr_CPA
         
     
-    def get_dispersion_energy(self):
-        """"
-        Return van der Waals dispersion energy as obtained by MBD/TS scheme.
-        """
-        try:
-            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
-        except KeyError:
-            try:
-                vdWmode = self.parameters['Hamiltonian_Dispersion_']
-            except KeyError:
-                vdWmode = 'none'
-        
-        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
-            return self.dispersion_energy
-        else:
-            raise ValueError('You did not specify a dispersion model.')
+#    def get_dispersion_energy(self):
+#        """"
+#        Return van der Waals dispersion energy as obtained by MBD/TS scheme.
+#        """
+#        try:
+#            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
+#        except KeyError:
+#            try:
+#                vdWmode = self.parameters['Hamiltonian_Dispersion_']
+#            except KeyError:
+#                vdWmode = 'none'
+#        
+#        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
+#            return self.dispersion_energy
+#        else:
+#            raise ValueError('You did not specify a dispersion model.')
         
     
-    def get_electronic_energy(self):
-        """
-        Return electronic energy = Etot - EBS - EC (- E3rd) in eV.
-        """
-        return self.electronic_energy
+#    def get_electronic_energy(self):
+#        """
+#        Return electronic energy = Etot - EBS - EC (- E3rd) in eV.
+#        """
+#        return self.electronic_energy
         
     
 

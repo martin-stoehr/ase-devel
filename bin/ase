@@ -1,12 +1,10 @@
-#!/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/bin/python
+#!/usr/bin/python
 # EASY-INSTALL-ENTRY-SCRIPT: 'ase==3.18.0b1','console_scripts','ase'
 __requires__ = 'ase==3.18.0b1'
-import re
 import sys
 from pkg_resources import load_entry_point
 
 if __name__ == '__main__':
-    sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
     sys.exit(
         load_entry_point('ase==3.18.0b1', 'console_scripts', 'ase')()
     )
