@@ -90,6 +90,10 @@ class Dftb(FileIOCalculator):
         do_3rd_o = kwargs.get('Hamiltonian_ThirdOrder', 'No')
         do_3rd_f = kwargs.get('Hamiltonian_ThirdOrderFull', 'No')
         do_3rd_order = any(np.asarray([do_3rd_o.lower(), do_3rd_f.lower()]) =='yes' )
+        
+        default_beta_MBD = 0.89 if do_3rd_order else 0.95
+        default_sR_TS = 0.91
+        
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
             if not slako_dir.endswith('/'): slako_dir += '/'
@@ -106,7 +110,8 @@ class Dftb(FileIOCalculator):
             Options_WriteResultsTag='Yes',
 #            Options_WriteEigenvectors='No',
 #            Options_WriteCPA='No',
-            Options_CalculateForces='Yes',
+            Analysis_='',
+            Analysis_CalculateForces='Yes',
             Options_MinimiseMemoryUsage='No',
             Hamiltonian_='DFTB',
             Hamiltonian_Scc='Yes',
@@ -124,7 +129,7 @@ class Dftb(FileIOCalculator):
         
         self.pbc = np.any(atoms.pbc)
         ## control whether DFTB+ should calculate forces or enable singe-point calculations (large systems!)
-#        calc_forces = kwargs.get('Options_CalculateForces', 'Yes')
+#        calc_forces = kwargs.get('Analysis_CalculateForces', 'Yes')
 #        self.calculate_forces = ( calc_forces.lower()=='yes' )
 #        if self.calculate_forces:
 #            self.default_parameters['Driver_']='ConjugateGradient'
@@ -134,8 +139,8 @@ class Dftb(FileIOCalculator):
         self.default_parameters['Driver']='{}'
         
         if do_3rd_order:
-            self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
-            self.default_parameters['Hamiltonian_DampXHExponent'] = '4.00'
+#            self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
+#            self.default_parameters['Hamiltonian_DampXHExponent'] = '4.00'
             self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
             for species in list(set(atoms.get_chemical_symbols())):
                 input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
@@ -165,6 +170,19 @@ class Dftb(FileIOCalculator):
                 key = initkey + '_empty' + str(i)
                 self.parameters[key] = str(mp[i]).strip('[]') + ' 1.0'
         
+        vdWmethod = self.parameters.get('Hamiltonian_Dispersion_', 'No_vdW_method_defined')
+        if vdWmethod.lower()=='mbd':
+            if not ('Hamiltonian_Dispersion_Beta' in self.parameters.keys()):
+                self.parameters['Hamiltonian_Dispersion_Beta'] = default_beta_MBD
+            if not ('Hamiltonian_Dispersion_KGrid' in self.parameters.keys()):
+                kpts_MBD = ' '.join([str(k) for k in self.kpts]) if self.kpts != None else '1 1 1'
+                self.parameters['Hamiltonian_Dispersion_KGrid'] = kpts_MBD
+        elif vdWmethod.lower()=='ts':
+            if not ('Hamiltonian_Dispersion_RangeSeparation' in self.parameters.keys()):
+                self.parameters['Hamiltonian_Dispersion_RangeSeparation'] = default_sR_TS
+        
+        calc_forces = self.parameters['Analysis_CalculateForces']
+        self.calculate_forces = ( calc_forces.lower()=='yes' )
         self.atoms = atoms
         #the input file written only once
         if restart == None:

@@ -50,6 +50,7 @@ ase/build/root.py
 ase/build/rotate.py
 ase/build/supercells.py
 ase/build/surface.py
+ase/build/surfaces_with_termination.py
 ase/build/tools.py
 ase/build/tube.py
 ase/build/voids.py
@@ -1118,6 +1119,13 @@ doc/ase/vibrations.rst
 doc/ase/visualize.rst
 doc/ase/xrdebye.py
 doc/ase/xrdebye.rst
+doc/ase/build/build.rst
+doc/ase/build/general_surface.py
+doc/ase/build/general_surface.tex
+doc/ase/build/structure.py
+doc/ase/build/surface.py
+doc/ase/build/surface.rst
+doc/ase/build/tools.rst
 doc/ase/calculators/FHI-aims.rst
 doc/ase/calculators/H2O_aims.py
 doc/ase/calculators/INCAR_NaCl
