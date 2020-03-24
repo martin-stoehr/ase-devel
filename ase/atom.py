@@ -1,21 +1,17 @@
 """This module defines the Atom object."""
 
-import warnings
-
 import numpy as np
 
 from ase.data import atomic_numbers, chemical_symbols, atomic_masses
 
-
-#         singular,    plural,     default value
+# Singular, plural, default value:
 names = {'position': ('positions', np.zeros(3)),
-         'number':   ('numbers',   0),
-         'tag':      ('tags',      0),
-         'momentum': ('momenta',   np.zeros(3)),
-         'mass':     ('masses',    None),
-         'magmom':   ('magmoms',   0.0),
-         'charge':   ('charges',   0.0)
-         }
+         'number': ('numbers', 0),
+         'tag': ('tags', 0),
+         'momentum': ('momenta', np.zeros(3)),
+         'mass': ('masses', None),
+         'magmom': ('initial_magmoms', 0.0),
+         'charge': ('initial_charges', 0.0)}
 
 
 def atomproperty(name, doc):
@@ -31,6 +27,24 @@ def atomproperty(name, doc):
         self.delete(name)
 
     return property(getter, setter, deleter, doc)
+
+
+def abcproperty(index):
+    """Helper function to easily create Atom ABC-property."""
+
+    def getter(self):
+        return self.scaled_position[index]
+
+    def setter(self, value):
+        # We can't just do self.scaled_position[i] = value
+        # because scaled_position is a new buffer, not a view into
+        # something we can write back to.
+        # This is a clear bug!
+        spos = self.scaled_position
+        spos[index] = value
+        self.scaled_position = spos
+
+    return property(getter, setter, doc='ABC'[index] + '-coordinate')
 
 
 def xyzproperty(index):
@@ -49,11 +63,11 @@ class Atom(object):
     """Class for representing a single atom.
 
     Parameters:
-    
+
     symbol: str or int
         Can be a chemical symbol (str) or an atomic number (int).
     position: sequence of 3 floats
-        Atomi position.
+        Atomic position.
     tag: int
         Special purpose tag.
     momentum: sequence of 3 floats
@@ -94,6 +108,17 @@ class Atom(object):
         self.index = index
         self.atoms = atoms
 
+    @property
+    def scaled_position(self):
+        pos = self.position
+        spos = self.atoms.cell.scaled_positions(pos[np.newaxis])
+        return spos[0]
+
+    @scaled_position.setter
+    def scaled_position(self, value):
+        pos = self.atoms.cell.cartesian_positions(value)
+        self.position = pos
+
     def __repr__(self):
         s = "Atom('%s', %s" % (self.symbol, list(self.position))
         for name in ['tag', 'momentum', 'mass', 'magmom', 'charge']:
@@ -114,15 +139,15 @@ class Atom(object):
             self.data[name] = self.get_raw(name)
         self.index = None
         self.atoms = None
-        
+
     def get_raw(self, name):
-        """Get attribute, return None if not explicitely set."""
+        """Get name attribute, return None if not explicitly set."""
         if name == 'symbol':
             return chemical_symbols[self.get_raw('number')]
 
         if self.atoms is None:
             return self.data[name]
-        
+
         plural = names[name][0]
         if plural in self.atoms.arrays:
             return self.atoms.arrays[plural][self.index]
@@ -130,7 +155,7 @@ class Atom(object):
             return None
 
     def get(self, name):
-        """Get attribute, return default if not explicitely set."""
+        """Get name attribute, return default if not explicitly set."""
         value = self.get_raw(name)
         if value is None:
             if name == 'mass':
@@ -140,7 +165,7 @@ class Atom(object):
         return value
 
     def set(self, name, value):
-        """Set attribute."""
+        """Set name attribute to value."""
         if name == 'symbol':
             name = 'number'
             value = atomic_numbers[value]
@@ -168,7 +193,7 @@ class Atom(object):
                 self.atoms.new_array(plural, array)
 
     def delete(self, name):
-        """Delete attribute."""
+        """Delete name attribute."""
         assert self.atoms is None
         assert name not in ['number', 'symbol', 'position']
         self.data[name] = None
@@ -180,35 +205,11 @@ class Atom(object):
     momentum = atomproperty('momentum', 'XYZ-momentum')
     mass = atomproperty('mass', 'Atomic mass')
     magmom = atomproperty('magmom', 'Initial magnetic moment')
-    charge = atomproperty('charge', 'Atomic charge')
+    charge = atomproperty('charge', 'Initial atomic charge')
     x = xyzproperty(0)
     y = xyzproperty(1)
     z = xyzproperty(2)
 
-    def _get(self, name):
-        """Helper function for deprecated get methods."""
-        warnings.warn('Use atom.%s' % name, stacklevel=3)
-        return getattr(self, name)
-
-    def _set(self, name, value):
-        """Helper function for deprecated set methods."""
-        warnings.warn('Use atom.%s = ...' % name, stacklevel=3)
-        setattr(self, name, value)
-
-    def get_symbol(self): return self._get('symbol')
-    def get_atomic_number(self): return self._get('number')
-    def get_position(self): return self._get('position')
-    def get_tag(self): return self._get('tag')
-    def get_momentum(self): return self._get('momentum')
-    def get_mass(self): return self._get('mass')
-    def get_initial_magnetic_moment(self): return self._get('magmom')
-    def get_charge(self): return self._get('charge')
-
-    def set_symbol(self, value): self._set('symbol', value)
-    def set_atomic_number(self, value): self._set('number', value)
-    def set_position(self, value): self._set('position', value)
-    def set_tag(self, value): self._set('tag', value)
-    def set_momentum(self, value): self._set('momentum', value)
-    def set_mass(self, value): self._set('mass', value)
-    def set_initial_magnetic_moment(self, value): self._set('magmom', value)
-    def set_charge(self, value): self._set('charge', value)
+    a = abcproperty(0)
+    b = abcproperty(1)
+    c = abcproperty(2)

@@ -1,12 +1,11 @@
-Metadata-Version: 1.1
+Metadata-Version: 2.1
 Name: ase
-Version: 3.18.0b1
+Version: 3.20.0b1
 Summary: Atomic Simulation Environment
 Home-page: https://wiki.fysik.dtu.dk/ase
-Author: ASE-community
-Author-email: ase-users@listserv.fysik.dtu.dk
+Maintainer: ASE-community
+Maintainer-email: ase-users@listserv.fysik.dtu.dk
 License: LGPLv2.1+
-Description-Content-Type: UNKNOWN
 Description: Atomic Simulation Environment
         =============================
         
@@ -93,10 +92,9 @@ Platform: unix
 Classifier: Development Status :: 6 - Mature
 Classifier: License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)
 Classifier: Operating System :: OS Independent
-Classifier: Programming Language :: Python :: 2
-Classifier: Programming Language :: Python :: 2.7
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.4
 Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
 Classifier: Topic :: Scientific/Engineering :: Physics
+Provides-Extra: docs

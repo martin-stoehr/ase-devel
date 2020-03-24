@@ -1,7 +1,6 @@
 import numpy as np
 
 from ase.utils import jsonable
-from ase.dft.kpoints import labels_from_kpts
 from ase.calculators.calculator import PropertyNotImplementedError
 
 
@@ -19,22 +18,19 @@ def calculate_band_structure(atoms, path=None, scf_kwargs=None,
     The difference from get_band_structure() is that the latter
     expects the calculation to already have been done."""
     if path is None:
-        path = atoms.cell.bandpath()  # Default bandpath
+        path = atoms.cell.bandpath()
 
-    cellpar1 = path.cell.cellpar()
-    cellpar2 = atoms.cell.cellpar()
-    cellpar_err = np.abs(cellpar2 - cellpar1).max()
-    if cellpar_err > cell_tol:
-        # For many cells this will be okay, but we are not smart enough
-        # to guarantee this.
-        #
-        # User must therefore create a new bandpath for each cell.
-        #
-        # (In principle we should have different tolerance for lengths/angles)
+    from ase.lattice import celldiff  # Should this be a method on cell?
+    if any(path.cell.any(1) != atoms.pbc):
+        raise ValueError('The band path\'s cell, {}, does not match the '
+                         'periodicity {} of the atoms'
+                         .format(path.cell, atoms.pbc))
+    cell_err = celldiff(path.cell, atoms.cell.uncomplete(atoms.pbc))
+    if cell_err > cell_tol:
         raise ValueError('Atoms and band path have different unit cells.  '
                          'Please reduce atoms to standard form.  '
                          'Cell lengths and angles are {} vs {}'
-                         .format(cellpar1, cellpar2))
+                         .format(atoms.cell.cellpar(), path.cell.cellpar()))
 
     calc = atoms.calc
     if calc is None:
@@ -158,7 +154,7 @@ class BandStructurePlot:
         self.show_legend = False
 
     def plot(self, ax=None, spin=None, emin=-10, emax=5, filename=None,
-             show=None, ylabel=None, colors=None, label=None,
+             show=False, ylabel=None, colors=None, label=None,
              spin_labels=['spin up', 'spin down'], loc=None, **plotkwargs):
         """Plot band-structure.
 
@@ -213,7 +209,7 @@ class BandStructurePlot:
         return ax
 
     def plot_with_colors(self, ax=None, emin=-10, emax=5, filename=None,
-                         show=None, energies=None, colors=None,
+                         show=False, energies=None, colors=None,
                          ylabel=None, clabel='$s_z$', cmin=-1.0, cmax=1.0,
                          sortcolors=False, loc=None, s=2):
         """Plot band-structure with colors."""
@@ -290,9 +286,6 @@ class BandStructurePlot:
         if filename:
             plt.savefig(filename)
 
-        if show is None:
-            show = not filename
-
         if show:
             plt.show()
 
@@ -330,46 +323,3 @@ class BandStructure:
                 .format(self.__class__.__name__, self.path,
                         '{}x{}x{}'.format(*self.energies.shape),
                         self.reference))
-
-
-from ase.io.jsonio import encode, decode
-from ase.parallel import paropen
-# XXX delete me
-class OldBandStructure:
-    def __init__(self, cell, kpts, energies, reference=0.0):
-        """Create band structure object from energies and k-points."""
-        assert cell.shape == (3, 3)
-        self.cell = cell
-        assert kpts.shape[1] == 3
-        self.kpts = kpts
-        self.energies = np.asarray(energies)
-        self.reference = reference
-
-    def get_labels(self):
-        return labels_from_kpts(self.kpts, self.cell)
-
-    def todict(self):
-        dct = dict((key, getattr(self, key))
-                   for key in
-                   ['cell', 'kpts', 'energies', 'reference'])
-        return dct
-
-    def write(self, filename):
-        """Write to json file."""
-        with paropen(filename, 'w') as f:
-            f.write(encode(self))
-
-    @classmethod
-    def read(cls, filename):
-        """Read from json file."""
-        with open(filename, 'r') as f:
-            bs = decode(f.read())
-            # Handle older BS files without __ase_objtype__:
-            if not isinstance(bs, cls):
-                return cls(**bs)
-            return bs
-
-    def plot(self, *args, **kwargs):
-        bsp = BandStructurePlot(self)
-        # Maybe return bsp?  But for now run the plot, for compatibility
-        return bsp.plot(*args, **kwargs)

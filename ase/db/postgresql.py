@@ -6,7 +6,8 @@ from psycopg2.extras import execute_values
 
 from ase.db.sqlite import (init_statements, index_statements, VERSION,
                            SQLite3Database)
-from ase.io.jsonio import encode as ase_encode, numpyfy, create_ase_object
+from ase.io.jsonio import (encode as ase_encode,
+                           create_ase_object, create_ndarray)
 
 jsonb_indices = [
     'CREATE INDEX idxkeys ON systems USING GIN (key_value_pairs);',
@@ -20,6 +21,8 @@ def remove_nan_and_inf(obj):
         return [remove_nan_and_inf(x) for x in obj]
     if isinstance(obj, dict):
         return {key: remove_nan_and_inf(value) for key, value in obj.items()}
+    if isinstance(obj, np.ndarray) and not np.isfinite(obj).all():
+        return remove_nan_and_inf(obj.tolist())
     return obj
 
 
@@ -76,15 +79,19 @@ class Cursor:
                        argslist=args[0], template=q, page_size=len(args[0]))
 
 
-def insert_ase_objects(obj):
+def insert_ase_and_ndarray_objects(obj):
     if isinstance(obj, dict):
         objtype = obj.pop('__ase_objtype__', None)
-        if objtype is None:
-            return {key: insert_ase_objects(value)
-                    for key, value in obj.items()}
-        return create_ase_object(objtype, obj)
+        if objtype is not None:
+            return create_ase_object(objtype,
+                                     insert_ase_and_ndarray_objects(obj))
+        data = obj.get('__ndarray__')
+        if data is not None:
+            return create_ndarray(*data)
+        return {key: insert_ase_and_ndarray_objects(value)
+                for key, value in obj.items()}
     if isinstance(obj, list):
-        return [insert_ase_objects(value) for value in obj]
+        return [insert_ase_and_ndarray_objects(value) for value in obj]
     return obj
 
 
@@ -96,7 +103,7 @@ class PostgreSQLDatabase(SQLite3Database):
         return ase_encode(remove_nan_and_inf(obj))
 
     def decode(self, obj, lazy=False):
-        return insert_ase_objects(insert_nan_and_inf(numpyfy(obj)))
+        return insert_ase_and_ndarray_objects(insert_nan_and_inf(obj))
 
     def blob(self, array):
         """Convert array to blob/buffer object."""
@@ -160,6 +167,11 @@ class PostgreSQLDatabase(SQLite3Database):
         assert 5 < self.version <= VERSION
 
         self.initialized = True
+
+    def get_offset_string(self, offset, limit=None):
+        # postgresql allows you to set offset without setting limit;
+        # very practical
+        return '\nOFFSET {0}'.format(offset)
 
     def get_last_id(self, cur):
         cur.execute('SELECT last_value FROM systems_id_seq')

@@ -2,7 +2,8 @@ import sys
 
 import numpy as np
 
-from ase.calculators.calculator import (get_calculator, names as calcnames,
+from ase.calculators.calculator import (get_calculator_class,
+                                        names as calcnames,
                                         PropertyNotImplementedError)
 from ase.constraints import FixAtoms, UnitCellFilter
 from ase.eos import EquationOfState
@@ -127,7 +128,7 @@ class Runner:
             return atoms
 
     def set_calculator(self, atoms, name):
-        cls = get_calculator(self.calculator_name)
+        cls = get_calculator_class(self.calculator_name)
         parameters = str2dict(self.args.parameters)
         if getattr(cls, 'nolabel', False):
             atoms.calc = cls(**parameters)
@@ -197,7 +198,7 @@ class Runner:
         p('bulk modulus:', B)
         p('eos type:', args.eos_type)
 
-    def get_filename(self, name, ext=''):
+    def get_filename(self, name: str, ext: str = '') -> str:
         if '.' in name:
             name = name.rsplit('.', 1)[0]
         if self.args.tag is not None:
@@ -207,7 +208,7 @@ class Runner:
         return name
 
 
-def str2dict(s, namespace={}, sep='='):
+def str2dict(s: str, namespace={}, sep: str = '='):
     """Convert comma-separated key=value string to dictionary.
 
     Examples:
