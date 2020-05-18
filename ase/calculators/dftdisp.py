@@ -4,7 +4,7 @@ import os
 import numpy as np
 from ase import atoms
 from ase.calculators.calculator import Calculator
-
+from ase.calculators.calculator import all_changes
 
 class dftdisp(Calculator):
 
@@ -98,31 +98,15 @@ class dftdisp(Calculator):
 
     def get_potential_energy(self, atoms=None):
         self.update_properties(atoms)
-        return float(eval(self.sdch + 'sedc_energy'))
+        return self.results['energy']
 
     def get_forces(self, atoms=None):
         self.update_properties(atoms)
-
-        forces = eval(self.sdch + 'sedc_forces.transpose()')
-        ###REMOVING TRANSLATIONS
-        unit_vec = np.zeros([len(forces)*3,3])
-        unit_vec[:, 0] = 1.0
-        unit_vec[:,0] /= np.linalg.norm(unit_vec[:,0])
-        forces -= (unit_vec[:,0] * np.dot(forces.flatten(),unit_vec[:,0])).reshape(-1,3)
-        unit_vec = np.zeros([len(forces)*3,3])
-        unit_vec[:, 1] = 1.0
-        unit_vec[:,1] /= np.linalg.norm(unit_vec[:,1])
-        forces -= (unit_vec[:,1] * np.dot(forces.flatten(),unit_vec[:,1])).reshape(-1,3)
-        unit_vec = np.zeros([len(forces)*3,3])
-        unit_vec[:, 2] = 1.0
-        unit_vec[:,2] /= np.linalg.norm(unit_vec[:,2])
-        forces -= (unit_vec[:,2] * np.dot(forces.flatten(),unit_vec[:,2])).reshape(-1,3)
-
-        return forces
+        return self.results['forces']
 
     def get_stress(self, atoms=None):
         self.update_properties(atoms)
-        return eval(self.sdch + 'sedc_stress')
+        return self.results['stress']
 
     def update_properties(self, atoms):
         """ check if already computed everything for this set of atoms. """
@@ -130,7 +114,8 @@ class dftdisp(Calculator):
         if not hasattr(self, 'atoms') or self.atoms != atoms:
             self.calculate(atoms)
 
-    def calculate(self, atoms):
+    def calculate(self, atoms, properties=['energy','forces','stress'],
+                  system_changes=all_changes):
         """ actual calculation of all properties. """
 
         self.atoms = atoms.copy()
@@ -139,7 +124,28 @@ class dftdisp(Calculator):
 
         # Run the calculation
         sdc.sdc_recode.sedc()
+        
+        self.results['energy'] = float(eval(self.sdch + 'sedc_energy'))
+        forces = eval(self.sdch + 'sedc_forces.transpose()')
+        self.results['forces'] = self.remove_com_force(forces)
+        self.results['stress'] = eval(self.sdch + 'sedc_stress')
 
+    def remove_com_force(self, F):
+        unit_vec = np.zeros([len(F)*3,3])
+        unit_vec[:,0] = 1.0
+        unit_vec[:,0] /= np.linalg.norm(unit_vec[:,0])
+        F -= (unit_vec[:,0] * np.dot(F.flatten(),unit_vec[:,0])).reshape(- 1,3)
+        unit_vec = np.zeros([len(F)*3,3])
+        unit_vec[:,1] = 1.0
+        unit_vec[:,1] /= np.linalg.norm(unit_vec[:,1])
+        F -= (unit_vec[:,1] * np.dot(F.flatten(),unit_vec[:,1])).reshape(- 1,3)
+        unit_vec = np.zeros([len(F)*3,3])
+        unit_vec[:,2] = 1.0
+        unit_vec[:,2] /= np.linalg.norm(unit_vec[:,2])
+        F -= (unit_vec[:,2] * np.dot(F.flatten(),unit_vec[:,2])).reshape(- 1,3)
+        
+        return F
+    
     def initialize_sdc(self, atoms=None):
         """ Initialization of all parameters in the sedc-module.
 

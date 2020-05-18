@@ -1,6 +1,6 @@
-#!/opt/apps/resif/data/production/v1.1-20180716/default/software/lang/Python/3.6.4-intel-2018a/bin/python
-# EASY-INSTALL-ENTRY-SCRIPT: 'setuptools==38.4.0','console_scripts','easy_install'
-__requires__ = 'setuptools==38.4.0'
+#!/opt/apps/resif/data/production/v1.2-20191021/default/software/lang/Python/3.7.2-GCCcore-8.2.0/bin/python
+# EASY-INSTALL-ENTRY-SCRIPT: 'setuptools==40.8.0','console_scripts','easy_install'
+__requires__ = 'setuptools==40.8.0'
 import re
 import sys
 from pkg_resources import load_entry_point
@@ -8,5 +8,5 @@ from pkg_resources import load_entry_point
 if __name__ == '__main__':
     sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
     sys.exit(
-        load_entry_point('setuptools==38.4.0', 'console_scripts', 'easy_install')()
+        load_entry_point('setuptools==40.8.0', 'console_scripts', 'easy_install')()
     )

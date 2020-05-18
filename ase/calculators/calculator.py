@@ -857,7 +857,8 @@ class FileIOCalculator(Calculator):
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=all_changes):
         Calculator.calculate(self, atoms, properties, system_changes)
-        self.write_input(self.atoms, properties, system_changes)
+        if atoms is None: atoms = self.atoms.copy()
+        self.write_input(atoms, properties, system_changes)
         if self.command is None:
             raise CalculatorSetupError(
                 'Please set ${} environment variable '

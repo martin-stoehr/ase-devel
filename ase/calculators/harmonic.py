@@ -5,6 +5,7 @@
 import os
 import numpy as np
 from ase.calculators.calculator import Calculator
+from ase.calculators.calculator import all_changes
 
 
 ## force_constant for harmonic bond in eV/A^2
@@ -211,13 +212,13 @@ class harmonic_potential(Calculator):
         
     
     def get_potential_energy(self, atoms=None):
-        self.update_properties(atoms)
-        return self.energy
+        self.calculate(atoms)
+        return self.results['energy']
         
     
     def get_forces(self, atoms=None):
-        self.update_properties(atoms)
-        return self.forces
+        self.calculate(atoms)
+        return self.results['forces']
         
     
     def update_properties(self, atoms):
@@ -228,10 +229,12 @@ class harmonic_potential(Calculator):
             for par in self.tensor_args:
                 self.check_interaction_params(atoms, to_check=par)
     
-            self.calculate(atoms)
+#            self.calculate(atoms)
         
     
-    def calculate(self, atoms):
+    def calculate(self, atoms, properties=['energy', 'forces'],
+                  system_changes=all_changes):
+        self.update_properties(atoms)
         pos = atoms.positions
         if self.mode != 'lattice':
             distances = atoms.get_all_distances()
@@ -266,8 +269,8 @@ class harmonic_potential(Calculator):
         
         ## add exponential repulsion between non-nearest neighbors
         if not self.with_repulsion:
-            self.energy = E
-            self.forces = F
+            self.results['energy'] = E
+            self.results['forces'] = F
             return
         
         ## add exponential repulsion between non-nearest neighbors
@@ -283,8 +286,8 @@ class harmonic_potential(Calculator):
                 F[iAtom] += Fij
                 F[jAtom] -= Fij
         
-        self.energy = E
-        self.forces = F
+        self.results['energy'] = E
+        self.results['forces'] = F
         
     
     def check_interaction_params(self, atoms, to_check="k"):

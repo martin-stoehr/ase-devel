@@ -129,7 +129,7 @@ class MBD(Calculator):
     def get_potential_energy(self, atoms=None):
         """ Return dispersion energy as obtained by MBD calculation. """
         self.update_properties(atoms)
-        return self.E_MBD
+        return self.results['energy']
         
     
     def get_forces(self, atoms=None):
@@ -137,7 +137,7 @@ class MBD(Calculator):
             raise ValueError("Please, specify 'calc_forces=True'.")
         
         self.update_properties(atoms)
-        return self.F_MBD
+        return self.results['forces']
         
     
     def get_stress(self, atoms=None):
@@ -145,7 +145,7 @@ class MBD(Calculator):
             raise ValueError("Please, specify 'calc_forces=True'.")
         
         self.update_properties(atoms)
-        return self.F_MBD_latt
+        return self.results['stress']
         
     
     def get_hessian(self, atoms=None):
@@ -157,7 +157,7 @@ class MBD(Calculator):
             raise ValueError("Please, specify 'calc_hessian=True'.")
         
         self.update_properties(atoms)
-        return self.H_MBD
+        return self.results['hessian']
         
     
     def update_properties(self, atoms):
@@ -221,28 +221,30 @@ class MBD(Calculator):
                  self.beta, force=self.calc_forces)
         
         if self.periodic and self.get_MBD_spectrum and self.calc_forces:   # all
-            ((self.E_MBD, self.MBDevals, self.MBDmodes), \
-                  self.F_MBD, self.F_MBD_latt) = res
-            self.F_MBD *= -1.*Hartree/Bohr
-            self.F_MBD_latt *= -1.*Hartree/Bohr
+            ((self.results['energy'], self.MBDevals, self.MBDmodes), \
+                    self.results['forces'], self.results['stress']) = res
+            self.results['forces'] *= -1.*Hartree/Bohr
+            self.results['stress'] *= -1.*Hartree/Bohr
         elif self.periodic and self.get_MBD_spectrum:   # no forces
-            (self.E_MBD, self.MBDevals, self.MBDmodes) = res
+            (self.results['energy'], self.MBDevals, self.MBDmodes) = res
         elif self.periodic and self.calc_forces:   # no spectrum
-            (self.E_MBD, self.F_MBD, self.F_MBD_latt) = res
-            self.F_MBD *= -1.*Hartree/Bohr
-            self.F_MBD_latt *= -1.*Hartree/Bohr
+            (self.results['energy'], self.results['forces'], \
+                    self.results['stress']) = res
+            self.results['forces'] *= -1.*Hartree/Bohr
+            self.results['stress'] *= -1.*Hartree/Bohr
         elif self.get_MBD_spectrum and self.calc_forces:   # no PBC
-            ((self.E_MBD, self.MBDevals, self.MBDmodes), self.F_MBD) = res
-            self.F_MBD *= -1.*Hartree/Bohr
+            ((self.results['energy'], self.MBDevals, self.MBDmodes), \
+                    self.results['forces']) = res
+            self.results['forces'] *= -1.*Hartree/Bohr
         elif self.get_MBD_spectrum:   # no forces and no PBC
-            (self.E_MBD, self.MBDevals, self.MBDmodes) = res
+            (self.results['energy'], self.MBDevals, self.MBDmodes) = res
         elif self.calc_forces:   # no spectrum and no PBC
-            (self.E_MBD, self.F_MBD) = res
-            self.F_MBD *= -1.*Hartree/Bohr
+            (self.results['energy'], self.results['forces']) = res
+            self.results['forces'] *= -1.*Hartree/Bohr
         else:   # only energy (with and without PBC)
-            self.E_MBD = res
+            self.results['energy'] = res
         
-        self.E_MBD *= Hartree
+        self.results['energy'] *= Hartree
         
     
     def _run_MBD_tf(self):
@@ -258,19 +260,20 @@ class MBD(Calculator):
                   R_vdw=self.RvdW_TS, beta=self.beta)
         
         if self.calc_forces and self.calc_hessian:
-            self.E_MBD, self.F_MBD, self.H_MBD = res
-            self.F_MBD *= -1.*Hartree/Bohr
-            self.H_MBD *= -1.*Hartree/Bohr/Bohr
+            self.results['energy'], self.results['forces'], \
+                    self.results['hessian'] = res
+            self.results['forces'] *= -1.*Hartree/Bohr
+            self.results['hessian'] *= -1.*Hartree/Bohr/Bohr
         elif self.calc_forces:
-            self.E_MBD, self.F_MBD = res
-            self.F_MBD *= -1.*Hartree/Bohr
+            self.results['energy'], self.results['forces'] = res
+            self.results['forces'] *= -1.*Hartree/Bohr
         elif self.calc_hessian:
-            self.E_MBD, self.H_MBD = res
-            self.H_MBD *= -1.*Hartree/Bohr/Bohr
+            self.results['energy'], self.results['hessian'] = res
+            self.results['hessian'] *= -1.*Hartree/Bohr/Bohr
         else:
-            self.E_MBD = res
+            self.results['energy'] = res
         
-        self.E_MBD *= Hartree
+        self.results['energy'] *= Hartree
         
     
     def _run_MBD_py(self):
@@ -278,10 +281,10 @@ class MBD(Calculator):
         Run MBD calculation via pure Python implementation.
         """
         
-        self.E_MBD = MBDcalc_Py(self.xyz, self.alpha0_TS, self.C6_TS, 
+        self.results['energy'] = MBDcalc_Py(self.xyz, self.alpha0_TS, self.C6_TS, 
                                 self.RvdW_TS, self.beta, lattice=self.UC, 
                                 k_grid=self.kgrid, nfreq=self.n_omega_SCS)
-        self.E_MBD *= Hartree
+        self.results['energy'] *= Hartree
         
         #TODO: numerical forces ?and stress?
         

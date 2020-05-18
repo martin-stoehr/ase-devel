@@ -82,6 +82,7 @@ bool_keys = [
     'compute_kinetic',
     'compute_numerical_stress',
     'compute_analytical_stress',
+    'compute_heat_flux',
     'distributed_spline_storage',
     'evaluate_work_function',
     'final_forces_cleaned',
@@ -126,9 +127,9 @@ class Aims(FileIOCalculator):
     __command_default = 'aims.version.serial.x > aims.out'
     __outfilename_default = 'aims.out'
 
-    implemented_properties = ['energy', 'forces', 'stress', 'dipole', 'magmom',
-                              'hirsh_volrat', 'hirsh_volume', 'hirsh_charges',
-                              'mull_charges']
+    implemented_properties = ['energy', 'forces', 'stress', 'stresses', 
+                              'dipole', 'magmom', 'hirsh_volrat', 'hirsh_volume',
+                              'hirsh_charges', 'mull_charges']
 
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label=os.curdir, atoms=None, cubes=None, radmul=None,
@@ -261,6 +262,7 @@ class Aims(FileIOCalculator):
     @property
     def command(self):
         return self.__command
+    
     @command.setter
     def command(self, x):
         self.__update_command(command=x)
@@ -392,9 +394,17 @@ class Aims(FileIOCalculator):
         return changed_parameters
 
     def write_input(self, atoms, properties=None, system_changes=None,
-                    ghosts=None, scaled=False):
+                    ghosts=None, geo_constrain=None, scaled=False, velocities=None):
         FileIOCalculator.write_input(self, atoms, properties, system_changes)
 
+        if geo_constrain is None:
+            geo_constrain = "relax_geometry" in self.parameters
+
+        if scaled is None:
+            scaled = np.all(atoms.get_pbc())
+        if velocities is None:
+            velocities = atoms.has('momenta')
+        
         have_lattice_vectors = atoms.pbc.any()
         have_k_grid = ('k_grid' in self.parameters or
                        'kpts' in self.parameters)
@@ -402,7 +412,14 @@ class Aims(FileIOCalculator):
             raise RuntimeError('Found lattice vectors but no k-grid!')
         if not have_lattice_vectors and have_k_grid:
             raise RuntimeError('Found k-grid but no lattice vectors!')
-        write_aims(os.path.join(self.directory, 'geometry.in'), atoms, scaled, ghosts)
+        write_aims(
+            os.path.join(self.directory, 'geometry.in'), 
+            atoms, 
+            scaled, 
+            geo_constrain,
+            velocities=velocities,
+            ghosts=ghosts
+        )
         self.write_control(atoms, os.path.join(self.directory, 'control.in'))
         self.write_species(atoms, os.path.join(self.directory, 'control.in'))
         self.parameters.write(os.path.join(self.directory, 'parameters.ase'))
@@ -452,6 +469,8 @@ class Aims(FileIOCalculator):
                 output.write('%-35s%f %f %f\n' % (('k_offset',) + tuple(dk)))
             elif key == 'species_dir' or key == 'run_command':
                 continue
+            elif key == 'plus_u':
+                continue
             elif key == 'smearing':
                 name = self.parameters.smearing[0].lower()
                 if name == 'fermi-dirac':
@@ -478,7 +497,8 @@ class Aims(FileIOCalculator):
                         print("Let me fix that for you...")
                         value.append('k_point_list')
         
-                for output_type in value: output.write('%-35s%s\n' % (key, output_type))
+                for output_type in value:
+                    output.write('%-35s%s\n' % (key, output_type))
             elif key == 'vdw_correction_hirshfeld' and value:
                 output.write('%-35s\n' % key)
             elif key == 'many_body_dispersion' and value:
@@ -497,7 +517,8 @@ class Aims(FileIOCalculator):
         output.write(lim + '\n\n')
         output.close()
 
-    def read(self, label):
+    def read(self, label=None):
+        if label is None: label = self.label
         FileIOCalculator.read(self, label)
         geometry = os.path.join(self.directory, 'geometry.in')
         control = os.path.join(self.directory, 'control.in')
@@ -506,9 +527,11 @@ class Aims(FileIOCalculator):
             if not os.path.isfile(filename):
                 raise ReadError
 
-        self.atoms = read_aims(geometry)
+        self.atoms, symmetry_block = read_aims(geometry, True)
         self.parameters = Parameters.read(os.path.join(self.directory,
                                                        'parameters.ase'))
+        if symmetry_block:
+            self.parameters["symmetry_block"] = symmetry_block
         self.read_results()
 
     def read_results(self):
@@ -528,9 +551,19 @@ class Aims(FileIOCalculator):
         if ('compute_forces' in self.parameters or
             'sc_accuracy_forces' in self.parameters):
             self.read_forces()
-        if ('compute_numerical_stress' in self.parameters or
-            'compute_analytical_stress' in self.parameters):
+        if ('sc_accuracy_stress' in self.parameters or
+                ('compute_numerical_stress' in self.parameters
+                and self.parameters['compute_numerical_stress']) or
+                ('compute_analytical_stress' in self.parameters
+                and self.parameters['compute_analytical_stress']) or
+                ('compute_heat_flux' in self.parameters
+                and self.parameters['compute_heat_flux'])):
             self.read_stress()
+
+        if ('compute_heat_flux' in self.parameters
+            and self.parameters['compute_heat_flux']):
+            self.read_stresses()
+        
         if ('dipole' in self.parameters.get('output', []) and
             not self.atoms.pbc.any()):
             self.read_dipole()
@@ -575,6 +608,10 @@ class Aims(FileIOCalculator):
                 raise RuntimeError(
                     "Basis tier %i not found for element %s" %
                     (self.targettier, symbol))
+            if self.parameters.get('plus_u') is not None:
+                if symbol in self.parameters.plus_u.keys():
+                    control.write('plus_u %s \n' %
+                                  self.parameters.plus_u[symbol])
         control.close()
 
         if self.radmul is not None:
@@ -646,6 +683,9 @@ class Aims(FileIOCalculator):
             raise PropertyNotImplementedError
         return FileIOCalculator.get_forces(self, atoms)
 
+    def get_potential_energy(self, atoms):
+        return FileIOCalculator.get_potential_energy(self, atoms)
+    
     def read_dipole(self):
         "Method that reads the electric dipole moment from the output file."
         for line in open(self.out, 'r'):
@@ -693,6 +733,44 @@ class Aims(FileIOCalculator):
         self.results['stress'] = np.array([stress[0], stress[4], stress[8],
                                            stress[5], stress[2], stress[1]])
 
+    def read_stresses(self):
+        """ Read stress per atom """
+        with open(self.out) as f:
+            next(l for l in f if
+                 'Per atom stress (eV) used for heat flux calculation' in l)
+            # scroll to boundary
+            next(l for l in f if '-------------' in l)
+
+            stresses = []
+            for l in [next(f) for _ in range(len(self.atoms))]:
+                # Read stresses and rearrange from
+                # (xx, yy, zz, xy, xz, yz) to (xx, yy, zz, yz, xz, xy)
+                xx, yy, zz, xy, xz, yz = [float(d) for d in l.split()[2:8]]
+                stresses.append([xx, yy, zz, yz, xz, xy])
+
+            self.results['stresses'] = np.array(stresses)
+
+    def get_stresses(self, voigt=False):
+        """ Return stress per atom
+
+        Returns an array of the six independent components of the
+        symmetric stress tensor per atom, in the traditional Voigt order
+        (xx, yy, zz, yz, xz, xy) or as a 3x3 matrix.  Default is 3x3 matrix.
+        """
+
+        voigt_stresses = self.results['stresses']
+
+        if voigt:
+            return voigt_stresses
+        else:
+            stresses = np.zeros((len(self.atoms), 3, 3))
+            for ii, stress in enumerate(voigt_stresses):
+                xx, yy, zz, yz, xz, xy = stress
+                stresses[ii] = np.array([(xx, xy, xz),
+                                         (xy, yy, yz),
+                                         (xz, yz, zz)])
+            return stresses
+    
     def read_convergence(self):
         converged = False
         lines = open(self.out, 'r').readlines()
