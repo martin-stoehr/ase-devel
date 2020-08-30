@@ -114,8 +114,8 @@ os.system('cp -r '+home+'/ase/calculators/alpha_FI_refdata/ '+libcalcs)
 sdc_cmd =  'cd '+home+'/ase/calculators/ && bash build_options_sdc-'+fcomp
 sdc_cmd += ' && cp '+home+'/ase/calculators/sdc.* '+libcalcs+' && cd '+home
 os.system(sdc_cmd)
-os.system('python '+home+'/ase/calculators/make_HA.py '+home+'/ase/calculators ')
-os.system('python '+home+'/ase/calculators/make_CPA.py '+home+'/ase/calculators ')
+os.system('python3 '+home+'/ase/calculators/make_HA.py '+home+'/ase/calculators ')
+os.system('python3 '+home+'/ase/calculators/make_CPA.py '+home+'/ase/calculators ')
 for modname in ['HA_recode.', 'splines_alt.', 'spherical_harmonics.', 'CPA_recode.']:
     os.system('cp '+home+'/'+modname+'* '+libcalcs)
     os.system('mv '+home+'/'+modname+'* '+home+'/ase/calculators/')

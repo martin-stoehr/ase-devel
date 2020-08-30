@@ -139,18 +139,19 @@ class Dftb(FileIOCalculator):
         self.default_parameters['Driver']='{}'
         
         if do_3rd_order:
-#            self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
-#            self.default_parameters['Hamiltonian_DampXHExponent'] = '4.00'
+            self.default_parameters['Hamiltonian_HCorrection_'] = 'Damping',
+            self.default_parameters['Hamiltonian_HCorrection_Exponent'] = 4.00,
             self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
-            for species in list(set(atoms.get_chemical_symbols())):
-                input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
+            for s in list(set(atoms.get_chemical_symbols())):
+                idU = kwargs.get('Hamiltonian_HubbardDerivs_'+s, 
+                                      'inputdoesntlooklikethis')
                 if (not (input_dU=='inputdoesntlooklikethis')):
-                    self.default_parameters['Hamiltonian_HubbardDerivs_'+species] = input_dU
+                    self.default_parameters['Hamiltonian_HubbardDerivs_'+s] = idU
                 else:
                     try:
-                        self.default_parameters['Hamiltonian_HubbardDerivs_'+species] = DefaultdU[species]
+                        self.default_parameters['Hamiltonian_HubbardDerivs_'+s] = DefaultdU[s]
                     except KeyError:
-                        raise NotImplementedError("Hubbard Derivative for '"+species+"' not found. Please specify on input or implement.")
+                        raise NotImplementedError("Hubbard Derivative for '"+s+"' not found. Please specify on input or implement.")
         
         ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
         ## 'CPA' native in newest DFTB+ versions
