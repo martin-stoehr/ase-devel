@@ -33,6 +33,7 @@ default_parameters = {
                       'eigensolver':'qr',
                       'get_MBD_eigenvalues':False,
                       'get_MBD_eigenvectors':False,
+                      'get_alpha_full':False,
                       'set_negative_eigenvalues_zero':True,
                       'use_MBDrsSCS_damping':False, 
                       'use_fractional_ionic_approach':False,
@@ -85,6 +86,7 @@ class MBD(Calculator):
                   'eigensolver', \
                   'get_MBD_eigenvalues', \
                   'get_MBD_eigenvectors', \
+                  'get_alpha_full', \
                   'set_negative_eigenvalues_zero', \
                   'use_MBDrsSCS_damping', \
                   'use_fractional_ionic_approach', \
@@ -261,6 +263,7 @@ class MBD(Calculator):
             self._get_SCS_and_MBD_damping_params()
         
         if self.do_SCS:
+            if self.get_alpha_full: self.modus += 'A'
             self._run_electrostatic_screening()
         
         if self.do_reciprocal: self.modus = self.modus.replace('C','CR')
