@@ -1,6 +1,6 @@
-#!/usr/bin/python3
-# EASY-INSTALL-ENTRY-SCRIPT: 'numpy==1.17.4','console_scripts','f2py'
-__requires__ = 'numpy==1.17.4'
+#!/opt/apps/resif/data/production/v1.2-20191021/default/software/lang/Python/3.7.2-GCCcore-8.2.0/bin/python
+# EASY-INSTALL-ENTRY-SCRIPT: 'numpy==1.18.2','console_scripts','f2py'
+__requires__ = 'numpy==1.18.2'
 import re
 import sys
 from pkg_resources import load_entry_point
@@ -8,5 +8,5 @@ from pkg_resources import load_entry_point
 if __name__ == '__main__':
     sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
     sys.exit(
-        load_entry_point('numpy==1.17.4', 'console_scripts', 'f2py')()
+        load_entry_point('numpy==1.18.2', 'console_scripts', 'f2py')()
     )

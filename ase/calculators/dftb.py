@@ -36,6 +36,7 @@ import os
 import numpy as np
 
 from ase.calculators.calculator import FileIOCalculator, kpts2mp
+from ase.calculators.calculator import PropertyNotImplementedError
 
 
 ## default value of maximal angular momentum to be included in DFTB calculation (ease calculator init, MS)
@@ -100,6 +101,7 @@ class Dftb(FileIOCalculator):
             Options_='',
             Options_WriteResultsTag='Yes',
             Options_WriteCPA='No',
+            Options_WriteDetailedOut='Yes',
             Analysis_='',
             Analysis_CalculateForces='Yes',
             Hamiltonian_='DFTB',
@@ -157,6 +159,9 @@ class Dftb(FileIOCalculator):
         vdWmethod = self.parameters.get(dispkey, 'No_vdW_method_defined')
         doMBD = ( vdWmethod.lower()=='mbd' )
         doTS = ( vdWmethod.lower()=='ts' )
+        self.CPAavail = (self.parameters['Options_WriteCPA'].lower() == 'yes')
+        self.CPAavail = self.CPAavail and (doMBD or doTS)
+        self.do_vdW = dispkey in self.parameters.keys()
         if doMBD:
             if not (dispkey+'Beta' in self.parameters.keys()):
                 self.parameters[dispkey+'Beta'] = default_beta_MBD
@@ -172,8 +177,10 @@ class Dftb(FileIOCalculator):
                 
                 self.parameters[dispkey+'KGrid'] = kpts_vdW
         
-        calc_forces = self.parameters['Analysis_CalculateForces']
-        self.calculate_forces = ( calc_forces.lower()=='yes' )
+        _calc_forces = self.parameters['Analysis_CalculateForces']
+        self.calculate_forces = ( _calc_forces.lower()=='yes' )
+        _writeDet = self.parameters['Options_WriteDetailedOut']
+        self.writeDetOut = (_writeDet.lower() == 'yes')
         self.atoms = atoms
         #the input file written only once
         if restart == None:
@@ -260,64 +267,45 @@ class Dftb(FileIOCalculator):
         myfile.close()
         if self.first_time:
             self.first_time = False
-            # Energy line index
-            estring = 'total_energy'
+            # line indices
+            estring, fstring = 'total_energy', 'forces   '
+            sstring, qstring = 'stress   ', 'gross_atomic_charges'
+            found_indices = [False,False,False,False]
             for iline, line in enumerate(self.lines):
                 if line.find(estring) >= 0:
                     self.index_energy = iline + 1
-                    break
-            # Force line indexes
-            fstring = 'forces   '
-            for iline, line in enumerate(self.lines):
+                    found_indices[0] = True
+                    continue
                 if line.find(fstring) >= 0:
                     self.index_force_begin = iline + 1
                     line1 = line.replace(':', ',')
                     self.index_force_end = iline+1+int(line1.split(',')[-1])
-                    break
-            # Stress line indexes
-            sstring = 'stress   '
-            for iline, line in enumerate(self.lines):
+                    found_indices[1] = True
+                    continue
                 if line.find(sstring) >= 0:
                     self.index_stress_begin = iline + 1
                     self.index_stress_end = iline + 4
-                    break
-            # Charge line indexes
-            qstring = 'gross_atomic_charges'
-            for iline, line in enumerate(self.lines):
+                    found_indices[2] = True
+                    continue
                 if line.find(qstring) >= 0:
                     self.index_charges_begin = iline + 1
                     line1 = line.replace(':', ',')
                     nqlines = (int(line1.split(',')[-1]) - 1)//3 + 1
                     self.index_charges_end = iline + 1 + nqlines
-                    break
-        
+                    found_indices[3] = True
+                    continue
+                if all(found_indices): break
+            
         self.read_energy()
         if self.calculate_forces:
             self.read_forces()
             if self.pbc: self.read_stress()
         
         self.read_charges()
+        if self.writeDetOut: self.read_DetailedOut()
+        if self.CPAavail: self.read_CPA()
         
         os.remove('results.tag')
-        
-    
-    def read_CPA(self):
-        """
-        Read CPA ratios as returned by DFTB+, length = nAtoms
-        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
-        """
-        try:
-            fCPA = open('CPA_ratios.out','r')
-            lines = fCPA.readlines()[1:]
-            fCPA.close()
-            CPA = np.zeros(self.nAtoms)
-            for iAtom in range(self.nAtoms):
-                CPA[iAtom] = float(lines[iAtom].split()[-1])
-            
-            return CPA
-        except IOError:
-            msg = "No file 'CPA_ratios.out'. Something went terribly wrong."
-            raise RuntimeError(msg)
         
     
     def read_energy(self):
@@ -341,7 +329,6 @@ class Dftb(FileIOCalculator):
                 gradients.append([float(word[k]) for k in range(0, 3)])
 
             self.results['forces'] = np.array(gradients) * Hartree / Bohr
-
         except:
             raise RuntimeError('Problem in reading forces')
         
@@ -349,7 +336,6 @@ class Dftb(FileIOCalculator):
     def read_stress(self):
         """Read Stress from dftb output file (results.tag)."""
         from ase.units import Hartree, Bohr
-
         try:
             _stress = []
             for j in range(self.index_stress_begin, self.index_stress_end):
@@ -360,7 +346,6 @@ class Dftb(FileIOCalculator):
             # as required by ASE
             _stress = np.array(_stress).flat[[0, 4, 8, 5, 2, 1]]
             self.results['stress'] =  _stress * Hartree / Bohr
-
         except:
             raise RuntimeError('Problem in reading stress')
         
@@ -377,15 +362,65 @@ class Dftb(FileIOCalculator):
             raise RuntimeError('Problem in reading charges')
         
     
+    def read_DetailedOut(self):
+        """
+        Read energy components from detailed.out.
+        """
+        try:
+            fdet = open('detailed.out', 'r')
+            lines = fdet.readlines()
+            fdet.close()
+        except IOError:
+            msg = "No file 'detailed.out'. Something went terribly wrong."
+            raise RuntimeError(msg)
+        
+        read_properties = [False, False, False]
+        for line in lines:
+            if line.find('Total Electronic energy: ') >= 0:
+                self.E_el = float(line.split()[-2])
+                read_properties[0] = True
+                continue
+            if line.find('Repulsive energy:        ') >= 0:
+                self.E_rep = float(line.split()[-2])
+                read_properties[1] = True
+                continue
+            if line.find('Dispersion energy:       ') >= 0:
+                self.E_vdW = float(line.split()[-2])
+                read_properties[2] = True
+                continue
+            if all(read_properties): return
+        
+    
+    def read_CPA(self):
+        """
+        Read CPA ratios as returned by DFTB+, length = nAtoms
+        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
+        """
+        try:
+            fCPA = open('CPA_ratios.out','r')
+            lines = fCPA.readlines()[1:]
+            fCPA.close()
+            CPA = np.zeros(len(self.atoms))
+            for iAtom in range(len(self.atoms)):
+                CPA[iAtom] = float(lines[iAtom].split()[-1])
+            self.CPA_ratios = CPA
+            return
+        except IOError:
+            msg = "No file 'CPA_ratios.out'. Something went terribly wrong."
+            raise RuntimeError(msg)
+        
+    
     def get_hirsh_volrat(self):
         """
         Return rescaling ratios for atomic polarizabilities (CPA ratios)
         """
-        if (self.parameters['Options_WriteCPA'].lower()=='yes'):
-            CPA_ratios = self.read_CPA()
-            return CPA_ratios
+        if hasattr(self, 'CPA_ratios'):
+            return self.CPA_ratios
         else:
-            raise PropertyNotImplementedError
+            msg  = "Could not obtain CPA ratios. You  need to specify the "
+            msg += "MBD or TS dispersion model and set "
+            msg += "Options_WriteCPA = 'Yes'"
+            raise PropertyNotImplementedError(msg)
         
     
     def get_stress(self, atoms):
@@ -395,29 +430,42 @@ class Dftb(FileIOCalculator):
             raise PropertyNotImplementedError
         
     
-#    def get_dispersion_energy(self):
-#        """"
-#        Return van der Waals dispersion energy as obtained by MBD/TS scheme.
-#        """
-#        try:
-#            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
-#        except KeyError:
-#            try:
-#                vdWmode = self.parameters['Hamiltonian_Dispersion_']
-#            except KeyError:
-#                vdWmode = 'none'
-#        
-#        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
-#            return self.dispersion_energy
-#        else:
-#            raise ValueError('You did not specify a dispersion model.')
+    def get_dispersion_energy(self):
+        """"
+        Return van der Waals dispersion energy as obtained by MBD/TS scheme.
+        """
+        if not self.do_vdW:
+            raise ValueError('You did not specify a dispersion model.')
+        elif self.writeDetOut:
+            return self.E_vdW
+        else:
+            msg  = "Need to enable output of 'detailed.out' to get "
+            msg += 'dispersion energy'
+            raise ValueError(msg)
+       
+    
+    def get_electronic_energy(self):
+        """
+        Return electronic energy = EBS + EC (+ E3rd) in eV.
+        """
+        if self.writeDetOut:
+            return self.E_el
+        else:
+            msg  = "Need to enable output of 'detailed.out' to get "
+            msg += 'electronic energy'
+            raise ValueError(msg)
         
     
-#    def get_electronic_energy(self):
-#        """
-#        Return electronic energy = Etot - EBS - EC (- E3rd) in eV.
-#        """
-#        return self.electronic_energy
+    def get_repulsive_energy(self):
+        """
+        Return repulsive energy = Etot - EBS - EC (- E3rd) in eV.
+        """
+        if self.writeDetOut:
+            return self.E_rep
+        else:
+            msg  = "Need to enable output of 'detailed.out' to get "
+            msg += 'repulsive energy'
+            raise ValueError(msg)
         
     
 
