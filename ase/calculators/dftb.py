@@ -37,15 +37,6 @@ import numpy as np
 
 from ase.calculators.calculator import FileIOCalculator, kpts2mp
 
-## analysis of atomic polarizabilities via Hirshfeld volume ratios (M.S. 19/Oct/15)
-from ase.io import read
-from ase.calculators.hb_box_data import data
-#try:
-#    from ase.calculators.ext_HA_wrapper import HirshfeldWrapper
-#    ext_analysis_avail = True
-#except ImportError:
-#    ext_analysis_avail = False
-
 
 ## default value of maximal angular momentum to be included in DFTB calculation (ease calculator init, MS)
 DefaultMaxAngMom = { 'H':'"s"',                                                                  'He':'"s"', \
@@ -77,7 +68,7 @@ class Dftb(FileIOCalculator):
     else:
         command = 'dftb+ > PREFIX.out'
     
-    implemented_properties = ['energy', 'forces']#, 'charges']
+    implemented_properties = ['energy', 'forces', 'stress', 'charges']
     
     def __init__(self, restart=None, ignore_bad_restart_file=False,
                  label='dftb', atoms=None, kpts=None, **kwargs):
@@ -92,7 +83,7 @@ class Dftb(FileIOCalculator):
         do_3rd_order = any(np.asarray([do_3rd_o.lower(), do_3rd_f.lower()]) =='yes' )
         
         default_beta_MBD = 0.89 if do_3rd_order else 0.95
-        default_sR_TS = 0.91
+        default_sR_TS = 1.03 if do_3rd_order else 1.06
         
         if 'DFTB_PREFIX' in os.environ:
             slako_dir = os.environ['DFTB_PREFIX']
@@ -108,11 +99,9 @@ class Dftb(FileIOCalculator):
         self.default_parameters = dict(
             Options_='',
             Options_WriteResultsTag='Yes',
-#            Options_WriteEigenvectors='No',
-#            Options_WriteCPA='No',
+            Options_WriteCPA='No',
             Analysis_='',
             Analysis_CalculateForces='Yes',
-            Options_MinimiseMemoryUsage='No',
             Hamiltonian_='DFTB',
             Hamiltonian_Scc='Yes',
             Hamiltonian_SccTolerance = 1.0E-005,
@@ -128,19 +117,11 @@ class Dftb(FileIOCalculator):
             self.default_parameters['Hamiltonian_MaxAngularMomentum_'+species] = DefaultMaxAngMom[species]
         
         self.pbc = np.any(atoms.pbc)
-        ## control whether DFTB+ should calculate forces or enable singe-point calculations (large systems!)
-#        calc_forces = kwargs.get('Analysis_CalculateForces', 'Yes')
-#        self.calculate_forces = ( calc_forces.lower()=='yes' )
-#        if self.calculate_forces:
-#            self.default_parameters['Driver_']='ConjugateGradient'
-#            self.default_parameters['Driver_MaxForceComponent']='1E-4'
-#            self.default_parameters['Driver_MaxSteps']=0
-#        else:
         self.default_parameters['Driver']='{}'
         
         if do_3rd_order:
-#            self.default_parameters['Hamiltonian_DampXH'] = 'Yes'
-#            self.default_parameters['Hamiltonian_DampXHExponent'] = '4.00'
+            self.default_parameters['Hamiltonian_HCorrection_'] = 'Damping'
+            self.default_parameters['Hamiltonian_HCorrection_Exponent'] = '4.05'
             self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
             for species in list(set(atoms.get_chemical_symbols())):
                 input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
@@ -152,9 +133,6 @@ class Dftb(FileIOCalculator):
                     except KeyError:
                         raise NotImplementedError("Hubbard Derivative for '"+species+"' not found. Please specify on input or implement.")
         
-        ## default approach to Hirshfeld rescaling ratios (Martin Stoehr)
-        ## 'CPA' native in newest DFTB+ versions
-        self.hvr_approach = 'CPA'
         
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
@@ -171,15 +149,18 @@ class Dftb(FileIOCalculator):
                 self.parameters[key] = str(mp[i]).strip('[]') + ' 1.0'
         
         vdWmethod = self.parameters.get('Hamiltonian_Dispersion_', 'No_vdW_method_defined')
-        if vdWmethod.lower()=='mbd':
+        doMBD = ( vdWmethod.lower()=='mbd' )
+        doTS = ( vdWmethod.lower()=='ts' )
+        if doMBD:
             if not ('Hamiltonian_Dispersion_Beta' in self.parameters.keys()):
                 self.parameters['Hamiltonian_Dispersion_Beta'] = default_beta_MBD
-            if not ('Hamiltonian_Dispersion_KGrid' in self.parameters.keys()):
-                kpts_MBD = ' '.join([str(k) for k in self.kpts]) if self.kpts != None else '1 1 1'
-                self.parameters['Hamiltonian_Dispersion_KGrid'] = kpts_MBD
-        elif vdWmethod.lower()=='ts':
+        elif doTS:
             if not ('Hamiltonian_Dispersion_RangeSeparation' in self.parameters.keys()):
                 self.parameters['Hamiltonian_Dispersion_RangeSeparation'] = default_sR_TS
+        if self.pbc and (doMBD or doTS):
+            if not ('Hamiltonian_Dispersion_KGrid' in self.parameters.keys()):
+                kpts_vdW = ' '.join([str(k) for k in self.kpts]) if self.kpts != None else '1 1 1'
+                self.parameters['Hamiltonian_Dispersion_KGrid'] = kpts_vdW
         
         calc_forces = self.parameters['Analysis_CalculateForces']
         self.calculate_forces = ( calc_forces.lower()=='yes' )
@@ -198,6 +179,10 @@ class Dftb(FileIOCalculator):
         self.index_energy = None
         self.index_force_begin = None
         self.index_force_end = None
+        self.index_stress_begin = None
+        self.index_stress_end = None
+        self.index_charges_begin = None
+        self.index_charges_end = None
         
     
     def write_dftb_in(self):
@@ -215,8 +200,6 @@ class Dftb(FileIOCalculator):
         #--------MAIN KEYWORDS-------
         previous_key = 'dummy_'
         myspace = ' '
-#        if (self.hvr_approach == 'HA'):
-#            self.parameters['Analysis_WriteEigenvectors'] = 'Yes'
 
         for key, value in sorted(self.parameters.items()):
             current_depth = key.rstrip('_').count('_')
@@ -260,7 +243,6 @@ class Dftb(FileIOCalculator):
         """ all results are read from results.tag file
             It will be destroyed after it is read to avoid
             reading it once again after some runtime error """
-        from ase.io import read
         from os import remove
         
         myfile = open('results.tag', 'r')
@@ -268,181 +250,45 @@ class Dftb(FileIOCalculator):
         myfile.close()
         if self.first_time:
             self.first_time = False
-            self.solved_hvr = {'HA':False, 'CPA':False}
             # Energy line index
+            estring = 'total_energy'
             for iline, line in enumerate(self.lines):
-                estring = 'total_energy'
                 if line.find(estring) >= 0:
                     self.index_energy = iline + 1
                     break
             # Force line indexes
+            fstring = 'forces   '
             for iline, line in enumerate(self.lines):
-                fstring = 'forces   '
                 if line.find(fstring) >= 0:
                     self.index_force_begin = iline + 1
                     line1 = line.replace(':', ',')
-                    self.index_force_end = iline + 1 + int(line1.split(',')[-1])
+                    self.index_force_end = iline+1+int(line1.split(',')[-1])
                     break
-                
-#            ## get number of orbitals and k-points (Martin Stoehr)
-#            for line in self.lines:
-#                if 'eigenvalues  ' in line:
-#                    line1 = line.replace(':',',')
-#                    self.nk = int(line1.split(',')[-2])
-#                    self.nOrbs = int(line1.split(',')[-3])
-#                    break
-            
-            ## read further information for SCC calculations (Martin Stoehr)
-            ## where is this information for non-SCC calculations
-#            hSCC = 'Hamiltonian_SCC'
-#            if hSCC in self.parameters.keys():
-#                if (self.parameters[hSCC].lower() == 'yes'):
-#                    self.read_additional_info()
-#                else:
-#                    print('You started a non-SCC calculation. No additional Information available.')
-            
-#            if self.hvr_approach == 'HA':
-#                try:
-#                    myfile = open('eigenvec.out','r')
-#                    self.evlines = myfile.readlines()
-#                    myfile.close()
-#                    ## read-in LCAO-coefficients (Martin Stoehr)
-#                    self.read_eigenvectors()
-#                    self.eigenvectors_missing = False
-#                except IOError:
-#                    self.eigenvectors_missing = True
-            
+            # Stress line indexes
+            sstring = 'stress   '
+            for iline, line in enumerate(self.lines):
+                if line.find(sstring) >= 0:
+                    self.index_stress_begin = iline + 1
+                    self.index_stress_end = iline + 4
+                    break
+            # Charge line indexes
+            qstring = 'gross_atomic_charges'
+            for iline, line in enumerate(self.lines):
+                if line.find(qstring) >= 0:
+                    self.index_charges_begin = iline + 1
+                    line1 = line.replace(':', ',')
+                    nqlines = (int(line1.split(',')[-1]) - 1)//3 + 1
+                    self.index_charges_end = iline + 1 + nqlines
+                    break
+        
         self.read_energy()
-        # read geometry from file in case dftb+ has done steps
-        # to move atoms, in that case forces are not read
-        #if int(self.parameters['Driver_MaxSteps']) > 0:
-            #self.atoms = read('geo_end.gen')
-            #self.results['forces'] = np.zeros([len(self.atoms), 3])
-        #else:
-            #self.read_forces()
-        if self.calculate_forces: self.read_forces()
+        if self.calculate_forces:
+            self.read_forces()
+            if self.pbc: self.read_stress()
+        
+        self.read_charges()
         
         os.remove('results.tag')
-        
-    
-#    def read_additional_info(self):
-#        """
-#        Read additional info, i.e. nAtoms, positions, fillings, etc.
-#        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
-#        """
-#        orbitalslist = {0:['s'], 1:['py','pz','px'], 2:['dxy','dyz','dz2','dxz','dx2-y2'], \
-#                       3:['f3yx2-y3','fxyz','fyz2','fz3','fxz2','fzx2-zy2','fx3-3xy2']}
-#        try:
-#            atoms_end = read('geo_end.xyz')
-#        except IOError:
-#            atoms_end = self.atoms
-#        
-#        self.atoms = atoms_end
-#        self.nAtoms = len(self.atoms)
-#        self.charges = np.zeros(self.nAtoms)
-#        self.Orb2Atom = np.zeros(self.nOrbs)
-#        self.otypes = []
-#        ## read 'detailed.out' in lines
-#        myfile = open('detailed.out', 'r')
-#        linesdet = myfile.readlines()
-#        myfile.close()
-#        ## net atomic charges and basis orbital types
-#        for iline, line in enumerate(linesdet):
-#            if 'Net atomic charges (e)' in line:
-#                for iAtom in range(self.nAtoms):
-#                    self.charges[iAtom] = float(linesdet[iline+2+iAtom].split()[-1])
-#                iline = iline+2+self.nAtoms
-#            if 'Orbital populations (up)' in line:
-#                for iOrb in range(self.nOrbs):
-#                    self.Orb2Atom[iOrb] = int( linesdet[iline+2+iOrb].split()[0] ) - 1
-#                    l = int(linesdet[iline+2+iOrb].split()[2])
-#                    m = int(linesdet[iline+2+iOrb].split()[3])
-#                    self.otypes.append(orbitalslist[l][l+m])
-#            
-#        self.results['charges'] = self.charges
-#        self.Atom2Orbs = np.zeros((self.nAtoms, 2))
-#        for iAtom in range(self.nAtoms):
-#            startOrb = list(self.Orb2Atom).index(iAtom) + 1
-#            nOrbsiAtom = len(self.Orb2Atom) - np.count_nonzero(self.Orb2Atom - iAtom) - 1
-#            self.Atom2Orbs[iAtom] = np.array([startOrb, startOrb + nOrbsiAtom])
-#            
-#        ## Fillings 
-#        myfile = open('detailed.out','r')
-#        textdet = myfile.read()   ## read 'detailed.out' as string
-#        myfile.close()
-#        textoccs = (textdet.split('Fillings')[1]).split('\n \n')[0]
-#        textoccs = np.array(textoccs.split(), dtype=float)  ## 1D array of occupations
-#        if len(textoccs) != (self.nOrbs*self.nk):
-#            print('Error in reading occupations (~> length). Skipping.')
-#            pass
-#        else:
-#            ## reshape array into shape = (n_kpoints, n_Orbitals)
-#            self.f = textoccs.reshape((self.nOrbs, self.nk)).T
-#        
-#        ## electronic energy: move this out of read_additional_info!!
-#        textelec = textdet.split('Total Electronic energy:')[1].split('\n')[0]
-#        self.electronic_energy = float(textelec.split()[-2])
-#        
-#        ## dispersion energy (MBD/TS): move this out of read_additional_info!!
-#        try:
-#            vdWmode = self.parameters['Hamiltonian_ManyBodyDispersion_']
-#            oldvdW = True
-#        except KeyError:
-#            try:
-#                vdWmode = self.parameters['Hamiltonian_Dispersion_']
-#                olfvdW = False
-#            except KeyError:
-#                vdWmode = 'none'
-#        
-#        if ( (vdWmode == 'MBD') or (vdWmode == 'TS') ):
-#            if oldvdW:
-#                textdisp = textdet.split('MBD/TS energy:')[1].split('\n')[0]
-#            else:
-#                if (vdWmode == 'MBD'):
-#                    textdisp = textdet.split('Many-body dispersion energy:')[1].split('\n')[0]
-#                elif (vdWmode == 'TS'):
-#                    textdisp = textdet.split('Dispersion energy:')[1].split('\n')[0]
-#            
-#            self.dispersion_energy = float(textdisp.split()[-2])
-##        else:
-##            print('No dispersion model defined.')
-#        
-#        ## k-point weighting
-#        myfile = open('dftb_in.hsd','r')
-#        linesin = myfile.readlines()
-#        myfile.close()
-#        self.wk = np.ones(self.nk)
-#        self.kpts = np.zeros((self.nk,3))
-#        for iline, line in enumerate(linesin):
-#            if 'KPointsAndWeights =' in line:
-#                for ik in range(self.nk):
-#                    self.wk[ik] = float(linesin[iline+1+ik].split()[3])
-#                    self.kpts[ik,:] = np.array(linesin[iline+1+ik].split()[:3], dtype=float)
-#                break
-#        ## normalize k-point weighting factors (sum_k wk = 1)
-#        ## In principle, this should not be neccessary. Anyway, ...
-#        self.wk /= np.sum(self.wk)
-#        
-#    
-#    def read_eigenvectors(self):
-#        """
-#        Read LCAO-coefficients to self.wf, shape = (n_kpoints, n_States, n_Orbitals)
-#        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
-#        """
-#        ## LCAO-coefficients
-#        self.wf = np.zeros((self.nk, self.nOrbs, self.nOrbs))
-#        c = []
-#        if self.pbc:
-#            for line in self.evlines[1:]:
-#                if (line.split() != []) and ('Eigenvector: ' not in line):
-#                    line1 = line.replace(',','').replace(')','')
-#                    c.append(float(line1.split()[-3]) + float(line1.split()[-2])*1.j)
-#            self.wf = np.array(c, dtype=complex).reshape((self.nk, self.nOrbs, self.nOrbs))
-#        else:
-#            for line in self.evlines[1:]:
-#                if (line.split() != []) and ('Eigenvector: ' not in line):
-#                    c.append(float(line.split()[1]))
-#            self.wf[0] = np.array(c).reshape((self.nk, self.nOrbs, self.nOrbs))
         
     
     def read_CPA(self):
@@ -454,19 +300,20 @@ class Dftb(FileIOCalculator):
             fCPA = open('CPA_ratios.out','r')
             lines = fCPA.readlines()[1:]
             fCPA.close()
-            self.hvr_CPA = np.zeros(self.nAtoms)
+            CPA = np.zeros(self.nAtoms)
             for iAtom in range(self.nAtoms):
-                self.hvr_CPA[iAtom] = float(lines[iAtom].split()[-1])
+                CPA[iAtom] = float(lines[iAtom].split()[-1])
             
+            return CPA
         except IOError:
-            raise RuntimeError("No file 'CPA_ratios.out'. Something went terribly wrong.")
+            msg = "No file 'CPA_ratios.out'. Something went terribly wrong."
+            raise RuntimeError(msg)
         
     
     def read_energy(self):
         """Read Energy from dftb output file (results.tag)."""
         from ase.units import Hartree
         
-        # Energy:
         try:
             energy = float(self.lines[self.index_energy].split()[0]) * Hartree
             self.results['energy'] = energy
@@ -489,82 +336,53 @@ class Dftb(FileIOCalculator):
             raise RuntimeError('Problem in reading forces')
         
     
-    #-------------------------------------------#
-    #  Approach(es) to atomic polarizabilities  #
-    #  by Martin Stoehr, martin.stoehr@uni.lu   #
-    #-------------------------------------------#
-    
-    def set_hvr_approach(self, approach):
-        """ set approach for obtaining (approximate) Hirshfeld ratios """
-        valid_approaches = ['const', 'CPA']#, 'HA']
+    def read_stress(self):
+        """Read Stress from dftb output file (results.tag)."""
+        from ase.units import Hartree, Bohr
+
+        try:
+            _stress = []
+            for j in range(self.index_stress_begin, self.index_stress_end):
+                word = self.lines[j].split()
+                _stress.append([float(word[k]) for k in range(0, 3)])
+
+            # Convert 3x3 stress tensor to Voigt form (xx,yy,zz,yz,xz,xy)
+            # as required by ASE
+            _stress = np.array(_stress).flat[[0, 4, 8, 5, 2, 1]]
+            self.results['stress'] =  _stress * Hartree / Bohr
+
+        except:
+            raise RuntimeError('Problem in reading stress')
         
-        if approach in valid_approaches:
-            self.hvr_approach = approach
-        else:
-            print('\033[91m'+"WARNING: '"+str(approach)+"' is not a valid identifier. \
-                   Defaulting to ratios as obtained by charge population approach instead..."+'\033[0m')
-            self.hvr_approach = 'CPA'
+    
+    def read_charges(self):
+        """Read Charges from dftb output file (results.tag)."""
+        try:
+            _qstart = self.index_charges_begin
+            _qend = self.index_charges_end
+            _qtxt = " ".join(self.lines[_qstart:_qend])
+            _charges = np.array(_qtxt.split(), dtype=float)
+            self.results['charges'] = _charges
+        except:
+            raise RuntimeError('Problem in reading charges')
         
     
     def get_hirsh_volrat(self):
         """
-        Return Hirshfeld volume ratios using method <self.approach>
+        Return rescaling ratios for atomic polarizabilities (CPA ratios)
         """
-        if self.hvr_approach == 'const':
-            self.rescaling = self.get_hvr_const()
-#        elif self.hvr_approach == 'HA':
-#            self.rescaling = self.get_hvr_HA()
-        elif self.hvr_approach == 'CPA':
-            self.rescaling = self.get_hvr_CPA()
+        if (self.parameters['Options_WriteCPA'].lower()=='yes'):
+            CPA_ratios = self.read_CPA()
+            return CPA_ratios
         else:
-            raise NotImplementedError("Sorry dude, I don't know about a scheme called '"+self.hvr_approach+"'.")
-        return self.rescaling
+            raise PropertyNotImplementedError
         
     
-    def get_hvr_const(self):
-        """  Return constant rescaling (use free atom parameters).  """
-        
-        return np.ones(self.nAtoms)
-        
-    
-#    def get_hvr_HA(self, dr=0.2, nThetas=36, nPhis=72, cutoff=3.,conf='Both'):
-#        """
-#        Return Hirsfeld volume ratios as obtained by density partitioning
-#        
-#        parameters:
-#        ===========
-#            dr(opt):       radial step width in Angstroms, default: 0.2 Angstroms
-#            nThetas(opt):  number of discrete azemuthal angles, default: 36
-#            nPhis(opt):    number of discrete polar angles, default: 72
-#            cutoff(opt):   cutoff radius for partial grid in Angstroms, default: 3 Angstroms
-#            conf(opt):     confinement for basis functions in density construction in Angstroms,
-#                             . 'None':     use free radial wave functions throughout,
-#                             . 'Both':     use confined radial wave functions throughout (DEFAULT),
-#                             . list of confinement radii in Angstroms to use per atom.
-#        """
-#        if self.eigenvectors_missing:
-#            raise ValueError('No eigenvectors available. Please set WriteEigenvectors = True for DFTB calculation.')
-#        
-#        if not ext_analysis_avail:
-#            raise ImportError("External Hirshfeld analysis not available.")
-#        
-#        Atom2OrbsF = np.array(self.Atom2Orbs, dtype=int).transpose()
-#        HA = HirshfeldWrapper(self.atoms, self.wk, self.wf, self.f, self.otypes, Atom2OrbsF, self.Orb2Atom, \
-#                              dr=dr, nThetas=nThetas, nPhis=nPhis, cutoff=cutoff,conf=conf)
-#        
-#        self.hvr_HA = HA.get_hvr()
-#        
-#        return self.hvr_HA
-        
-    
-    def get_hvr_CPA(self):
-        """  Return rescaling ratios as obtained by charge population approach.  """
-        if (self.parameters['Options_WriteCPA'].lower() == 'yes'):
-            self.read_CPA()
+    def get_stress(self, atoms):
+        if self.calculate_forces and self.pbc:
+            return FileIOCalculator.get_stress(self, atoms)
         else:
-            raise ValueError("Sorry, you need to set Options_WriteCPA = 'Yes' for this feature.")
-        
-        return self.hvr_CPA
+            raise PropertyNotImplementedError
         
     
 #    def get_dispersion_energy(self):
