@@ -128,7 +128,7 @@ class Dftb(FileIOCalculator):
             self.default_parameters[hubder] = ''
             for s in list(set(atoms.get_chemical_symbols())):
                 idU = kwargs.get(hubder+s, 'inputdoesntlooklikethis')
-                if (not (input_dU=='inputdoesntlooklikethis')):
+                if (not (idU=='inputdoesntlooklikethis')):
                     self.default_parameters[hubder+s] = idU
                 else:
                     try:
