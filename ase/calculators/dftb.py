@@ -113,25 +113,30 @@ class Dftb(FileIOCalculator):
             )
         
         ## set default maximum angular momentum to consider
-        for species in list(set(atoms.get_chemical_symbols())):
-            self.default_parameters['Hamiltonian_MaxAngularMomentum_'+species] = DefaultMaxAngMom[species]
+        maxang = 'Hamiltonian_MaxAngularMomentum_'
+        for s in list(set(atoms.get_chemical_symbols())):
+            self.default_parameters[maxang+s] = DefaultMaxAngMom[s]
         
         self.pbc = np.any(atoms.pbc)
         self.default_parameters['Driver']='{}'
         
         if do_3rd_order:
-            self.default_parameters['Hamiltonian_HCorrection_'] = 'Damping'
-            self.default_parameters['Hamiltonian_HCorrection_Exponent'] = '4.05'
-            self.default_parameters['Hamiltonian_HubbardDerivs_'] = ''
-            for species in list(set(atoms.get_chemical_symbols())):
-                input_dU = kwargs.get('Hamiltonian_HubbardDerivs_'+species, 'inputdoesntlooklikethis')
+            hcorr = 'Hamiltonian_HCorrection_'
+            hubder = 'Hamiltonian_HubbardDerivs_'
+            self.default_parameters[hcorr] = 'Damping'
+            self.default_parameters[hcorr+'Exponent'] = '4.05'
+            self.default_parameters[hubder] = ''
+            for s in list(set(atoms.get_chemical_symbols())):
+                idU = kwargs.get(hubder+s, 'inputdoesntlooklikethis')
                 if (not (input_dU=='inputdoesntlooklikethis')):
-                    self.default_parameters['Hamiltonian_HubbardDerivs_'+species] = input_dU
+                    self.default_parameters[hubder+s] = idU
                 else:
                     try:
-                        self.default_parameters['Hamiltonian_HubbardDerivs_'+species] = DefaultdU[species]
+                        self.default_parameters[hubder+s] = DefaultdU[s]
                     except KeyError:
-                        raise NotImplementedError("Hubbard Derivative for '"+species+"' not found. Please specify on input or implement.")
+                        msg  = "Hubbard Derivative for '"+s+"' not found. "
+                        msg += "Please specify on input or implement."
+                        raise NotImplementedError(msg)
         
         
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
@@ -148,19 +153,24 @@ class Dftb(FileIOCalculator):
                 key = initkey + '_empty' + str(i)
                 self.parameters[key] = str(mp[i]).strip('[]') + ' 1.0'
         
-        vdWmethod = self.parameters.get('Hamiltonian_Dispersion_', 'No_vdW_method_defined')
+        dispkey = 'Hamiltonian_Dispersion_'
+        vdWmethod = self.parameters.get(dispkey, 'No_vdW_method_defined')
         doMBD = ( vdWmethod.lower()=='mbd' )
         doTS = ( vdWmethod.lower()=='ts' )
         if doMBD:
-            if not ('Hamiltonian_Dispersion_Beta' in self.parameters.keys()):
-                self.parameters['Hamiltonian_Dispersion_Beta'] = default_beta_MBD
+            if not (dispkey+'Beta' in self.parameters.keys()):
+                self.parameters[dispkey+'Beta'] = default_beta_MBD
         elif doTS:
-            if not ('Hamiltonian_Dispersion_RangeSeparation' in self.parameters.keys()):
-                self.parameters['Hamiltonian_Dispersion_RangeSeparation'] = default_sR_TS
+            if not (dispkey+'RangeSeparation' in self.parameters.keys()):
+                self.parameters[dispkey+'RangeSeparation'] = default_sR_TS
         if self.pbc and (doMBD or doTS):
-            if not ('Hamiltonian_Dispersion_KGrid' in self.parameters.keys()):
-                kpts_vdW = ' '.join([str(k) for k in self.kpts]) if self.kpts != None else '1 1 1'
-                self.parameters['Hamiltonian_Dispersion_KGrid'] = kpts_vdW
+            if not (dispkey+'KGrid' in self.parameters.keys()):
+                if self.kpts is None:
+                    kpts_vdW = '1 1 1'
+                else:
+                    kpts_vdW = ' '.join([str(k) for k in self.kpts])
+                
+                self.parameters[dispkey+'KGrid'] = kpts_vdW
         
         calc_forces = self.parameters['Analysis_CalculateForces']
         self.calculate_forces = ( calc_forces.lower()=='yes' )
