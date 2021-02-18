@@ -4,6 +4,5 @@
 *.so
 *.pyf
 *.mod
-build
-lib
-install.log
+ase*
+f2py

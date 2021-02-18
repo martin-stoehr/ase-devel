@@ -5,8 +5,8 @@
 **/*.pyf
 **/*.mod
 ase.egg-info
-bin
-build
-lib
-dist
+bin/*
+/build/
+/lib/
+/dist/
 install.log
