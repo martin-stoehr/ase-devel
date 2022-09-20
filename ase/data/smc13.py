@@ -7,6 +7,9 @@ smc13_names = ['C70_10-CPP', 'C70_6-CPPA-tilted', 'C70_8-CPPA-along', 'C70_11-CP
     'C70_catcher', 'dicyanobenzene_tweezer', 'C70_8-CPPA-center', 'C70_6-CPPA-upright', \
     'tetracyanoquinone_tweezer']
 
+## Diffusion Quantum Monte-Carlo reference data from
+## A. Ambrosetti, D. Alfe, R. A. DiStasio, Jr. and A. Tkatchenko, J. Phys. Chem. Lett., 2014, 5, 849–855
+## J. Hermann, D. Alfe and A. Tkatchenko, Nat. Commun., 2017, 8, 14052.
 smc13_interaction_energy = {}
 smc13_interaction_energy['C70_10-CPP'] = -1.7866010807
 smc13_interaction_energy['C70_6-CPPA-tilted'] = -1.47871594301

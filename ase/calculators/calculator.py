@@ -621,7 +621,7 @@ class Calculator(object):
         is returned.
 
         Subclasses must implement a set() method that will look at the
-        chaneged parameters and decide if a call to reset() is needed.
+        changed parameters and decide if a call to reset() is needed.
         If the changed parameters are harmless, like a change in
         verbosity, then there is no need to call reset().
 

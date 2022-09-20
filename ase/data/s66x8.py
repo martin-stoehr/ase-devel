@@ -11,7 +11,7 @@
 ##########################################################
 
 
-from s66x8_data import *
+from .s66x8_data import *
 
 
 class s66x8_class:

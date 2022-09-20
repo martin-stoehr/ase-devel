@@ -109,7 +109,8 @@ setup(name='ase',
 fcomp = 'intel' if (os.system("ifort -help")==0) else 'foss'
 home = os.getcwd()
 vshort = '%d.%d' %sys.version_info[0:2]
-libcalcs = home+'/lib/python/ase-'+version+'-py'+vshort+'.egg/ase/calculators/'
+libcalcs  = '/home/martin/.local/lib/python'+vshort+'/site-packages/'
+libcalcs += 'ase-'+version+'-py'+vshort+'.egg/ase/calculators/'
 os.system('cp -r '+home+'/ase/calculators/alpha_FI_refdata/ '+libcalcs)
 sdc_cmd =  'cd '+home+'/ase/calculators/ && bash build_options_sdc-'+fcomp
 sdc_cmd += ' && cp '+home+'/ase/calculators/sdc.* '+libcalcs+' && cd '+home
