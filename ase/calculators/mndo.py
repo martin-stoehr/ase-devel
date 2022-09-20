@@ -18,15 +18,154 @@ from ase.calculators.calculator import FileIOCalculator
 from ase.calculators.calculator import PropertyNotImplementedError
 
 
-## PUT SOME DEFAULTS HERE
+## list of available MNDO keywords  # equiv. human-readable keyword
+mndo_kwargs = [
+    'limit',      # maxtime
+    'iop',        # method
+    'jop',        # calc_type
+    'igeom',      # coord_type
+    'mplib',      # parallel_mode
+    'ief',        # optimizer
+    'idiis',      # diis_mode
+    'inrefd',     # ref_data
+    'iparok',     # custom_param
+    'mminp',      # external_pts
+    'nmr',        # compute_nmr
+    'nsav7',      # write_full_input
+    'nsav8',      # output_mopac
+    'nsav9',      # output_pdb
+    'nsav13',     # output_aux
+    'nsav15',     # output_each
+    'nsav16',     # output_sybyl
+    'immok',      # peptide_correction
+    'ihbond',     # hbond_dmax
+    'ifld1',      # external_field
+    'ifld2',      # field_strength
+    'ifld3',      # ext_field_scf
+    'icuts',      # cutoff_3center_ovlp
+    'icutg',      # cutoff_3center_grad
+    'iexbas',     # polarized_basis
+    'icosmo',     # cosmo_mode
+    'ipsana',     # analyt_grad
+    'immdp',      # vdw_corr
+    'inac',       # nac_mode
+    'maxend',     # max_scf_opt
+    'maxlin',     # max_scf_ls
+    'maxrtl',     # max_scf_tot
+    'iscf',       # ene_threshold
+    'iplscf',     # rho_threshold
+    'middle',     # continuation
+    'iprint',     # write_opt
+    'kprint',     # write_force_const
+    'lprint',     # write_vib
+    'mprint',     # write_gradients
+    'jprint',     # write_input
+    'iprec',      # opt_fmax
+    'iconv',      # opt_fmax_type
+    'ihess',      # init_hessian
+    'idfp',       # update_type_hessian
+    'nrepet',     # special_convergence
+    'linitg',     # check_f_init
+    'lconvg',     # check_f_norm
+    'lgdum',      # check_f_requested
+    'ihdlc1',     # hdlc_coords
+    'ihdlc2',     # hdlc_coords_core
+    'ihdlc3',     # hdlc_extra
+    'ingeom',     # special_geom_in
+    'intdir',     # direct_scf
+    'lindms',     # cgdms
+    'lindia',     # cgdms_diag
+    'linfrg',     # guess_from_frag
+    'inpfrg',     # extra_inp_frag
+    'inp21',      # extra_in21
+    'inp22',      # extra_in22
+    'inp23',      # extra_in23
+    'inp24',      # extra_in24
+    'inp25',      # extra_in25
+    'iaterg',     # atomization_type
+## general
+    'kharge',     # charge
+    'imult',      # multiplicity
+    'ktrial',     # rdm_init
+    'kgeom',      # geometry_grid
+    'ipubo',      # save_scf
+    'iuhf',       # scf_type
+    'kitscf',     # max_scf
+    'nprint',     # output_lvl
+    'ifast',      # pseudodiag_type
+    'idiag',      # diag_type
+    'ksym',       # symmetry
+    'numsym',     # symmetry_num
+    'kci',        # ci_type
+    'nstart',     # extrapol_1st_scf
+    'nstep',      # extrapol_scf_step
+    'ktitle',     # title
+## optimizer and force constant calcs
+    'nrst',       # reset_hessian
+    'ldrop',      # restart_opt_thresh
+    'ldell',      # updated_restart
+    'lsub',       # which_ls
+    'lalpha',     # ls_dinit
+    'lconv',      # ls_thresh_step
+    'ltolf',      # ls_thresh_ene
+    'lmaxst',     # ls_max_step
+    'igrad',      # special_grad
+    'lpoint',     # num_grad_pts
+    'lfac',       # num_grad_step
+    'kpoint',     # num_vib_pts
+    'kfac',       # num_vib_step
+    'kmass',      # vib_masses
+    'ntemp',      # temperatures_n
+    'ntemp1',     # temperatures_min
+    'ntemp2',     # temepratures_max
+]
 
 
-class Dftb(FileIOCalculator):
+## list of corresponding human readable keywords
+kwargs_all = [
+    'maxtime', 'method', 'calc_type', 'coord_type', 'parallel_mode',
+    'optimizer', 'diis_mode', 'ref_data', 'custom_param', 'external_pts',
+    'compute_nmr', 'write_full_input', 'output_mopac', 'output_pdb',
+    'output_aux', 'output_each', 'output_sybyl', 'peptide_correction',
+    'hbond_dmax', 'external_field', 'field_strength', 'ext_field_scf',
+    'cutoff_3center_ovlp', 'cutoff_3center_grad', 'polarized_basis',
+    'cosmo_mode', 'analyt_grad', 'vdw_corr', 'nac_mode', 'max_scf_opt',
+    'max_scf_ls', 'max_scf_tot', 'ene_threshold', 'rho_threshold',
+    'continuation', 'write_opt', 'write_force_const', 'write_vib',
+    'write_gradients', 'write_input', 'opt_fmax', 'opt_fmax_type',
+    'init_hessian', 'update_type_hessian', 'special_convergence',
+    'check_f_init', 'check_f_norm', 'check_f_requested', 'hdlc_coords',
+    'hdlc_coords_core', 'hdlc_extra', 'special_geom_in', 'direct_scf',
+    'cgdms', 'cgdms_diag', 'guess_from_frag', 'extra_inp_frag', 
+    'extra_in21', 'extra_in22', 'extra_in23', 'extra_in24', 'extra_in25',
+    'atomization_type', 'charge', 'multiplicity', 'rdm_init', 
+    'geometry_grid', 'save_scf', 'scf_type', 'max_scf', 'output_lvl',
+    'pseudodiag_type', 'diag_type', 'symmetry', 'symmetry_num', 'ci_type',
+    'extrapol_1st_scf', 'extrapol_scf_step', 'title', 'reset_hessian', 
+    'restart_opt_thresh', 'updated_restart', 'which_ls', 'ls_dinit', 
+    'ls_thresh_step', 'ls_thresh_ene', 'ls_max_step', 'special_grad', 
+    'num_grad_pts', 'num_grad_step', 'num_vib_pts', 'num_vib_step', 
+    'vib_masses', 'temperatures_n', 'temperatures_min', 'temepratures_max',
+    'opt_mask']
+
+## create dictionary of human-readable -> mndo kwargs
+h2mndo_key = dict(zip(kwargs_all, mndo_kwargs))
+
+## convert human-readable values of kwargs to mndo values
+def h2mndo_val(hkey, hval):
+    raise NotImplementedError("Need to implement this function!")
+    return mndo_val
+
+## fix input format to formatted
+iform = 1
+
+
+class Mndo(FileIOCalculator):
     """  A MNDO calculator with ase-FileIOCalculator nomenclature  """
     if 'MNDO_COMMAND' in os.environ:
-        command = os.environ['MNDO_COMMAND'] + ' > PREFIX.out'
+        command = os.environ['MNDO_COMMAND'] + ' mndo_ase.inp > PREFIX.out'
     else:
-        command = 'mndo > PREFIX.out'
+        command = 'mndo mndo_ase.inp > PREFIX.out'
     
     implemented_properties = ['energy', 'forces']
     
@@ -38,15 +177,25 @@ class Dftb(FileIOCalculator):
         
         
         self.default_parameters = dict(
-#            ???
+            igeom=1,    # use Cartesian coordinates
         )
         
+        ## translate human-readable to mndo kwargs and pop
+        for key in kwargs.keys():
+            if key in kwargs_all:
+                kwargs[h2mndo_key[key]] = h2mndo_val(kwargs.pop(key))
+        
+        kwargs['iform'] = iform
         self.pbc = np.any(atoms.pbc)
         
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
         
-        self.atoms = atoms
+        self.atoms, self.nAtoms = atoms, len(atoms)
+        
+        if not hasattr(self, 'opt_mask'):
+            self.opt_mask = np.zeros_like(atoms.positions)
+        
         if restart == None:
             self.write_mndo_inp()
         else:
@@ -55,117 +204,98 @@ class Dftb(FileIOCalculator):
             if not os.path.exists('mndo_ase.inp'):
                 raise IOError('No file "mndo_ase.inp", use restart=None')
         
-        #indexes for the result file
+        if self.pbc: raise NotImplementedError('PBC not supported')
+        
+        ## indexes for the result file
         self.first_time = True
         self.index_energy = None
-        self.index_force_begin = None
-        self.index_force_end = None
+#        self.index_force_begin = None
+#        self.index_force_end = None
         
     
-    def write_dftb_in(self):
+    def write_mndo_in(self):
         """
         Write the input file for the dftb+ calculation.
         Geometry is taken always from the file 'geo_end.gen'.
         """
 
-        outfile = open('dftb_in.hsd', 'w')
-        outfile.write('Geometry = GenFormat { \n')
-        outfile.write('    <<< "geo_end.gen" \n')
-        outfile.write('} \n')
-        outfile.write(' \n')
+        outfile = open('mndo_ase.inp', 'w')
+        ## write kwargs
+        in_str = ''
+        title = self.parameters.pop('ktitle', ' MNDO calculations from ASE')
+        for key, val in self.parameters.items():
+            if key == 'ktitle': continue
+            test_len = len(key)+len(str(val))+3
+            if (len(in_str) + test_len > 78): in_str += ' +\n'
+            in_str += key+'='+str(val)+' '
         
-        #--------MAIN KEYWORDS-------
-        previous_key = 'dummy_'
-        myspace = ' '
-
-        for key, value in sorted(self.parameters.items()):
-            current_depth = key.rstrip('_').count('_')
-            previous_depth = previous_key.rstrip('_').count('_')
-            for my_backsclash in reversed(\
-                range(previous_depth - current_depth)):
-                outfile.write(3 * (1 + my_backsclash) * myspace + '} \n')
-            outfile.write(3 * current_depth * myspace)
-            if key.endswith('_'):
-                outfile.write(key.rstrip('_').rsplit('_')[-1] + \
-                                  ' = ' + str(value) + '{ \n')
-            elif key.count('_empty') == 1:
-                outfile.write(str(value) + ' \n')
-            else:
-                outfile.write(key.rsplit('_')[-1] + ' = ' + str(value) + ' \n')
-            previous_key = key
-        current_depth = key.rstrip('_').count('_')
-        for my_backsclash in reversed(range(current_depth)):
-            outfile.write(3 * my_backsclash * myspace + '} \n')
+        if in_str.count('+\n')>10: raise ValueError('Too many inputs!')
+        outfile.write(in_str)
+        
+        ## write geometry
+        mol = self.get_molecule_array()
+        gen  = '{0: >2d}    {1: >14.10f}  {2:1d}   {3: >14.10f}  {4:1d}   '
+        gen += '{5: >14.10f}  {6:1d}'
+        for iAtom in range(self.nAtoms): f.write(gen.format(mol[iAtom]))
+        
+        ## write symmetry data
+        
         
         outfile.close()
+        
+    def get_molecule_array(self):
+        """
+        Convert atomic numbers, positions and ptimization mask into input
+        array as used by MNDO.
+        """
+        Z = self.atoms.get_atomic_numbers()
+        xyz = self.atoms.positions
+        
+        if self.igeom == 1: # Cartesian
+            res = np.insert(np.insert(xyz, 0, Z, axis=1), (2,3,4), self.opt_mask)
+        elif self.igeom == 0: # internal
+            msg = "Using internal coordinates not supported yet!"
+            raise NotImplementedError(msg)
+        else:
+            msg  = "'coord_type' has to be 'Cartesian' or 'internal'"
+            msg += " (or equivalently 'igeom' has to be 1 or 0)!"
+            raise ValueError(msg)
+        return res
+        
         
     def set(self, **kwargs):
         changed_parameters = FileIOCalculator.set(self, **kwargs)
         if changed_parameters:
             self.reset()
-            self.write_dftb_in()
+            self.write_mndo_in()
     
     def check_state(self, atoms):
         system_changes = FileIOCalculator.check_state(self, atoms)
         return system_changes
     
     def write_input(self, atoms, properties=None, system_changes=None):
-        from ase.io import write
-        FileIOCalculator.write_input(\
-            self, atoms, properties, system_changes)
-        self.write_dftb_in()
-        write('geo_end.gen', atoms)
+        pass
     
     def read_results(self):
-        """ all results are read from results.tag file
-            It will be destroyed after it is read to avoid
-            reading it once again after some runtime error """
-        from os import remove
-        
-        myfile = open('results.tag', 'r')
+        myfile = open('PREFIX.out', 'r')
         self.lines = myfile.readlines()
+        myfile.close()
+        myfile = open('fort.15', 'r')
+        self.extra_lines = myfile.readlines()
         myfile.close()
         if self.first_time:
             self.first_time = False
             # line indices
-            estring, fstring = 'total_energy', 'forces   '
-            sstring, qstring = 'stress   ', 'gross_atomic_charges'
+            estring, fstring = 'SCF TOTAL ENERGY', ' CARTESIAN GRADIENT'
+            dstring, qstring = '', 'NET ATOMIC CHARGES AND'
             found_indices = [False,False,False,False]
             for iline, line in enumerate(self.lines):
-                if line.find(estring) >= 0:
-                    self.index_energy = iline + 1
-                    found_indices[0] = True
-                    continue
-                if line.find(fstring) >= 0:
-                    self.index_force_begin = iline + 1
-                    line1 = line.replace(':', ',')
-                    self.index_force_end = iline+1+int(line1.split(',')[-1])
-                    found_indices[1] = True
-                    continue
-                if line.find(sstring) >= 0:
-                    self.index_stress_begin = iline + 1
-                    self.index_stress_end = iline + 4
-                    found_indices[2] = True
-                    continue
-                if line.find(qstring) >= 0:
-                    self.index_charges_begin = iline + 1
-                    line1 = line.replace(':', ',')
-                    nqlines = (int(line1.split(',')[-1]) - 1)//3 + 1
-                    self.index_charges_end = iline + 1 + nqlines
-                    found_indices[3] = True
-                    continue
-                if all(found_indices): break
+            
             
         self.read_energy()
         if self.calculate_forces:
             self.read_forces()
-            if self.pbc: self.read_stress()
         
-        self.read_charges()
-        if self.writeDetOut: self.read_DetailedOut()
-        if self.CPAavail: self.read_CPA()
-        
-        os.remove('results.tag')
         
     
     def read_energy(self):
@@ -193,83 +323,6 @@ class Dftb(FileIOCalculator):
             raise RuntimeError('Problem in reading forces')
         
     
-    def read_stress(self):
-        """Read Stress from dftb output file (results.tag)."""
-        from ase.units import Hartree, Bohr
-        try:
-            _stress = []
-            for j in range(self.index_stress_begin, self.index_stress_end):
-                word = self.lines[j].split()
-                _stress.append([float(word[k]) for k in range(0, 3)])
-
-            # Convert 3x3 stress tensor to Voigt form (xx,yy,zz,yz,xz,xy)
-            # as required by ASE
-            _stress = np.array(_stress).flat[[0, 4, 8, 5, 2, 1]]
-            self.results['stress'] =  _stress * Hartree / Bohr
-        except:
-            raise RuntimeError('Problem in reading stress')
-        
-    
-    def read_charges(self):
-        """Read Charges from dftb output file (results.tag)."""
-        try:
-            _qstart = self.index_charges_begin
-            _qend = self.index_charges_end
-            _qtxt = " ".join(self.lines[_qstart:_qend])
-            _charges = np.array(_qtxt.split(), dtype=float)
-            self.results['charges'] = _charges
-        except:
-            raise RuntimeError('Problem in reading charges')
-        
-    
-    def read_DetailedOut(self):
-        """
-        Read energy components from detailed.out.
-        """
-        try:
-            fdet = open('detailed.out', 'r')
-            lines = fdet.readlines()
-            fdet.close()
-        except IOError:
-            msg = "No file 'detailed.out'. Something went terribly wrong."
-            raise RuntimeError(msg)
-        
-        read_properties = [False, False, False]
-        for line in lines:
-            if line.find('Total Electronic energy: ') >= 0:
-                self.E_el = float(line.split()[-2])
-                read_properties[0] = True
-                continue
-            if line.find('Repulsive energy:        ') >= 0:
-                self.E_rep = float(line.split()[-2])
-                read_properties[1] = True
-                continue
-            if line.find('Dispersion energy:       ') >= 0:
-                self.E_vdW = float(line.split()[-2])
-                read_properties[2] = True
-                continue
-            if all(read_properties): return
-        
-    
-    def read_CPA(self):
-        """
-        Read CPA ratios as returned by DFTB+, length = nAtoms
-        by Martin Stoehr, martin.stoehr@tum.de (Oct/20/2015)
-        """
-        try:
-            fCPA = open('CPA_ratios.out','r')
-            lines = fCPA.readlines()[1:]
-            fCPA.close()
-            CPA = np.zeros(len(self.atoms))
-            for iAtom in range(len(self.atoms)):
-                CPA[iAtom] = float(lines[iAtom].split()[-1])
-            self.CPA_ratios = CPA
-            return
-        except IOError:
-            msg = "No file 'CPA_ratios.out'. Something went terribly wrong."
-            raise RuntimeError(msg)
-        
-    
     def get_hirsh_volrat(self):
         """
         Return rescaling ratios for atomic polarizabilities (CPA ratios)
@@ -288,44 +341,6 @@ class Dftb(FileIOCalculator):
             return FileIOCalculator.get_stress(self, atoms)
         else:
             raise PropertyNotImplementedError
-        
-    
-    def get_dispersion_energy(self):
-        """"
-        Return van der Waals dispersion energy as obtained by MBD/TS scheme.
-        """
-        if not self.do_vdW:
-            raise ValueError('You did not specify a dispersion model.')
-        elif self.writeDetOut:
-            return self.E_vdW
-        else:
-            msg  = "Need to enable output of 'detailed.out' to get "
-            msg += 'dispersion energy'
-            raise ValueError(msg)
-       
-    
-    def get_electronic_energy(self):
-        """
-        Return electronic energy = EBS + EC (+ E3rd) in eV.
-        """
-        if self.writeDetOut:
-            return self.E_el
-        else:
-            msg  = "Need to enable output of 'detailed.out' to get "
-            msg += 'electronic energy'
-            raise ValueError(msg)
-        
-    
-    def get_repulsive_energy(self):
-        """
-        Return repulsive energy = Etot - EBS - EC (- E3rd) in eV.
-        """
-        if self.writeDetOut:
-            return self.E_rep
-        else:
-            msg  = "Need to enable output of 'detailed.out' to get "
-            msg += 'repulsive energy'
-            raise ValueError(msg)
         
     
 
