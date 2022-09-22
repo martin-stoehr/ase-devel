@@ -103,6 +103,11 @@ mndo_kwargs = {
     'nstart':'numerical',  # extrapol_1st_scf
     'nstep' :'numerical',  # extrapol_scf_step
     'ktitle':'numerical',  # title
+    'ifermi':'numerical',  # electronic_temp
+    'imode' :'numerical',  # two_e_int_storage
+    'ihcorr':[0,1],  # hbond_corr
+    'domega':'numerical',  # fomo_width
+    'nfloat':'numerical',  # fomo_n_orbs
 ## optimizer and force constant calcs
     'nrst'  :'numerical',  # reset_hessian_step
     'ldrop' :'numerical',  # restart_opt_thresh
@@ -159,7 +164,7 @@ kwargs_all = {
     'output_sybyl'          :[False,True,'stdout_only'], 
     'peptide_correction'    :[False,True],
     'hbond_dmax'            :'numerical', 
-    'external_field'        :[False,True],  ## add handling of field strength
+    'external_field'        :[False,True],
     'field_strength'        :'numerical', 
     'ext_field_scf'         :'numerical',
     'cutoff_3center_ovlp'   :'ftexp',
@@ -177,11 +182,11 @@ kwargs_all = {
     'ene_thresh'            :'exp', 
     'rho_thresh'            :'exp',
     'continuation'          :[False,'default',True,'newsettings'], 
-    'output_lvl_opt'        :[0,1,2,3,4],  ## 'default'=2
-    'output_lvl_force_const':[0,1,2,3,4],  ## 'default'=2
-    'output_lvl_vib'        :[0,1,2,3,4,5],  ## 'default'=3
-    'output_lvl_gradients'  :[0,1,2,3,4],  ## 'default'=1
-    'output_lvl_input'      :[0,1,2,3,4,5,6],  ## 'default'=1
+    'output_lvl_opt'        :[0,1,2,3,4],
+    'output_lvl_force_const':[0,1,2,3,4],
+    'output_lvl_vib'        :[0,1,2,3,4,5],
+    'output_lvl_gradients'  :[0,1,2,3,4],
+    'output_lvl_input'      :[0,1,2,3,4,5,6],
     'opt_lvl'               :'numerical',
     'opt_converge_type'     :[0,1,2,3,4],  ## TODO: translate!
     'init_hessian'          :['read4path','finite_diff','read','identity'], 
@@ -251,7 +256,12 @@ kwargs_all = {
     'extrapol_1st_scf'      :'ftnum', 
     'extrapol_scf_step'     :'numerical',
     'title'                 :'numerical', 
-    'reset_hessian'         :'numerical', 
+    'electronic_temp'       :'numerical',
+    'two_e_int_storage'     :'numerical',
+    'hbond_corr'            :[False, True],
+    'fomo_width'            :'numerical',
+    'fomo_n_orbs'           :'numerical',
+    'reset_hessian_step'    :'numerical', 
     'restart_opt_thresh'    :1/kcalmol,
     'update_d_restart'      :0.001, 
     'which_ls'              :['quadratic_fstmin','quadratic_locmin','cubic'], 
@@ -310,8 +320,38 @@ def h2mndo_val(hkey, hval):
             elif hkey == 'guess_from_frag':
                 if type(hval) == bool:
                     hval = 1 if hval else 0
-            elif hkey == 'nac_mode':
+            elif hkey in ['nac_mode', 'fomo_n_orbs']:
                 if hval == 'default': hval = 0
+            elif hkey == 'electronic_temp':
+                if hval == 'default': hval = 20000
+            elif hkey == 'two_e_int_storage':
+                if hval == 'default':
+                    hval = 0
+                elif hval == 'in_memory_mat_fock':
+                    hval = -2
+                elif hval == 'in_memory_mat_fockx':
+                    hval = -1
+                elif hval == 'in_memory_lin':
+                    hval = 1
+                elif hval.startswith('in_memory_lim'):
+                    try:
+                        lm6lim = int(hval.replace('in_memory_lim',''))
+                        hval = -lm6lim
+                    except:
+                        msg = "Unrecognized option for 'two_e_int_storage'."
+                        raise ValueError(msg)
+                elif hval.startswith('on_disk_size'):
+                    try:
+                        iosize = int(hval.replace('on_disk_size',''))
+                        hval = iosize
+                    except:
+                        msg = "Unrecognized option for 'two_e_int_storage'."
+                        raise ValueError(msg)
+                elif type(hval) == int:
+                    hval = hval
+            elif hkey == 'fomo_width':
+                #                             = 0.2 Ha
+                if hval == 'default': hval = 5.442277204873449
             elif hkey == 'diis_mode':
                 if type(hval) == bool:
                     hval = 1 if hval else -1
@@ -340,20 +380,20 @@ class Mndo(FileIOCalculator):
                  label='mndo_ase', atoms=None, kpts=None, **kwargs):
         """  Construct a MNDO calculator.  """
         
-        from os.path import exists as pexists
-        
-        
         self.default_parameters = dict(
             igeom=1,    # use Cartesian coordinates
         )
         
         ## handle complicated definition of field strength for external field
-        ext_field = kwargs.get('external_field', False)
+        ext_field = kwargs.pop('external_field', False)
         if ext_field:
-            field = kwargs.get('field_strength', 0)
+            field = kwargs.pop('field_strength', 0)
             if field != 0:
-                kwargs['external_field'] = round(a/10**floor(log10(a)))
-                kwargs['field_strength'] = -1*floor(log10(field))
+                kwargs['ifld1'] = round(a/10**floor(log10(a)))
+                kwargs['ifld2'] = -1*floor(log10(field))
+            elif field == 'default':
+                kwargs['ifld1'] = 1
+                kwargs['ifld2'] = 0
         
         ## translate human-readable to mndo kwargs and pop
         input_keys = list(kwargs.keys())
@@ -372,6 +412,8 @@ class Mndo(FileIOCalculator):
         
         self.first_time = True
         self.label = label
+        self.calc_info = {}
+        self.extra_properties = {}
         
     
     def set_atoms(self, atoms):
@@ -384,23 +426,23 @@ class Mndo(FileIOCalculator):
         """
 
         self.nAtoms = len(self.atoms)
-        self.pbc = np.any(self.atoms.pbc)
-        if self.pbc: raise NotImplementedError('PBC not supported')
+        pbc = np.any(self.atoms.pbc)
+        if pbc: raise NotImplementedError('PBC not supported')
         
         arg_str = ''
         title = self.parameters.pop('ktitle', ' MNDO calculation from ASE')
         if self.opt_mask is None: self.opt_mask = np.zeros((self.nAtoms,3))
         for key, val in self.parameters.items():
             if key not in mndo_kwargs: continue
-            test_len = len(key)+len(str(val))+3
-            if (len(arg_str) + test_len > 78): arg_str += ' +\n'
+            test_len = len(key)+len(str(val))
+            if (len(arg_str) + test_len > 75): arg_str += ' +\n'
             arg_str += key+'='+str(val)+' '
         
         if arg_str.count('+\n')>10: raise ValueError('Too many inputs!')
         inp = open('asejob_mndo.inp', 'w')
         inp.write(arg_str+'\n')
         inp.write('{0:76s}'.format(title.replace('\n',' ')))
-        inp.write('\n#Generated by ASE\n')
+        inp.write('\n## Generated by ASE\n')
         
         ## write geometry
         arr = self.get_molecule_array()
@@ -411,7 +453,7 @@ class Mndo(FileIOCalculator):
         
         
         ## write symmetry data
-        #TODO, but do we need this to run?
+        ## TODO!
         
         inp.close()
         
@@ -453,8 +495,7 @@ class Mndo(FileIOCalculator):
         
     def set(self, **kwargs):
         changed_parameters = FileIOCalculator.set(self, **kwargs)
-        if changed_parameters:
-            self.reset()
+        if changed_parameters: self.reset()
         return changed_parameters
     
     def check_state(self, atoms):
@@ -474,26 +515,86 @@ class Mndo(FileIOCalculator):
             fstring = '      GRADIENTS (KCAL'
             qstring = 'NET ATOMIC CHARGES AND'
             dstring = ' DIPOLE     '
-            found_indices = [False,False,False,False]
+            heat_of_formation_str = ['SCF HEAT OF FORMATION   ']
+            electronic_energy_str = ['ELECTRONIC ENERGY       ']
+            nuclear_energy_str    = ['NUCLEAR ENERGY          ']
+            ionization_energy_str = ['IONIZATION ENERGY       ']
+            point_group_str = ['   POINT GROUP ', ' ASSIGNED.']
+            scf_cycles_str  = ' SCF CYCLES           '
+            timing_ene_str  = ' TIME FOR ENERGY EVALUATION    '
+            timing_grad_str = ' TIME FOR GRADIENT EVALUATION  '
+            timing_tot_str  = 'COMPUTATION TIME      '
+            
+            found = {'energy':False, 'forces':False, 'charges':False,
+                     'dipole':False}
+            found_extra = {'heat_of_formation':False, 'electronic_energy':False,
+                           'nuclear_energy':False,    'ionization_energy':False, 
+                           'point_group':False}
+            found_info = {'scf_cycles':False,        'timing_ene':False, 
+                          'timing_grad':False,       'timing_tot':False}
+            
             for i, line in enumerate(outlines):
                 if estring in line:
                     lenergy = line
-                    found_indices[0] = True
-                elif fstring in line:
+                    found['energy'] = True
+                    continue
+                ## molecule might contain ghost atoms -> read twice the lines
+                if fstring in line:
                     lforces = outlines[i+4:i+4+2*self.nAtoms]
-                    found_indices[1] = True
-                elif qstring in line:
+                    found['forces'] = True
+                    continue
+                ## molecule might contain ghost atoms -> read twice the lines
+                if qstring in line:
                     lcharges = outlines[i+4:i+4+2*self.nAtoms]
-                    found_indices[2] = True
-                elif dstring in line:
+                    found['charges'] = True
+                    continue
+                ## depending on settings MNDO might output more details here
+                ## -> read more lines and find "SUM" entry
+                if dstring in line:
                     ldipole = outlines[i+2:i+10]
-                    found_indices[3] = True
+                    found['dipole'] = True
+                    continue
+                ## read extra properties
+                for prop in found_extra.keys():
+                    search_str = eval(prop+'_str')
+                    if all(i in line for i in search_str):
+                        exec(prop+'_line = line')
+                        found_extra[prop] = True
+                ## read info
+                for prop in found_info.keys():
+                    search_str = eval(prop+'_str')
+                    if search_str in line:
+                        exec(prop+'_line = line')
+                        found_info[prop] = True
+                            
+            for prop in ['energy','forces','charges','dipole']:
+                if found[prop]: exec('self.read_'+prop+'(l'+prop+')')
             
-            for i, prop in enumerate(['energy','forces','charges','dipole']):
-                if found_indices[i]: exec('self.read_'+prop+'(l'+prop+')')
+            indices_extra = {'heat_of_formation':-2, 'electronic_energy':-2,
+                             'nuclear_energy':-2,    'ionization_energy':-2,
+                             'point_group':-2}
+            type_extra = {'heat_of_formation':'float', 'electronic_energy':'float',
+                          'nuclear_energy':'float',    'ionization_energy':'float',
+                          'point_group':'str'}
+            
+            for prop in found_extra.keys():
+                if found_extra[prop]:
+                    idx = str(indices_extra[prop])
+                    lin = eval(prop+'_line')
+                    self.read_extra(prop, lin, idx, type_extra[prop])
+            
+            indices_info = {'scf_cycles':-1,        'timing_ene':-2,
+                            'timing_grad':-2,       'timing_tot':-2}
+            type_info = {'scf_cycles':'int',          'timing_ene':'float',
+                         'timing_grad':'float',       'timing_tot':'float'}
+            
+            for prop in found_info.keys():
+                if found_info[prop]:
+                    idx = str(indices_info[prop])
+                    lin = eval(prop+'_line')
+                    self.read_info(prop, lin, idx, type_info[prop])
         
         
-    
     def read_energy(self, output_line):
         """Read energy from line of MNDO output"""
         try:
@@ -544,6 +645,50 @@ class Mndo(FileIOCalculator):
             raise RuntimeError('Problem reading dipole')
         
     
+    def read_extra(self, prop, prop_line, idx, prop_type):
+        """ Read extra property from one-line output line """
+        try:
+            res = eval(prop_type+'(prop_line.split()['+idx+'])')
+            if prop == 'heat_of_formation': res *= kcalmol
+            self.extra_properties[prop] = res
+        except:
+            raise RuntimeError('Proplem reading '+prop)
+        
+    def read_info(self, info, info_line, idx, info_type):
+        """ Read info from one-line output line """
+        try:
+            self.calc_info[info] = eval(info_type+'(info_line.split()['+idx+'])')
+        except:
+            raise RuntimeError('Proplem reading '+info)
+        
+    
+    def get_info(self, name):
+        """
+        Return extra info on calculation including <name>=
+            . scf_cycles:  number of SCF cycles
+            . timing_tot:  total computation time in seconds
+            . timing_ene:  computation time for energy in seconds
+            . timing_grad: computation time for gradients in seconds
+        """
+        info = self.calc_info.get(name.lower(), None)
+        if info is None:
+            raise NotImplementedError("Sorry, '"+name+"' is not available.")
+        return info
+        
+    def get_extra_property(self, name):
+        """
+        Return extra quantity available from calculation, such as <name>=
+            . point_group:       Point group assigned to system by MNDO
+            . heat_of_formation: heat of formation in eV
+            . electronic_energy: electronic part of total energy in eV
+            . nuclear_energy:    nuclear part of total energy in eV
+            . ionization_energy: ionization potential in eV
+        """
+        prop = self.extra_properties.get(name.lower(), None)
+        if prop is None:
+            raise NotImplementedError("Sorry, '"+name+"' is not available.")
+        return prop
+    
     def get_hirsh_volrat(self):
         """
         Return rescaling ratios for atomic polarizabilities (CPA ratios)
@@ -551,17 +696,14 @@ class Mndo(FileIOCalculator):
         if hasattr(self, 'CPA_ratios'):
             return self.CPA_ratios
         else:
-            msg  = "Could not obtain CPA ratios. You  need to specify the "
-            msg += "MBD or TS dispersion model and set "
-            msg += "Options_WriteCPA = 'Yes'"
-            raise PropertyNotImplementedError(msg)
+            msg  = "Could not obtain CPA ratios. "
+            msg += "This might be implemented in a future version."
+            raise NotImplementedError(msg)
         
     
     def get_stress(self, atoms):
-        if self.calculate_forces and self.pbc:
-            return FileIOCalculator.get_stress(self, atoms)
-        else:
-            raise PropertyNotImplementedError
+        msg = 'PBC and thus stress not available (yet).'
+        raise NotImplementedError(msg)
         
     
 
