@@ -98,7 +98,7 @@ mndo_kwargs = {
     'ifast' :[0,1,2],  # pseudodiagonalization
     'idiag' :[0,1,2,3,4,5,6,7,8,9],  # diagonalizer
     'ksym'  :[0,1],  # symmetry
-    'numsym':[0,1,2,3,4,5,6,8,10,12,24],  # symmetry_num
+    'numsym':[0,1,2,3,4,5,6,8,10,12,24],  # symmetry_group
     'kci'   :[-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8],  # post_hf
     'nstart':'numerical',  # extrapol_1st_scf
     'nstep' :'numerical',  # extrapol_scf_step
@@ -108,6 +108,9 @@ mndo_kwargs = {
     'ihcorr':[0,1],  # hbond_corr
     'domega':'numerical',  # fomo_width
     'nfloat':'numerical',  # fomo_n_orbs
+    'ici1'  :'numerical',  # nci_states_occ
+    'ici2'  :'numerical',  # nci_states_unocc
+    'ioutci':[-10,0,1,2,3,4,5,6],  # ci_output_lvl
 ## optimizer and force constant calcs
     'nrst'  :'numerical',  # reset_hessian_step
     'ldrop' :'numerical',  # restart_opt_thresh
@@ -231,18 +234,18 @@ kwargs_all = {
                               'add_info_interp'], 
     'save_scf'              :[False,'rdm','evecs','rdm_evecs'], 
     'scf_type'              :['fomo-rhf','smear-rhf','fo-rhf','read_irrep-rhf',
-                              'expl_occ-rhf','default-rhf','default',
-                              'default-uhf','expl_occ-uhf','read_irrep-uhf',
+                              'expl_occ-rhf','rhf','default',
+                              'uhf','expl_occ-uhf','read_irrep-uhf',
                               'fo-uhf','smear-uhf'], 
     'max_scf'               :'numerical', 
-    'output_lvl_scf'        :[0,1,2,3,4,5],
+    'output_lvl'            :[0,1,2,3,4,5],
     'pseudodiagonalization' :[True,'post_full',False], 
     'diagonalizer'          :['default','eispack_lin','eispack_square',
                               'lapack_lin','lapack_linx','lapack_square',
                               'lapack_squarex','lapack_lind','lapack_packed',
                               'eispack-based'], 
     'symmetry'              :[False,True], 
-    'symmetry_num'          :['auto','c1,ci,cs,c0v','c2,c2v,c2h,d0h',
+    'symmetry_group'        :['auto','c1,ci,cs,c0v','c2,c2v,c2h,d0h',
                               'c3,c3v,c3h,s6','c4,c4v,c4h,d2,d2d,d2h',
                               'c5,c5v,c5h','c6,c6v,c6h,d3,d3d,d3h',
                               'd4,d4d,d4h','d5,d5d,d5h','d6,d6d,d6h,t,td',
@@ -261,6 +264,9 @@ kwargs_all = {
     'hbond_corr'            :[False, True],
     'fomo_width'            :'numerical',
     'fomo_n_orbs'           :'numerical',
+    'nci_states_occ'        :'numerical',
+    'nci_states_unocc'      :'numerical',
+    'ci_output_lvl'         :[0,1,2,3,4,5,6,7],
     'reset_hessian_step'    :'numerical', 
     'restart_opt_thresh'    :1/kcalmol,
     'update_d_restart'      :0.001, 
@@ -285,19 +291,24 @@ h2mndo_key = dict(zip(kwargs_all.keys(), mndo_kwargs.keys()))
 
 ## convert human-readable values of kwargs to mndo values
 def h2mndo_val(hkey, hval):
-    hkey, hval = hkey.lower(), hval.lower()
+    hkey = hkey.lower()
+    if type(hval) == str: hval = hval.lower()
     hval_list = kwargs_all[hkey]
     mkey = h2mndo_key[hkey]
     mval_list = mndo_kwargs[mkey]
     if type(mval_list) == list:
-        if hkey in ['output_lvl_opt','output_lvl_force_const']:
-            if hval == 'default': hval = 2
-        elif hkey == 'output_lvl_vib':
-            if hval == 'default': hval = 3
+        if hkey == 'symmetry_group':
+            for i, s in enumerate(hval_list):
+                if any(hval==num for num in s.split(',')): idx = i
         elif hkey in ['output_lvl_gradients','output_lvl_input']:
-            if hval == 'default': hval = 1
-        
-        return mval_list[hval_list.index(hval)]
+            if hval == 'default': return 1
+        elif hkey in ['output_lvl_opt','output_lvl_force_const']:
+            if hval == 'default': return 2
+        elif hkey == 'output_lvl_vib':
+            if hval == 'default': return 3
+        else:
+            idx = hval_list.index(hval)
+        return mval_list[idx]
     elif mval_list == 'numerical':
         if type(hval_list) == float:
             return hval*hval_list
@@ -363,9 +374,9 @@ def h2mndo_val(hkey, hval):
 
 
 
-## fix input format to unformatted
-iform = 1
-
+## fix input format to unformatted and force SYBYL output file
+iform  = 1
+nsav16 = 1
 
 class Mndo(FileIOCalculator):
     """  A MNDO calculator with ase-FileIOCalculator nomenclature  """
@@ -404,11 +415,30 @@ class Mndo(FileIOCalculator):
         for key, val in self.default_parameters.items():
             if not key in kwargs.keys(): kwargs[key] = val
         
-        kwargs['iform'] = iform
+        kwargs['iform']  = iform
+        kwargs['nsav16'] = nsav16
         self.opt_mask = kwargs.pop('opt_mask', None)
         
         FileIOCalculator.__init__(self, restart, ignore_bad_restart_file,
                                   label, atoms, **kwargs)
+        
+        ## correlated method not available for (full) UHF
+        scf_flag = self.parameters.get('iuhf', 0)
+        post_hf = self.parameters.get('kci', 0)
+        if (post_hf > 0) and (scf_flag > 0):
+            err_msg  = "Correlated methods only available for RHF "
+            err_msg += "('scf_type'=*-rhf or 'iuhf'<0).\n"
+            err_msg += "For open-shell systems your best option is "
+            err_msg += "'scf_type'='default' (or 'iuhf'=0), which "
+            err_msg += "defaults to half-electron ROHF for open-shell "
+            err_msg += "and to RHF for closed-shell."
+            raise NotImplementedError(err_msg)
+        
+        ## FOMO only available (and meaningful) in conjunction with GUGACI
+        if scf_flag == 6:
+            raise NotImplementedError("FOMO not available with UHF")
+        if (scf_flag == -6) and not (post_hf == 5):
+            raise NotImplementedError("FOMO only available with GUGA-CI")
         
         self.first_time = True
         self.label = label
@@ -506,47 +536,49 @@ class Mndo(FileIOCalculator):
         self.write_mndo_in()
     
     def read_results(self):
-        myfile = open(self.label+'.out', 'r')
-        outlines = myfile.readlines()
-        myfile.close()
+        ## check for convergence
+        outlines = self.try_read_outfile()
+        syblines = self.try_read_sybfile(outlines[-20:])
         if self.first_time:
             self.first_time = False
-            estring = ' SCF TOTAL ENERGY '
+            lcharges = syblines[1:self.nAtoms+1]
+            found = {'charges':True}
+            search1 = 'HOMOs,LUMOs'
+            search2 = 'HF,IP,ETOT'
+            for k in ['energies','homo_lumo_gap']: found[k] = False
+            for line in syblines[self.nAtoms+1:]:
+                if all(found.values()): break
+                if search1 in line:
+                    lhomo_lumo_gap = line
+                    found['homo_lumo_gap'] = True
+                elif search2 in line:
+                    lenergies = line
+                    found['energies'] = True
+            
+            for i in ['16','91']: os.remove('fort.'+i)
+        
+            ## find remaining info in output file
             fstring = '      GRADIENTS (KCAL'
-            qstring = 'NET ATOMIC CHARGES AND'
-            dstring = ' DIPOLE     '
-            heat_of_formation_str = ['SCF HEAT OF FORMATION   ']
+            dstring = ' DIPOLE              X'
             electronic_energy_str = ['ELECTRONIC ENERGY       ']
             nuclear_energy_str    = ['NUCLEAR ENERGY          ']
-            ionization_energy_str = ['IONIZATION ENERGY       ']
             point_group_str = ['   POINT GROUP ', ' ASSIGNED.']
             scf_cycles_str  = ' SCF CYCLES           '
             timing_ene_str  = ' TIME FOR ENERGY EVALUATION    '
             timing_grad_str = ' TIME FOR GRADIENT EVALUATION  '
             timing_tot_str  = 'COMPUTATION TIME      '
             
-            found = {'energy':False, 'forces':False, 'charges':False,
-                     'dipole':False}
-            found_extra = {'heat_of_formation':False, 'electronic_energy':False,
-                           'nuclear_energy':False,    'ionization_energy':False, 
+            for k in ['forces','dipole']: found[k] = False
+            found_extra = {'electronic_energy':False, 'nuclear_energy':False,
                            'point_group':False}
             found_info = {'scf_cycles':False,        'timing_ene':False, 
                           'timing_grad':False,       'timing_tot':False}
             
             for i, line in enumerate(outlines):
-                if estring in line:
-                    lenergy = line
-                    found['energy'] = True
-                    continue
                 ## molecule might contain ghost atoms -> read twice the lines
                 if fstring in line:
                     lforces = outlines[i+4:i+4+2*self.nAtoms]
                     found['forces'] = True
-                    continue
-                ## molecule might contain ghost atoms -> read twice the lines
-                if qstring in line:
-                    lcharges = outlines[i+4:i+4+2*self.nAtoms]
-                    found['charges'] = True
                     continue
                 ## depending on settings MNDO might output more details here
                 ## -> read more lines and find "SUM" entry
@@ -566,15 +598,13 @@ class Mndo(FileIOCalculator):
                     if search_str in line:
                         exec(prop+'_line = line')
                         found_info[prop] = True
-                            
-            for prop in ['energy','forces','charges','dipole']:
+                    
+            for prop in ['charges','energies','homo_lumo_gap','forces','dipole']:
                 if found[prop]: exec('self.read_'+prop+'(l'+prop+')')
             
-            indices_extra = {'heat_of_formation':-2, 'electronic_energy':-2,
-                             'nuclear_energy':-2,    'ionization_energy':-2,
+            indices_extra = {'electronic_energy':-2,   'nuclear_energy':-2,
                              'point_group':-2}
-            type_extra = {'heat_of_formation':'float', 'electronic_energy':'float',
-                          'nuclear_energy':'float',    'ionization_energy':'float',
+            type_extra = {'electronic_energy':'float', 'nuclear_energy':'float',
                           'point_group':'str'}
             
             for prop in found_extra.keys():
@@ -595,12 +625,44 @@ class Mndo(FileIOCalculator):
                     self.read_info(prop, lin, idx, type_info[prop])
         
         
-    def read_energy(self, output_line):
-        """Read energy from line of MNDO output"""
+    def try_read_outfile(self):
         try:
-            self.results['energy'] = float(output_line.split()[-2])
+            with open(self.label+'.out', 'r') as f: lines = f.readlines()
+        except FileNotFoundError:
+            err_msg  = "Couldn't find file '"+self.label
+            err_msg += ".out'. Something went terribly wrong!"
+            raise RuntimeError(err_msg)
+        return lines
+    
+    def try_read_sybfile(self,tail_of_output_file):
+        nmax = self.parameters.get('kitscf', 200)
+        try:
+            ## read heat of formation, energy, charges, IP, HOMO-LUMO
+            ## from SYBYL file (then remove for future calculations)
+            with open('fort.16', 'r') as f: lines = f.readlines()
+        except FileNotFoundError:
+            scf_fail = False
+            for line in tail_of_output_file[-20:]:
+                if line.strip() == '': continue
+                if "UNABLE TO ACHIEVE SCF CONVERGENCE" in line: scf_fail = True
+            if scf_fail:
+                err_msg = "Calculation failed. Unable to achieve SCF convergence."
+            else:
+                err_msg  = "No SYBYL output file generated.\nYou probably chose "
+                err_msg += "incompatible input options or something unknown "
+                err_msg += "went terribly wrong."
+            raise RuntimeError(err_msg)
+        return lines
+    
+    def read_energies(self, output_line):
+        """Read heat of formation, IP, energy from line of SYBYL output"""
+        try:
+            es = [float(i) for i in output_line.split()[:3]]
+            self.extra_properties['heat_of_formation'] = es[0] * kcalmol
+            self.extra_properties['ionization_energy'] = es[1]
+            self.results['energy'] = es[2]
         except:
-            raise RuntimeError('Problem reading energy')
+            raise RuntimeError('Problem reading energies')
     
     def read_forces(self, output_lines):
         """Read forces from lines of MNDO output"""
@@ -622,16 +684,18 @@ class Mndo(FileIOCalculator):
         """Read net atomic charges from lines of MNDO output"""
         try:
             _charges = []
-            for line in output_lines:
-                if len(line.split())==0: break
-                if line.split()[0] not in self.atoms.get_chemical_symbols():
-                    continue
-                _charges.append(line.split()[2])
-            
-            assert len(_charges)==self.nAtoms, 'Problem reading atomic charges'
+            for line in output_lines: _charges.append(line.split()[-1])
             self.results['charges'] = np.array(_charges, dtype=float)
         except:
             raise RuntimeError('Problem reading atomic charges')
+        
+    def read_homo_lumo_gap(self, output_line):
+        """Read HOMO and LUMO energy and compute HOMO-LUMO gap"""
+        try:
+            eps = [float(i) for i in output_line.split()[1:3]]
+            self.extra_properties['homo_lumo_gap'] = eps[1] - eps[0]
+        except:
+            raise RuntimeError('Problem reading HOMO-LUMO gap')
         
     def read_dipole(self, output_lines):
         """Read molecular dipole from lines of MNDO output"""
@@ -683,6 +747,7 @@ class Mndo(FileIOCalculator):
             . electronic_energy: electronic part of total energy in eV
             . nuclear_energy:    nuclear part of total energy in eV
             . ionization_energy: ionization potential in eV
+            . homo_lumo_gap:     HOMO-LUMO gap in eV
         """
         prop = self.extra_properties.get(name.lower(), None)
         if prop is None:
@@ -706,5 +771,4 @@ class Mndo(FileIOCalculator):
         raise NotImplementedError(msg)
         
     
-
 #--EOF--#

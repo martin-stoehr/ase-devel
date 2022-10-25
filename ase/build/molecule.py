@@ -6,12 +6,56 @@ def molecule(name, vacuum=None, **kwargs):
     if name in extra:
         kwargs.update(extra[name])
         mol = Atoms(**kwargs)
-    else:
+    elif name in g2.names:
         mol = g2[name]
-        if kwargs:
-            mol = Atoms(mol, **kwargs)
+        if kwargs: mol = Atoms(mol, **kwargs)
+    elif 'n-alkane_' in name:
+        mol = build_n_alkane(name)
+    else:
+        raise ValueError("Molecule '"+name+"' not known.")
     if vacuum is not None:
         mol.center(vacuum=vacuum)
+    return mol
+
+
+def build_n_alkane(name):
+    err_msg  = "Input 'name' has to be of form 'n-alkane_<d>' "
+    err_msg += "with <d> an integer number!"
+    if not 'n-alkane_' in name: raise ValueError(err_msg)
+    try:
+        n = int(name.replace('n-alkane_',''))
+    except ValueError:
+        raise ValueError(err_msg)
+    
+    assert (n>1), "Number of carbon atoms has to be at least 2."
+    dy = 1.266857
+    CH3_i  = Atoms('CH3', positions=([[0.,        0.,       -0.423951],
+                                      [0.,       -0.899293,  0.198301],
+                                      [0.883619, -0.037377, -1.06817 ],
+                                      [-0.883619, -0.037377, -1.06817 ]]))
+    CH2_o  = Atoms('CH2', positions=([[ 0.      , 0.      ,  0.423951],
+                                      [-0.876898, 0.      ,  1.080948],
+                                      [ 0.876898, 0.      ,  1.080948]]))
+    CH2_e = CH2_o.copy()
+    CH2_e.positions[:,2] *= -1
+    CH3_fo = CH3_i.copy()
+    CH3_fo.positions[:,1:] *= -1
+    CH3_fo.positions[:,1]  += dy
+    CH3_fe = CH3_fo.copy()
+    CH3_fe.positions[:,2] *= -1
+    
+    ch2_group = [CH2_e, CH2_o]
+    mol, my_dy, j = CH3_i, 0., 0
+    for i in range(1,n-1):
+        my_dy, j = i*dy, i%2
+        new_ch2 = ch2_group[j].copy()
+        new_ch2.positions[:,1] += my_dy
+        mol = mol + new_ch2
+    
+    new_cap = CH3_fe if j else CH3_fo
+    new_cap.positions[:,1] += my_dy
+    mol += new_cap
+    
     return mol
 
 
